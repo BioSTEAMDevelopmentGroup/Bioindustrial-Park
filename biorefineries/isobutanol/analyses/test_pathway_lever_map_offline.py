@@ -94,6 +94,40 @@ check('baseline isobutanol segment == native Adh6 pool r17 (Ehrlich off)',
 check('baseline isobutanol + rest == Phi_M',
       abs(seg['isobutanol'] + seg['rest'] - float(base['Phi_M'])) < 1e-9)
 
+# --- renders to a temp PNG/PDF without error -------------------------------
+import tempfile
+
+sets = [base,
+        _campaign('IBO titer', objective='IBO titer',
+                  k_13=3.2, k_14=1.4, k_15=1.2, k_16_rel=1.5, glycolysis=1.6,
+                  inhib_ethanol=0.8, **{'IBO titer': 35.0, 'EtOH titer': 40.0,
+                                        'IRR': 0.10}),
+        _campaign('EtOH titer', objective='EtOH titer',
+                  k_6_rel=2.1, glycolysis=1.8,
+                  **{'IBO titer': 1.0, 'EtOH titer': 190.0, 'IRR': 0.05}),
+        _campaign('Financial', objective='PI (log-tail)',
+                  k_13=1.0, k_16_rel=1.2, glycolysis=1.3,
+                  **{'IBO titer': 33.0, 'EtOH titer': 63.0, 'IRR': 0.27})]
+# Task-2-local fallbacks (replaced by ps.pathway_colors / ps.pathway_helpers in Task 4):
+colors = {id(s): (ps.BASELINE_COLOR if s.get('is_baseline') else ps.HUE_COLORS[i])
+          for i, s in enumerate(sets)}
+helpers = dict(_mathify=ps._mathify, _bold_axis_title=ps._bold_axis_title,
+               _inward_top_right_ticks=ps._inward_top_right_ticks,
+               apply_fonts=ps.apply_fonts, FONTS=ps.FONTS,
+               STEP_ENZYME=ps.STEP_ENZYME, STEP_PARAMS=ps.STEP_PARAMS,
+               REACTION_LABELS=ps.REACTION_LABELS, FEED_LABELS=ps.FEED_LABELS,
+               FEED_DRAW_VARS=ps.FEED_DRAW_VARS,
+               BURDEN_CATEGORIES=ps.BURDEN_CATEGORIES,
+               BASELINE_COLOR=ps.BASELINE_COLOR, HUE_COLORS=ps.HUE_COLORS,
+               CLAMP_NEG_TO_ZERO=ps.CLAMP_NEG_TO_ZERO, BASELINE_A=ps.BASELINE_A)
+with tempfile.TemporaryDirectory() as td:
+    stem = os.path.join(td, 'lever_map')
+    out = plm.plot_pathway_lever_map(sets, colors, stem, ko=ps.ko, eb=eb,
+                                     helpers=helpers, dpi=90)
+    check('render returns out_stem', out == stem)
+    check('render wrote PNG', os.path.isfile(stem + '.png'))
+    check('render wrote PDF', os.path.isfile(stem + '.pdf'))
+
 n_fail = sum(1 for _n, ok in checks if not ok)
 print()
 if n_fail:
