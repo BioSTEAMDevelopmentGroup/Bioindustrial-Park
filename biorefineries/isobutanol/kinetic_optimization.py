@@ -113,7 +113,8 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'SIMULATED_STATES', 'trajectory_resume_state', 'AnnealingResult',
            'run_kinetic_dual_annealing',
            'SPLIT12D_STUDY_TARGET_PRODUCTS', 'SPLIT12D_STUDY_TYPE',
-           'split12d_trajectory_path', 'read_trajectory_row',)
+           'split12d_trajectory_path', 'read_trajectory_row',
+           'REPRODUCTION_MODES', 'reconstruct_trial_kinetics',)
 
 FEEDING_VARIABLES = ('threshold_conc', 'target_delta', 'spike_delta',
                      'max_n_spikes')
@@ -5385,3 +5386,85 @@ def read_trajectory_row(csv_path, trial_number):
             if numbers else 'no rows')
     raise KeyError(f'trial_number {trial_number} is not in {csv_path}; '
                    f'available trial numbers: {span}')
+
+#: How reconstruct_trial_kinetics obtains the group MEMBER values:
+#: 'rederive' = expand_grouped_values on the recorded multipliers (preset
+#: references + the anchor's live baselines); 'replay' = the recorded
+#: applied_<member> columns; 'both' = re-derive, cross-check against the
+#: replay, simulate the RE-DERIVED values.
+REPRODUCTION_MODES = ('rederive', 'replay', 'both')
+
+def _relative_delta(a, b):
+    """|a - b| / max(|a|, |b|); 0.0 when both are 0. Python floats only."""
+    scale = max(abs(a), abs(b))
+    return 0.0 if scale == 0.0 else abs(a - b)/scale
+
+def reconstruct_trial_kinetics(row, search_space, parameter_groups,
+                               kinetic_baselines, group_references=None, *,
+                               mode='both', cross_check_tol=1e-6):
+    """(values, applied, cross_check) for one RAW trajectory row
+    (read_trajectory_row). `values` is the decision dict in `search_space`
+    order (int(float(.)) for an 'int' entry -- max_n_spikes -- else float);
+    `applied` is what reaches the model: every non-group entry of `values`
+    passed through plus the group MEMBERS (group keys dropped) -- from
+    expand_grouped_values for mode 'rederive' / 'both', from the recorded
+    applied_<member> columns for 'replay'. 'both' compares the two per
+    member (relative delta > `cross_check_tol` -> an entry in
+    cross_check['mismatches'] and a RuntimeWarning: the expected signal
+    when the study ran under another anchor / reference than the one
+    passed, e.g. a pre-2026-09-16 B-anchored split_12d store) and returns
+    the RE-DERIVED values. cross_check = dict(mode, simulated ('rederive' |
+    'replay'), max_rel_delta (None unless 'both'), mismatches [(member,
+    rederived, replayed, rel_delta)]). ValueError: unknown mode; a blank /
+    missing decision column; (replay / both) a blank / missing
+    applied_<member> column. Pure."""
+    if mode not in REPRODUCTION_MODES:
+        raise ValueError(f'mode {mode!r} not in {REPRODUCTION_MODES}')
+    groups = {str(group): list(members)
+              for group, members in dict(parameter_groups or {}).items()}
+    blank = [name for name in search_space if row.get(name) in (None, '')]
+    if blank:
+        raise ValueError(f'trial row {row.get("trial_number")!r} has no value '
+                         f'for decision column(s) {blank}: not a row of this '
+                         'search space')
+    values = {name: (int(float(row[name])) if entry.get('int')
+                     else float(row[name]))
+              for name, entry in search_space.items()}
+    members = [member for group_members in groups.values()
+               for member in group_members]
+    rederived = replayed = None
+    if mode in ('rederive', 'both'):
+        rederived = expand_grouped_values(values, groups, kinetic_baselines,
+                                          group_references)
+    if mode in ('replay', 'both'):
+        absent = [f'applied_{member}' for member in members
+                  if row.get(f'applied_{member}') in (None, '')]
+        if absent:
+            raise ValueError(f'mode={mode!r} needs the recorded applied_* '
+                             f'columns, but the trial row lacks {absent}; '
+                             "use mode='rederive'")
+        replayed = {name: value for name, value in values.items()
+                    if name not in groups}
+        for member in members:
+            replayed[member] = float(row[f'applied_{member}'])
+    mismatches, max_rel_delta = [], None
+    if mode == 'both':
+        max_rel_delta = 0.0
+        for member in members:
+            rel = _relative_delta(rederived[member], replayed[member])
+            max_rel_delta = max(max_rel_delta, rel)
+            if rel > cross_check_tol:
+                mismatches.append((member, rederived[member],
+                                   replayed[member], rel))
+                warnings.warn(
+                    f'trial {row.get("trial_number")}: re-derived {member} = '
+                    f'{rederived[member]:.9g} differs from the recorded '
+                    f'applied_{member} = {replayed[member]:.9g} (rel '
+                    f'{rel:.3g} > {cross_check_tol:g}); the study likely ran '
+                    'under a different anchor / group reference. Simulating '
+                    'the RE-DERIVED value.', RuntimeWarning, stacklevel=2)
+    applied = replayed if mode == 'replay' else rederived
+    cross_check = dict(mode=mode,
+                       simulated='replay' if mode == 'replay' else 'rederive',
+                       max_rel_delta=max_rel_delta, mismatches=mismatches)
+    return values, applied, cross_check

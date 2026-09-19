@@ -6601,4 +6601,96 @@ else:
 PASS('trial reproduction: preset guard on the basename, CSV path resolution, '
      'row selection by int(float(trial_number)), KeyError with the range')
 
+#%% 97. reconstruct_trial_kinetics on a SYNTHETIC fixture row (a hand-written
+# trajectory CSV with known decision + applied_* columns and a stub
+# group_references): 'rederive' recomputes the members (reference x m for
+# the referenced ehrlich_downstream group, live baseline x m for
+# inhib_ethanol), 'replay' reads the recorded applied_* columns, 'both'
+# agrees and simulates the RE-DERIVED values; a perturbed applied_* column
+# lands in the mismatch list with a RuntimeWarning; replay / both without
+# applied_* columns raise; max_n_spikes is parsed int(float(.)).
+import warnings as _warnings97
+kb97 = {'k_3': 10.0, 'k_13': 0.0, 'k_14': 0.0, 'k_15': 0.0, 'k_16': 0.0, 'k_1ie': 0.02}
+groups97 = {'ehrlich_downstream': ['k_14', 'k_15', 'k_16'], 'inhib_ethanol': ['k_1ie']}
+refs97 = {'ehrlich_downstream': {'k_14': 1.0, 'k_15': 1.015, 'k_16': 1.015*0.866}}
+space97, _ = ko.build_search_space(
+    kb97, param_bounds_override={'k_13': (1e-3, 4.0)},
+    parameter_groups=groups97,
+    group_multiplier_bounds={'ehrlich_downstream': (1e-3, 4.0)},
+    group_references=refs97, spike_delta_bounds=None)
+assert list(space97) == ['k_3', 'k_13', 'ehrlich_downstream', 'inhib_ethanol',
+                         'threshold_conc', 'target_delta', 'max_n_spikes']
+m97, i97 = 0.73, 0.8
+header97 = ['trial_number', 'state', *space97, 'objective',
+            'applied_k_14', 'applied_k_15', 'applied_k_16', 'applied_k_1ie', 'error']
+cells97 = ['7', 'COMPLETE', repr(2.5), repr(2.0), repr(m97), repr(i97),
+           repr(219.4), repr(5.0), '11.0', repr(0.25),
+           repr(1.0*m97), repr(1.015*m97), repr(1.015*0.866*m97), repr(0.02*i97), '']
+dir97 = tempfile.mkdtemp()
+csv97 = os.path.join(dir97, 'fixture_trajectory.csv')
+with open(csv97, 'w', newline='') as f97:
+    w97 = _csv96.writer(f97)
+    w97.writerow(header97)
+    w97.writerow(cells97)
+row97 = ko.read_trajectory_row(csv97, 7)
+expected97 = {'k_3': 2.5, 'k_13': 2.0, 'k_14': 1.0*m97, 'k_15': 1.015*m97,
+              'k_16': 1.015*0.866*m97, 'k_1ie': 0.02*i97,
+              'threshold_conc': 219.4, 'target_delta': 5.0, 'max_n_spikes': 11}
+assert ko.REPRODUCTION_MODES == ('rederive', 'replay', 'both')
+for mode97 in ko.REPRODUCTION_MODES:
+    with _warnings97.catch_warnings():
+        _warnings97.simplefilter('error')                   # a clean row must not warn
+        v97, a97, cc97 = ko.reconstruct_trial_kinetics(
+            row97, space97, groups97, kb97, refs97, mode=mode97)
+    assert list(v97) == list(space97)
+    assert v97['max_n_spikes'] == 11 and isinstance(v97['max_n_spikes'], int)
+    assert v97['ehrlich_downstream'] == m97 and isinstance(v97['k_3'], float)
+    assert set(a97) == set(expected97), (mode97, a97)       # group keys dropped, members present
+    assert all(np.isclose(a97[n], expected97[n], rtol=1e-12, atol=0.0) for n in expected97)
+    assert cc97['mode'] == mode97 and cc97['mismatches'] == []
+    assert cc97['simulated'] == ('replay' if mode97 == 'replay' else 'rederive')
+    assert (cc97['max_rel_delta'] is None) == (mode97 != 'both')
+assert cc97['max_rel_delta'] <= 1e-12                       # last mode = 'both'
+# a deliberately perturbed applied_* column: mismatch + warning; 'both' still
+# simulates the RE-DERIVED value, 'replay' the recorded one
+bad_row97 = dict(row97, applied_k_15=repr(1.015*m97*1.01))
+with _warnings97.catch_warnings(record=True) as caught97:
+    _warnings97.simplefilter('always')
+    _, a97b, cc97b = ko.reconstruct_trial_kinetics(
+        bad_row97, space97, groups97, kb97, refs97, mode='both')
+assert [mm[0] for mm in cc97b['mismatches']] == ['k_15'], cc97b
+assert np.isclose(cc97b['max_rel_delta'], 0.01/1.01, rtol=1e-9, atol=0.0)
+assert len(caught97) == 1 and issubclass(caught97[0].category, RuntimeWarning)
+assert 'k_15' in str(caught97[0].message)
+assert np.isclose(a97b['k_15'], 1.015*m97, rtol=1e-12, atol=0.0)
+_, a97r, _ = ko.reconstruct_trial_kinetics(bad_row97, space97, groups97, kb97, refs97, mode='replay')
+assert np.isclose(a97r['k_15'], 1.015*m97*1.01, rtol=1e-12, atol=0.0)
+# a looser tolerance accepts it
+_, _, cc97c = ko.reconstruct_trial_kinetics(bad_row97, space97, groups97, kb97, refs97,
+                                            mode='both', cross_check_tol=0.05)
+assert cc97c['mismatches'] == []
+# no applied_* columns: replay / both raise, rederive works
+bare97 = {k: v for k, v in row97.items() if not k.startswith('applied_')}
+for mode97 in ('replay', 'both'):
+    try:
+        ko.reconstruct_trial_kinetics(bare97, space97, groups97, kb97, refs97, mode=mode97)
+    except ValueError as e97:
+        assert 'applied_k_14' in str(e97), str(e97)
+    else:
+        raise AssertionError(f'mode={mode97!r} accepted a row without applied_* columns')
+_, a97d, _ = ko.reconstruct_trial_kinetics(bare97, space97, groups97, kb97, refs97, mode='rederive')
+assert np.isclose(a97d['k_16'], 1.015*0.866*m97, rtol=1e-12, atol=0.0)
+# a blank decision cell and an unknown mode raise
+for kw97, needle97 in ((dict(row=dict(row97, k_13=''), mode='rederive'), 'k_13'),
+                       (dict(row=row97, mode='resimulate'), 'resimulate')):
+    try:
+        ko.reconstruct_trial_kinetics(kw97['row'], space97, groups97, kb97, refs97, mode=kw97['mode'])
+    except ValueError as e97:
+        assert needle97 in str(e97), str(e97)
+    else:
+        raise AssertionError(kw97)
+PASS('reconstruct_trial_kinetics: rederive == replay == both on the fixture; perturbed applied_* '
+     '-> mismatch + RuntimeWarning (both simulates the re-derived value); replay without '
+     'applied_* raises; int max_n_spikes; blank decision / unknown mode raise')
+
 print(f'\nALL {n_pass} CHECKS PASSED')
