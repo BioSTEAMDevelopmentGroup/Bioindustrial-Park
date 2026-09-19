@@ -114,7 +114,8 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'run_kinetic_dual_annealing',
            'SPLIT12D_STUDY_TARGET_PRODUCTS', 'SPLIT12D_STUDY_TYPE',
            'split12d_trajectory_path', 'read_trajectory_row',
-           'REPRODUCTION_MODES', 'reconstruct_trial_kinetics',)
+           'REPRODUCTION_MODES', 'reconstruct_trial_kinetics',
+           'REPRODUCTION_DIAGNOSTIC_METRICS', 'compare_tracked_metrics',)
 
 FEEDING_VARIABLES = ('threshold_conc', 'target_delta', 'spike_delta',
                      'max_n_spikes')
@@ -5468,3 +5469,89 @@ def reconstruct_trial_kinetics(row, search_space, parameter_groups,
                        simulated='replay' if mode == 'replay' else 'rederive',
                        max_rel_delta=max_rel_delta, mismatches=mismatches)
     return values, applied, cross_check
+
+#: Tracked metrics that describe the CONVERGENCE PATH, not the decision
+#: point: they depend on the flowsheet state the simulation started from
+#: (the study's previous trial vs. the anchor baseline of a reproduction),
+#: so compare_tracked_metrics reports them but never flags them.
+REPRODUCTION_DIAGNOSTIC_METRICS = ('spike_feed_residual', 'n_sims_run',
+                                   'final_drift')
+
+def _csv_float(cell):
+    """A trajectory-CSV cell as a Python float: blank / None -> NaN;
+    'nan', 'inf', '-inf' parse as such."""
+    if cell is None or cell == '':
+        return math.nan
+    return float(cell)
+
+def compare_tracked_metrics(reproduced_metrics, row, metric_check_tol=0.02):
+    """(metric_check, metric_warnings): every entry of `reproduced_metrics`
+    ({name: value}, TRACKED_METRICS order) whose name is a column of the
+    RAW trajectory `row`, as (name, reproduced, recorded, rel_delta) with
+    Python floats (cast BEFORE any comparison: flexsolve's global
+    np.seterr(invalid='raise') makes a numpy-scalar NaN comparison raise).
+    A finite pair is flagged when its relative delta (_relative_delta)
+    exceeds `metric_check_tol`; a non-finite pair has rel_delta NaN and
+    passes only if both are NaN or both the SAME infinity (finite <->
+    non-finite is flagged). REPRODUCTION_DIAGNOSTIC_METRICS are never
+    flagged. Each flagged name is appended to metric_warnings and raised as
+    a RuntimeWarning. The study's objective is one of the tracked metrics,
+    so it is covered without parsing the study name."""
+    metric_check, metric_warnings = [], []
+    for name, value in reproduced_metrics.items():
+        if name not in row:
+            continue
+        value, recorded = float(value), _csv_float(row[name])
+        if math.isfinite(value) and math.isfinite(recorded):
+            rel = _relative_delta(value, recorded)
+            ok = rel <= metric_check_tol
+        else:
+            rel = math.nan
+            ok = ((math.isnan(value) and math.isnan(recorded))
+                  or (math.isinf(value) and value == recorded))
+        metric_check.append((name, value, recorded, rel))
+        if not ok and name not in REPRODUCTION_DIAGNOSTIC_METRICS:
+            metric_warnings.append(name)
+            warnings.warn(f'reproduced {name} = {value:.6g} vs recorded '
+                          f'{recorded:.6g} (rel {rel:.3g}, tol '
+                          f'{metric_check_tol:g})', RuntimeWarning,
+                          stacklevel=2)
+    return metric_check, metric_warnings
+
+def _simulate_trial_reproduction(handles, kinetic_baselines, values, applied,
+                                 baseline_model_kwargs):
+    """evaluate_decision_point's APPLY steps without its side effects (no
+    trajectory row, no sidecar, no INFEASIBLE prune, no snapshot / restore):
+    set every kinetic parameter present in `applied` on r_te (all others
+    keep the loaded anchor's value), the spike cap, then
+    model_specification at the reconstructed feeding concentrations
+    (_resolve_feeding_concs: spike pinned at the baseline snapshot for this
+    preset) -> solve_TEA -> every TRACKED_METRICS getter. The k_7 / k_8
+    derating happens at system.load_simulate's choke point through the
+    active burden, exactly as during the study. A raising simulation
+    (system.EnzymeBurdenInfeasibleError for an over-cap point, a
+    FeedingStrategyError, a convergence failure) is REPORTED, not raised.
+    Returns (feeding, reproduced, error)."""
+    threshold, target, spike = _resolve_feeding_concs(values,
+                                                      baseline_model_kwargs)
+    r_te, fbs_spec = handles['r_te'], handles['fbs_spec']
+    for pname in kinetic_baselines:
+        if pname in applied:
+            setattr(r_te, pname, applied[pname])
+    if 'max_n_spikes' in values:
+        fbs_spec.max_n_spikes = values['max_n_spikes']
+    feeding = dict(threshold=threshold, target=target, spike=spike,
+                   max_n_spikes=fbs_spec.max_n_spikes)
+    reproduced, error = dict(MPSPs=None, IRR=None, metrics={}), None
+    try:
+        handles['model_specification'](target_conc=target,
+                                       threshold_conc=threshold,
+                                       spike_conc=spike)
+        solution = handles['solve_TEA'](stream_IDs=('ethanol', 'isobutanol'))
+        handles['latest_TEA_solution'].update(solution)
+        reproduced = dict(MPSPs=dict(solution['MPSPs']), IRR=solution['IRR'],
+                          metrics={name: getter(handles)
+                                   for name, getter in TRACKED_METRICS.items()})
+    except Exception as e:
+        error = repr(e)
+    return feeding, reproduced, error

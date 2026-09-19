@@ -6693,4 +6693,73 @@ PASS('reconstruct_trial_kinetics: rederive == replay == both on the fixture; per
      '-> mismatch + RuntimeWarning (both simulates the re-derived value); replay without '
      'applied_* raises; int max_n_spikes; blank decision / unknown mode raise')
 
+#%% 98. compare_tracked_metrics (finite pairs by relative delta; nan<->nan and
+# inf<->inf pass; finite<->non-finite warns; blank CSV cell = NaN; the
+# start-state-dependent convergence diagnostics are reported but never
+# warned on) and _simulate_trial_reproduction with fake handles (check-87
+# pattern): sets ONLY the applied members on r_te + the spike cap, pinned
+# spike from the baseline snapshot, returns MPSPs / IRR / every tracked
+# metric; a raising model_specification is reported as error, not raised.
+assert ko.REPRODUCTION_DIAGNOSTIC_METRICS == ('spike_feed_residual', 'n_sims_run', 'final_drift')
+rep98 = {'IRR': 0.20, 'TCI': 101.0, 'PI': float('-inf'), 'tau': float('nan'),
+         'EtOH titer': 50.0, 'IBO titer': float('nan'), 'n_glu_spikes': 0.0,
+         'final_drift': 5e-4, 'not_a_column': 1.0}
+row98 = {'IRR': '0.2001', 'TCI': '110.0', 'PI': '-inf', 'tau': '',
+         'EtOH titer': 'nan', 'IBO titer': '41.7', 'n_glu_spikes': '0.0',
+         'final_drift': '1e-9'}
+with _warnings97.catch_warnings(record=True) as caught98:
+    _warnings97.simplefilter('always')
+    mc98, mw98 = ko.compare_tracked_metrics(rep98, row98, metric_check_tol=0.02)
+by98 = {name: (rep, rec, rel) for name, rep, rec, rel in mc98}
+assert list(by98) == ['IRR', 'TCI', 'PI', 'tau', 'EtOH titer', 'IBO titer',
+                      'n_glu_spikes', 'final_drift']            # absent column skipped, order kept
+assert np.isclose(by98['IRR'][2], 0.0001/0.2001) and np.isclose(by98['TCI'][2], 9.0/110.0)
+assert by98['n_glu_spikes'][2] == 0.0                            # 0 vs 0
+assert all(np.isnan(by98[n][2]) for n in ('PI', 'tau', 'EtOH titer', 'IBO titer'))
+assert np.isnan(by98['tau'][1])                                   # blank cell -> NaN
+assert mw98 == ['TCI', 'EtOH titer', 'IBO titer'], mw98           # final_drift NOT flagged (diagnostic)
+assert len(caught98) == 3 and all(issubclass(c.category, RuntimeWarning) for c in caught98)
+assert all(isinstance(x, float) for _, rep, rec, rel in mc98 for x in (rep, rec, rel))
+
+class _FakeTE98:
+    k_3 = 10.0
+    k_13 = 0.0
+    k_14 = 0.0
+    k_1ie = 0.02
+    def getGlobalParameterIds(self):
+        return ['k_3', 'k_13', 'k_14', 'k_1ie']
+te98 = _FakeTE98()
+kb98 = ko.discover_kinetic_parameters(te98)
+fbs98 = SimpleNamespace(max_n_spikes=16)
+calls98 = []
+handles98 = {
+    'r_te': te98, 'fbs_spec': fbs98,
+    'V406': SimpleNamespace(nsk_results_specific_tau_dict=nsk, tau=55.0),
+    'tea': SimpleNamespace(TCI=350e6, NPV=35e6), 'HXN': SimpleNamespace(),
+    'model_specification': lambda **kw: calls98.append((kw, te98.k_3, te98.k_13, te98.k_14, te98.k_1ie)),
+    'solve_TEA': lambda stream_IDs=None: {'IRR': 0.2, 'MPSPs': {'ethanol': 0.5, 'isobutanol': 1.0}},
+    'latest_TEA_solution': {'IRR': np.nan, 'MPSPs': {'ethanol': np.nan, 'isobutanol': np.nan}}}
+bmk98 = dict(target_conc=221.25, threshold_conc=217.125, spike_conc=600.0)
+values98 = {'k_13': 2.0, 'ehrlich_downstream': 0.73, 'threshold_conc': 219.4,
+            'target_delta': 5.0, 'max_n_spikes': 11}
+applied98 = {'k_13': 2.0, 'k_14': 0.73, 'threshold_conc': 219.4,
+             'target_delta': 5.0, 'max_n_spikes': 11}
+feed98, out98, err98 = ko._simulate_trial_reproduction(handles98, kb98, values98, applied98, bmk98)
+assert err98 is None
+assert feed98 == dict(threshold=219.4, target=224.4, spike=600.0, max_n_spikes=11)
+assert calls98 == [(dict(target_conc=224.4, threshold_conc=219.4, spike_conc=600.0),
+                    10.0, 2.0, 0.73, 0.02)]                       # k_3 / k_1ie untouched
+assert fbs98.max_n_spikes == 11
+assert out98['IRR'] == 0.2 and out98['MPSPs'] == {'ethanol': 0.5, 'isobutanol': 1.0}
+assert list(out98['metrics']) == list(ko.TRACKED_METRICS)
+assert handles98['latest_TEA_solution']['IRR'] == 0.2
+def _boom98(**kw):
+    raise RuntimeError('SYS14 did not converge')
+feed98b, out98b, err98b = ko._simulate_trial_reproduction(
+    {**handles98, 'model_specification': _boom98}, kb98, values98, applied98, bmk98)
+assert err98b == "RuntimeError('SYS14 did not converge')"
+assert out98b == dict(MPSPs=None, IRR=None, metrics={}) and feed98b == feed98
+PASS('compare_tracked_metrics (rel delta, nan/inf pairing, blank = NaN, diagnostics never flagged) '
+     '+ _simulate_trial_reproduction (applied members only, pinned spike, error reported not raised)')
+
 print(f'\nALL {n_pass} CHECKS PASSED')
