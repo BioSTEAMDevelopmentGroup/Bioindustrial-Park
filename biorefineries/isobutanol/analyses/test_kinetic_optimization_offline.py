@@ -6762,4 +6762,43 @@ assert out98b == dict(MPSPs=None, IRR=None, metrics={}) and feed98b == feed98
 PASS('compare_tracked_metrics (rel delta, nan/inf pairing, blank = NaN, diagnostics never flagged) '
      '+ _simulate_trial_reproduction (applied members only, pinned spike, error reported not raised)')
 
+#%% 99. reproduce_split12d_trial surface (the simulation itself is sim-based,
+# ask-first): signature defaults per the spec (+ restore=True); every
+# input error raises BEFORE the model is touched (no load() in this
+# process, so reaching scenarios.load_scenario would fail differently):
+# unknown mode, preset-guard mismatch, missing CSV, missing trial. The
+# runner load()s, then calls the function, and never runs at import.
+import inspect as _inspect99
+sig99 = _inspect99.signature(ko.reproduce_split12d_trial)
+assert list(sig99.parameters) == ['anchor_scenario', 'study_name', 'trial_number', 'mode', 'burden',
+                                  'results_dir', 'cross_check_tol', 'metric_check_tol', 'restore',
+                                  'verbose']
+assert {n: p.default for n, p in sig99.parameters.items() if p.default is not _inspect99.Parameter.empty} == dict(
+    mode='both', burden=True, results_dir=None, cross_check_tol=1e-6, metric_check_tol=0.02,
+    restore=True, verbose=True)
+assert all(sig99.parameters[n].kind is _inspect99.Parameter.KEYWORD_ONLY
+           for n in ('mode', 'burden', 'results_dir', 'cross_check_tol', 'metric_check_tol',
+                     'restore', 'verbose'))
+empty99 = tempfile.mkdtemp()
+for args99, kw99, exc99, needle99 in (
+        (('A', NAME96, 0), dict(mode='resimulate'), ValueError, 'resimulate'),
+        (('A', 'kin_opt_A_kbB_irr', 0), {}, ValueError, 'metabolic_split_12d'),
+        (('A', NAME96, 0), dict(results_dir=empty99), FileNotFoundError, NAME96),
+        (('A', csv96, 3), {}, KeyError, '0-5')):
+    try:
+        ko.reproduce_split12d_trial(*args99, verbose=False, **kw99)
+    except exc99 as e99:
+        assert needle99 in str(e99), (needle99, str(e99))
+    else:
+        raise AssertionError((args99, kw99))
+run99 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          'reproduce_split12d_trial.py')).read()
+assert run99.startswith('#!/usr/bin/env python3\n# -*- coding: utf-8 -*-\n'
+                        "# Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results")
+assert run99.index('isobutanol.load()') < run99.index('ko.reproduce_split12d_trial(')
+assert "if __name__ == '__main__':" in run99                  # never simulates at import
+compile(run99, 'reproduce_split12d_trial.py', 'exec')         # syntax only; not executed
+PASS('reproduce_split12d_trial: spec signature (+ restore), input errors raise before the model '
+     'is touched; runner has the UIUC header, load()s first, guarded by __main__')
+
 print(f'\nALL {n_pass} CHECKS PASSED')

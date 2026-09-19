@@ -115,7 +115,8 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'SPLIT12D_STUDY_TARGET_PRODUCTS', 'SPLIT12D_STUDY_TYPE',
            'split12d_trajectory_path', 'read_trajectory_row',
            'REPRODUCTION_MODES', 'reconstruct_trial_kinetics',
-           'REPRODUCTION_DIAGNOSTIC_METRICS', 'compare_tracked_metrics',)
+           'REPRODUCTION_DIAGNOSTIC_METRICS', 'compare_tracked_metrics',
+           'reproduce_split12d_trial',)
 
 FEEDING_VARIABLES = ('threshold_conc', 'target_delta', 'spike_delta',
                      'max_n_spikes')
@@ -5555,3 +5556,133 @@ def _simulate_trial_reproduction(handles, kinetic_baselines, values, applied,
     except Exception as e:
         error = repr(e)
     return feeding, reproduced, error
+
+def _print_reproduction_summary(result):
+    """Compact human-readable report of a reproduce_split12d_trial result."""
+    print(f"Reproduction of trial {result['trial_number']} of "
+          f"{result['study_name']} (anchor scenario "
+          f"{result['anchor_scenario']}; recorded state "
+          f"{result['recorded_state']}):")
+    feeding = result['feeding']
+    print(f"  feeding: threshold {feeding['threshold']:g} / target "
+          f"{feeding['target']:g} / spike {feeding['spike']:g} g/L, spike "
+          f"cap {feeding['max_n_spikes']}")
+    cross_check = result['cross_check']
+    if cross_check['mode'] == 'both':
+        print(f"  cross-check (re-derived vs recorded applied_*): max rel "
+              f"delta {cross_check['max_rel_delta']:.3g}, "
+              f"{len(cross_check['mismatches'])} mismatch(es); simulated the "
+              'RE-DERIVED values')
+        for member, rederived, replayed, rel in cross_check['mismatches']:
+            print(f'    WARNING {member}: re-derived {rederived:.9g} vs '
+                  f'recorded {replayed:.9g} (rel {rel:.3g})')
+    else:
+        print(f"  kinetics: mode={cross_check['mode']!r} (no cross-check)")
+    if result['error'] is not None:
+        print(f"  SIMULATION FAILED: {result['error']}")
+        return
+    reproduced = result['reproduced']
+    print(f"  MPSPs {reproduced['MPSPs']}, IRR {reproduced['IRR']}")
+    print(f"  {'metric':<24}{'reproduced':>16}{'recorded':>16}{'rel delta':>12}")
+    for name, value, recorded, rel in result['metric_check']:
+        flag = '  <-- WARNING' if name in result['metric_warnings'] else ''
+        print(f'  {name:<24}{value:>16.6g}{recorded:>16.6g}{rel:>12.3g}{flag}')
+    if not result['metric_warnings']:
+        print('  all tracked metrics reproduced within tolerance '
+              '(convergence diagnostics are informational).')
+
+def reproduce_split12d_trial(anchor_scenario, study_name, trial_number, *,
+                             mode='both', burden=True, results_dir=None,
+                             cross_check_tol=1e-6, metric_check_tol=0.02,
+                             restore=True, verbose=True):
+    """Re-simulate trial `trial_number` of the ethanol_isobutanol x
+    metabolic_split_12d study `study_name` (a study name, or the path of its
+    trajectory CSV) on the live model, anchored on scenario
+    `anchor_scenario`, and compare it with the recorded row. READ-ONLY: no
+    study CSV / sidecar / optuna store is written. Requires
+    biorefineries.isobutanol.load() to have run in this kernel (the contract
+    of scenarios.load_scenario); analyses/reproduce_split12d_trial.py is the
+    runner.
+
+    The anchoring scenario supplies every NON-sampled kinetic parameter and
+    the basis of the un-referenced groups (glycolysis, inhib_*: live
+    baseline x multiplier); the referenced ehrlich_downstream group is
+    reference x multiplier with the preset's scenario-A-anchored references
+    (resolve_study_preset -> group_references). The split_12d studies ran
+    from anchor 'A'. `mode`: REPRODUCTION_MODES (see
+    reconstruct_trial_kinetics; 'both' simulates the RE-DERIVED values and
+    warns when they disagree with the recorded applied_<member> columns
+    beyond `cross_check_tol`). `burden`: True (default) installs the
+    A-referenced enzyme burden as the studies did, None = the anchor's
+    burden_default, False = burden-free; load_scenario raises ValueError
+    for an anchor whose own baseline is over the cap (scenario B). The
+    decision columns come from build_search_space with the preset's kwargs
+    on the anchor's live kinetics -- the path _prepare_optimization uses.
+
+    Every input error (unknown mode, preset-guard mismatch, missing CSV,
+    missing trial) raises BEFORE the model is touched. A raising simulation
+    is reported in result['error'] (e.g. an INFEASIBLE / FAIL recorded row
+    reproducing its failure). `restore` (default True) sets every kinetic
+    parameter and fbs_spec.max_n_spikes back to the anchor snapshot in a
+    finally WITHOUT re-simulating (the flowsheet stays at the reproduced
+    trial): the scenario-A workbook has no k_13-k_17 / isobutanol-inhibition
+    rows, so load_scenario alone cannot undo them and a second call in the
+    same kernel would re-derive its groups from contaminated baselines.
+    restore=False leaves the trial's kinetics live for inspection.
+
+    Returns dict(anchor_scenario, study_name, trial_number, csv_path,
+    recorded_state, values, applied, feeding, reproduced (MPSPs, IRR,
+    metrics), recorded_row, cross_check, metric_check [(name, reproduced,
+    recorded, rel_delta)], metric_warnings [names], error). Tracked metrics
+    are compared with `metric_check_tol` (compare_tracked_metrics); the
+    study's objective is one of them."""
+    if mode not in REPRODUCTION_MODES:
+        raise ValueError(f'mode {mode!r} not in {REPRODUCTION_MODES}')
+    csv_path = split12d_trajectory_path(study_name, results_dir)
+    row = read_trajectory_row(csv_path, trial_number)
+    preset = resolve_study_preset(SPLIT12D_STUDY_TARGET_PRODUCTS,
+                                  SPLIT12D_STUDY_TYPE)
+    # Lazy: keeps this module importable without load() (offline test,
+    # stdlib-only supervisor).
+    from biorefineries.isobutanol import scenarios
+    scenarios.load_scenario(anchor_scenario, burden=burden)
+    handles = get_handles()
+    r_te, fbs_spec = handles['r_te'], handles['fbs_spec']
+    # The anchor's FULL live kinetics: the non-sampled fill and the
+    # un-referenced group bases. load_scenario has just baseline-simulated,
+    # so current_specifications IS the anchor's feeding baseline (the pinned
+    # spike concentration is read from it, as the engine does).
+    kinetic_baselines = discover_kinetic_parameters(r_te)
+    baseline_model_kwargs = {
+        k: fbs_spec.current_specifications[k]
+        for k in ('target_conc', 'threshold_conc', 'spike_conc')}
+    baseline_max_n_spikes = fbs_spec.max_n_spikes
+    search_space, _ = build_search_space(
+        kinetic_baselines,
+        **{key: value for key, value in preset.items()
+           if key not in ('scenario', 'kinetic_bounds_scenario')})
+    values, applied, cross_check = reconstruct_trial_kinetics(
+        row, search_space, preset['parameter_groups'], kinetic_baselines,
+        preset['group_references'], mode=mode,
+        cross_check_tol=cross_check_tol)
+    try:
+        feeding, reproduced, error = _simulate_trial_reproduction(
+            handles, kinetic_baselines, values, applied,
+            baseline_model_kwargs)
+    finally:
+        if restore:
+            for pname, baseline in kinetic_baselines.items():
+                setattr(r_te, pname, baseline)
+            fbs_spec.max_n_spikes = baseline_max_n_spikes
+    metric_check, metric_warnings = ([], []) if error is not None else (
+        compare_tracked_metrics(reproduced['metrics'], row, metric_check_tol))
+    result = dict(anchor_scenario=anchor_scenario, study_name=study_name,
+                  trial_number=int(float(trial_number)), csv_path=csv_path,
+                  recorded_state=row.get('state'), values=values,
+                  applied=applied, feeding=feeding, reproduced=reproduced,
+                  recorded_row=row, cross_check=cross_check,
+                  metric_check=metric_check, metric_warnings=metric_warnings,
+                  error=error)
+    if verbose:
+        _print_reproduction_summary(result)
+    return result
