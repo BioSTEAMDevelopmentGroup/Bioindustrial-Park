@@ -5628,7 +5628,12 @@ def reproduce_split12d_trial(anchor_scenario, study_name, trial_number, *,
     trial): the scenario-A workbook has no k_13-k_17 / isobutanol-inhibition
     rows, so load_scenario alone cannot undo them and a second call in the
     same kernel would re-derive its groups from contaminated baselines.
-    restore=False leaves the trial's kinetics live for inspection.
+    restore=False leaves the trial's kinetics live for inspection. Either
+    way the flowsheet is NOT re-simulated, so a solve_TEA() in the same
+    kernel after the call reads the reproduced TRIAL's TEA, not the anchor
+    baseline's. load_scenario also leaves its scenario-level active burden
+    installed on return (as any load_scenario call does), so later model
+    work in the same kernel inherits it until the next load_scenario.
 
     Returns dict(anchor_scenario, study_name, trial_number, csv_path,
     recorded_state, values, applied, feeding, reproduced (MPSPs, IRR,
