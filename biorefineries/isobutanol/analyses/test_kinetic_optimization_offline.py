@@ -6555,4 +6555,50 @@ legacy95 = sup95[sup95.index('scenario = scenario or'):sup95.index('def row_coun
 assert '_aA' not in legacy95 and 'ibo_pathway_anchoring' not in legacy95
 PASS('supervisor: _aA on the preset path only; legacy path unchanged')
 
+#%% 96. Trial reproduction (spec 2026-09-18-reproduce-split12d-trial): the
+# preset guard checks the BASENAME of study_name for both preset tokens
+# (ValueError naming the missing one), a bare study name resolves to
+# {results_dir}/{study_name}_trajectory.csv (default analyses/results next to
+# the module), a *.csv argument is a path; read_trajectory_row selects by
+# int(float(trial_number)) and a missing number raises KeyError with the
+# available range.
+import csv as _csv96
+NAME96 = 'kin_opt_ethanol_isobutanol_metabolic_split_12d_irr_gp_rb0.001-4_ib0.75-1.5_aA_burden'
+for bad96, token96 in (
+        ('kin_opt_ethanol_isobutanol_metabolic_split_14d_irr_burden', 'metabolic_split_12d'),
+        ('kin_opt_ethanol_only_metabolic_split_12d_irr_burden', 'ethanol_isobutanol'),
+        # tokens in the DIRECTORY do not count: only the basename is checked
+        (os.path.join('ethanol_isobutanol_metabolic_split_12d', 'kin_opt_A_irr_trajectory.csv'),
+         'ethanol_isobutanol')):
+    try:
+        ko.split12d_trajectory_path(bad96)
+    except ValueError as e96:
+        assert f"lacks ['{token96}'" in str(e96), str(e96)   # names the MISSING token (first one)
+    else:
+        raise AssertionError(f'preset guard accepted {bad96!r}')
+assert ko.split12d_trajectory_path(NAME96, results_dir='X') == os.path.join(
+    'X', NAME96 + '_trajectory.csv')
+default96 = ko.split12d_trajectory_path(NAME96)
+assert default96 == os.path.join(os.path.dirname(os.path.abspath(ko.__file__)),
+                                 'analyses', 'results', NAME96 + '_trajectory.csv')
+csv96 = os.path.join(tempfile.mkdtemp(), NAME96 + '_trajectory.csv')
+assert ko.split12d_trajectory_path(csv96, results_dir='ignored') == csv96   # a path passes through
+with open(csv96, 'w', newline='') as f96:
+    w96 = _csv96.writer(f96)
+    w96.writerow(['trial_number', 'state', 'k_3'])
+    w96.writerow(['0', 'COMPLETE', '1.5'])
+    w96.writerow(['1.0', 'FAIL', '2.5'])        # pandas-style float trial number
+    w96.writerow(['5', 'COMPLETE', '3.5'])
+row96 = ko.read_trajectory_row(csv96, 1)
+assert row96 == {'trial_number': '1.0', 'state': 'FAIL', 'k_3': '2.5'}      # raw strings
+assert ko.read_trajectory_row(csv96, '5')['k_3'] == '3.5'
+try:
+    ko.read_trajectory_row(csv96, 3)
+except KeyError as e96:
+    assert '0-5' in str(e96) and '3 rows' in str(e96), str(e96)
+else:
+    raise AssertionError('missing trial_number did not raise')
+PASS('trial reproduction: preset guard on the basename, CSV path resolution, '
+     'row selection by int(float(trial_number)), KeyError with the range')
+
 print(f'\nALL {n_pass} CHECKS PASSED')

@@ -53,6 +53,7 @@ import json
 import math
 import os
 import re
+import warnings
 
 import numpy as np
 
@@ -110,7 +111,9 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'unit_to_internal', 'unit_to_external', 'external_to_unit',
            'PENALTY_ENERGY', 'resolve_energy_scale', 'annealing_energy',
            'SIMULATED_STATES', 'trajectory_resume_state', 'AnnealingResult',
-           'run_kinetic_dual_annealing',)
+           'run_kinetic_dual_annealing',
+           'SPLIT12D_STUDY_TARGET_PRODUCTS', 'SPLIT12D_STUDY_TYPE',
+           'split12d_trajectory_path', 'read_trajectory_row',)
 
 FEEDING_VARIABLES = ('threshold_conc', 'target_delta', 'spike_delta',
                      'max_n_spikes')
@@ -5319,3 +5322,66 @@ def run_kinetic_dual_annealing(objective='IRR',
         n_infeasible=state['n_infeasible'], stop_reason=stop_reason,
         message=message)
     return result, ctx.csv_path, ctx.kinetic_baselines
+
+#%% Trial reproduction (read-only)
+# Re-simulate ONE recorded trial of an ethanol_isobutanol x
+# metabolic_split_12d study on the live model and compare it with the
+# recorded trajectory row (spec docs/superpowers/specs/2026-09-18-reproduce-
+# split12d-trial-design.md). Read-only: nothing here writes a study CSV, a
+# sidecar or an optuna store, and evaluate_decision_point is deliberately
+# NOT reused (it appends rows and prunes / snapshots).
+
+#: The one preset reproduce_split12d_trial supports (not arguments).
+SPLIT12D_STUDY_TARGET_PRODUCTS = 'ethanol_isobutanol'
+SPLIT12D_STUDY_TYPE = 'metabolic_split_12d'
+
+def split12d_trajectory_path(study_name, results_dir=None):
+    """Trajectory-CSV path of a split_12d study, after the PRESET GUARD:
+    the BASENAME of `study_name` must contain both
+    SPLIT12D_STUDY_TARGET_PRODUCTS and SPLIT12D_STUDY_TYPE (ValueError
+    naming the missing token(s) otherwise -- the reconstruction below is
+    specific to that preset's referenced ehrlich_downstream group).
+    `study_name` ending in '.csv' is taken as the path itself; otherwise
+    the path is {results_dir}/{study_name}_trajectory.csv, results_dir
+    defaulting to analyses/results next to this module (the engines'
+    default). Pure; the file need not exist."""
+    study_name = str(study_name)
+    basename = os.path.basename(study_name)
+    missing = [token for token in (SPLIT12D_STUDY_TARGET_PRODUCTS,
+                                   SPLIT12D_STUDY_TYPE)
+               if token not in basename]
+    if missing:
+        raise ValueError(
+            f'study {basename!r} is not an {SPLIT12D_STUDY_TARGET_PRODUCTS} '
+            f'x {SPLIT12D_STUDY_TYPE} study (its name lacks {missing}); '
+            'reproduce_split12d_trial supports that preset only.')
+    if study_name.lower().endswith('.csv'):
+        return study_name
+    if results_dir is None:
+        results_dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            'analyses', 'results')
+    return os.path.join(results_dir, f'{study_name}_trajectory.csv')
+
+def read_trajectory_row(csv_path, trial_number):
+    """The RAW row (dict of strings, csv.DictReader) of `csv_path` whose
+    trial_number equals `trial_number` (both compared as int(float(.)), so
+    '7', '7.0' and 7 match). KeyError naming the available range if absent;
+    a missing file raises FileNotFoundError as usual. Raw strings are kept
+    so the caller decides how to parse blanks (NaN) and '-inf'."""
+    trial_number = int(float(trial_number))
+    with open(csv_path, newline='') as csvfile:
+        rows = list(csv.DictReader(csvfile))
+    numbers = []
+    for row in rows:
+        try:
+            number = int(float(row['trial_number']))
+        except (KeyError, TypeError, ValueError):
+            continue
+        numbers.append(number)
+        if number == trial_number:
+            return row
+    span = (f'{min(numbers)}-{max(numbers)} ({len(numbers)} rows)'
+            if numbers else 'no rows')
+    raise KeyError(f'trial_number {trial_number} is not in {csv_path}; '
+                   f'available trial numbers: {span}')
