@@ -762,7 +762,8 @@ if plot:
     # cells fall below 0.8).
     MPSP_w_levels = np.arange(0.8, 2.0001, 0.02)
     MPSP_cbar_ticks = np.arange(0.8, 2.0001, 0.2)
-    MPSP_w_ticks = [0.9, 1.0, 1.2, 1.5, 2.0]
+    # 1.2 dropped: it overlaps the 1.15 market-range comparison line
+    MPSP_w_ticks = [0.9, 1.0, 1.5, 2.0]
     # MPSP_w_levels = np.arange(0., 15.5, 0.5)
 
 
@@ -800,10 +801,10 @@ if plot:
                                     default_fontsize = default_fontsize,
                                     axis_tick_fontsize = axis_tick_fontsize,
                                     comparison_range=EtOH_market_range,
-                                    # opaque white so the band's boundary lines
-                                    # read white like the hatching (the default
-                                    # (1,1,1,0.25) makes a solid line look grey)
-                                    comparison_range_rgba=(1, 1, 1, 1),
+                                    # white, half-transparent so the band's
+                                    # boundary lines and hatch read white but
+                                    # sit lightly over the colormap
+                                    comparison_range_rgba=(1, 1, 1, 0.5),
                                     n_minor_ticks = 1,
                                     cbar_n_minor_ticks = 4,
                                     units_on_newline = (False, False, False, False), # x,y,z,w
@@ -865,7 +866,8 @@ if plot:
             # fill with the over colour; the ethanol baseline sits at ~0.86).
             curr_metric_w_levels = np.arange(0.8, 2.0001, 0.02)
             curr_metric_cbar_ticks = np.arange(0.8, 2.0001, 0.2)
-            curr_metric_w_ticks = [0.9, 1.0, 1.2, 1.5, 2.0]
+            # 1.2 dropped: it overlaps the 1.15 market-range comparison line
+            curr_metric_w_ticks = [0.9, 1.0, 1.5, 2.0]
             if curr_metric == 'MPSP':
                 # ethanol market price band on the ethanol-MPSP colour axis only
                 # (not IBO MPSP, whose price basis differs)
@@ -931,7 +933,7 @@ if plot:
                                         default_fontsize = default_fontsize,
                                         axis_tick_fontsize = axis_tick_fontsize,
                                         comparison_range=curr_comparison_range,
-                                        comparison_range_rgba=(1, 1, 1, 1),
+                                        comparison_range_rgba=(1, 1, 1, 0.5),
                                         n_minor_ticks = 1,
                                         cbar_n_minor_ticks = 3,
                                         units_on_newline = (False, False, False, False), # x,y,z,w
