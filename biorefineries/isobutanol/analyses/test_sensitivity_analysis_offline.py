@@ -115,5 +115,75 @@ print(f'   feasible fraction of the campaign box: {vec.mean():.3f}')
 PASS('feasible_sobol_stream deterministic / nested / feasible; VectorizedFeasibility '
      '== ko.feasibility_predicate on 3000 points; phi_M == BurdenModel.evaluate')
 
+#%% 4. unconstrained box: analytic Ishigami indices (first / total / closed / Shapley)
+def ishigami(U):
+    x = -np.pi + 2*np.pi*U
+    return np.sin(x[:, 0]) + 7*np.sin(x[:, 1])**2 + 0.1*x[:, 2]**4*np.sin(x[:, 0])
+box = lambda U: np.ones(len(U), dtype=bool)
+S4, fb4 = sa.all_closed_indices({'y': ishigami}, box, 3, n_base=2**15,
+                                n_replicates=3, seed=0)
+m4 = S4['y'].mean(axis=0)
+assert S4['y'].shape == (3, 8) and m4[0] == 0.0 and m4[7] == 1.0
+assert fb4.max() == 0.0                                  # a box never needs the fallback
+TOL = 0.02
+assert np.allclose(sa.first_order(m4, 3), [0.3139, 0.4424, 0.0], atol=TOL)
+assert np.allclose(sa.total_order(m4, 3), [0.5576, 0.4424, 0.2437], atol=TOL)
+assert abs(m4[0b101] - 0.5576) < TOL                     # closed {x1, x3} = 1 - ST_2
+sh4 = sa.shapley_effects(m4, 3)
+assert np.allclose(sh4, [0.3139 + 0.2437/2, 0.4424, 0.2437/2], atol=TOL)
+assert abs(sh4.sum() - 1.0) < 1e-12
+PASS('Ishigami on a box: first / total / closed{1,3} / Shapley within 0.02 of analytic; Shapley sums to 1')
+
+#%% 5. additive function on a box: Shapley == first-order == total
+additive = lambda U: 3*U[:, 0] + 2*U[:, 1] + U[:, 2]
+S5, _ = sa.all_closed_indices({'y': additive}, box, 3, n_base=2**14,
+                              n_replicates=2, seed=1)
+m5 = S5['y'].mean(axis=0)
+expect5 = np.array([9, 4, 1])/14
+assert np.allclose(sa.first_order(m5, 3), expect5, atol=TOL)
+assert np.allclose(sa.shapley_effects(m5, 3), expect5, atol=TOL)
+assert np.allclose(sa.total_order(m5, 3), expect5, atol=TOL)
+PASS('additive function: Shapley == first-order == total == analytic 9:4:1')
+
+#%% 6. CONSTRAINED domain (triangle x1 + x2 < 1): analytic values under dependence
+tri = lambda U: U[:, 0] + U[:, 1] < 1.0
+X6 = sa.sample_feasible(20000, 2, tri, np.random.default_rng(2))
+assert tri(X6).all() and abs(X6[:, 0].mean() - 1/3) < 0.01      # uniform on the triangle
+Xp6, nfb6 = sa.conditional_partners(X6, 0b01, tri, np.random.default_rng(3))
+assert (Xp6[:, 0] == X6[:, 0]).all() and tri(Xp6).all()          # x1 frozen, partner feasible
+assert nfb6 < 20                                                 # fallback only at x1 ~ 1
+S6, _ = sa.all_closed_indices({'x1': lambda U: U[:, 0],
+                               'sum': lambda U: U[:, 0] + U[:, 1]},
+                              tri, 2, n_base=2**15, n_replicates=3, seed=4)
+assert abs(S6['x1'].mean(axis=0)[0b01] - 1.0) < 1e-9             # Y = X1: S_{1} = 1 exactly
+# Y = X1 + X2 on the triangle: E[Y|X1] = (1 + X1)/2, Var(X1) = Var(Y) = 1/18 -> S_{1} = 1/4
+msum = S6['sum'].mean(axis=0)
+assert abs(msum[0b01] - 0.25) < TOL and abs(msum[0b10] - 0.25) < TOL
+assert np.allclose(sa.shapley_effects(msum, 2), [0.5, 0.5], atol=TOL)
+PASS('triangle domain: uniform-feasible sampling, conditional partners, S_{1}(X1) = 1, '
+     'S_{1}(X1+X2) = 1/4 analytic, Shapley symmetric')
+
+#%% 7. subset search on a hand-built table
+names7 = ['a', 'b', 'c']
+S7 = np.zeros(8)
+S7[0b001], S7[0b010], S7[0b100] = 0.10, 0.30, 0.05
+S7[0b011], S7[0b101], S7[0b110] = 0.85, 0.20, 0.40
+S7[0b111] = 1.0
+best7 = sa.best_subsets(S7, 3, sizes=(1, 2, 3))
+assert best7[1] == (0b010, 0.30) and best7[2] == (0b011, 0.85) and best7[3] == (0b111, 1.0)
+assert sa.smallest_subset_reaching(S7, 3, 0.8) == (0b011, 0.85)
+assert sa.smallest_subset_reaching(S7, 3, 0.9) == (0b111, 1.0)
+assert sa.mask_names(0b011, names7) == ('a', 'b') and sa.mask_names(0b100, names7) == ('c',)
+PASS('best_subsets / smallest_subset_reaching / mask_names on a hand-built index table')
+
+#%% 8. tail_variance_share against a hand calculation
+y8 = np.array([-10.0, -8.0, 1.0, 2.0, 3.0, 4.0])
+# exact: 1 - (variance carried by the y >= 0 group alone, within-group) / Var(y)
+p_hi = 4/6
+share8 = 1.0 - p_hi*np.var(y8[2:])/np.var(y8)
+assert abs(sa.tail_variance_share(y8, 0.0) - share8) < 1e-12
+assert sa.tail_variance_share(np.array([1.0, 2.0, 3.0]), 0.0) == 0.0
+PASS('tail_variance_share: 1 - within-variance of the non-tail group / Var(y)')
+
 #%% Done
 print(f'ALL {n_pass} CHECKS PASSED')

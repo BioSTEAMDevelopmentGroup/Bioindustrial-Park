@@ -23,7 +23,11 @@ import math
 import numpy as np
 
 __all__ = ('campaign_engine_kwargs', 'design_record', 'unit_to_values',
-           'feasible_sobol_stream', 'VectorizedFeasibility')
+           'feasible_sobol_stream', 'VectorizedFeasibility',
+           'sample_feasible', 'conditional_partners', 'closed_index',
+           'all_closed_indices', 'first_order', 'total_order',
+           'shapley_effects', 'best_subsets', 'smallest_subset_reaching',
+           'mask_names', 'tail_variance_share')
 
 #%% Campaign space
 
@@ -202,3 +206,127 @@ class VectorizedFeasibility:
         log_ratio = np.where(spk <= tgt, np.inf, log_ratio)
         log_ratio = np.where(n_spikes <= 0, 0.0, log_ratio)
         return ok & (log_ratio <= math.log(vol['volume_cap']))
+
+#%% Index estimators on the feasible domain
+
+def sample_feasible(n, d, is_feasible_U, rng):
+    """n uniform rows of the unit cube satisfying `is_feasible_U` (a
+    vectorized predicate U -> bool array), by batch rejection."""
+    out, have = [], 0
+    while have < n:
+        cand = rng.random((max(1024, 2*(n - have)), d))
+        cand = cand[is_feasible_U(cand)]
+        out.append(cand)
+        have += len(cand)
+    return np.concatenate(out)[:n]
+
+def _mask_columns(mask, d):
+    return np.array([(mask >> j) & 1 for j in range(d)], dtype=bool)
+
+def conditional_partners(X, mask, is_feasible_U, rng, max_tries=200):
+    """Pick-freeze partners under DEPENDENCE: Xp shares the columns in
+    `mask` with X and redraws the others uniformly until the whole row is
+    feasible, i.e. Xp_~u ~ P(X_~u | X_u). A row still infeasible after
+    `max_tries` rounds keeps its own X_~u (always feasible; a slight upward
+    bias) -- returns (Xp, that count)."""
+    free = ~_mask_columns(mask, X.shape[1])
+    Xp, todo = X.copy(), np.arange(len(X))
+    for _ in range(max_tries):
+        if todo.size == 0:
+            break
+        cand = X[todo].copy()
+        cand[:, free] = rng.random((todo.size, int(free.sum())))
+        ok = is_feasible_U(cand)
+        Xp[todo[ok]] = cand[ok]
+        todo = todo[~ok]
+    return Xp, int(todo.size)
+
+def closed_index(y, yp):
+    """Var(E[Y | X_u]) / Var(Y) from a pick-freeze pair (Janon-Monod
+    estimator: mean and variance pooled over both samples)."""
+    mu = 0.5*(y.mean() + yp.mean())
+    var = 0.5*((y*y).mean() + (yp*yp).mean()) - mu*mu
+    return float(((y*yp).mean() - mu*mu)/var) if var > 0.0 else float('nan')
+
+def all_closed_indices(predictors, is_feasible_U, d, *, n_base=4096,
+                       n_replicates=3, seed=0, max_tries=200, progress=None):
+    """Closed indices of EVERY subset (bitmask 0 .. 2^d - 1; bit j <-> input
+    j) for every metric in `predictors` ({metric: callable(U) -> y}). One
+    base sample and one partner sample per (replicate, subset) are shared by
+    all metrics. S[..., 0] = 0 and S[..., 2^d - 1] = 1 by definition.
+    Returns (S {metric: (n_replicates, 2^d)}, fallback_fraction (2^d,))."""
+    n_masks, full = 2**d, 2**d - 1
+    S = {m: np.zeros((n_replicates, n_masks)) for m in predictors}
+    fallback = np.zeros(n_masks)
+    for r in range(n_replicates):
+        rng = np.random.default_rng([seed, r])
+        X = sample_feasible(n_base, d, is_feasible_U, rng)
+        y = {m: np.asarray(f(X), dtype=float) for m, f in predictors.items()}
+        for mask in range(1, full):
+            Xp, n_fb = conditional_partners(X, mask, is_feasible_U, rng, max_tries)
+            fallback[mask] += n_fb/(n_base*n_replicates)
+            for m, f in predictors.items():
+                S[m][r, mask] = closed_index(y[m], np.asarray(f(Xp), dtype=float))
+            if progress is not None:
+                progress(r, mask, full - 1)
+        for m in predictors:
+            S[m][r, full] = 1.0
+    return S, fallback
+
+def first_order(S, d):
+    return np.stack([S[..., 1 << i] for i in range(d)], axis=-1)
+
+def total_order(S, d):
+    full = 2**d - 1
+    return np.stack([1.0 - S[..., full ^ (1 << i)] for i in range(d)], axis=-1)
+
+def _popcounts(d):
+    return np.array([bin(m).count('1') for m in range(2**d)])
+
+def shapley_effects(S, d):
+    """Exact Shapley effects from all closed indices: Sh_i = sum over
+    u not containing i of |u|! (d - |u| - 1)! / d! x (S[u + i] - S[u]).
+    Sums to S[full] - S[empty] = 1 by construction."""
+    sizes, masks = _popcounts(d), np.arange(2**d)
+    weight = np.array([math.factorial(k)*math.factorial(d - k - 1)/math.factorial(d)
+                       for k in range(d)])
+    out = []
+    for i in range(d):
+        bit = 1 << i
+        without = masks[(masks & bit) == 0]
+        out.append(np.sum(weight[sizes[without]]
+                          *(S[..., without | bit] - S[..., without]), axis=-1))
+    return np.stack(out, axis=-1)
+
+def best_subsets(S_mean, d, sizes=(1, 2, 3, 4)):
+    """{k: (mask, S)} -- the size-k subset with the largest closed index."""
+    pop, best = _popcounts(d), {}
+    for k in sizes:
+        masks = np.flatnonzero(pop == k)
+        if masks.size:
+            j = masks[np.argmax(S_mean[masks])]
+            best[k] = (int(j), float(S_mean[j]))
+    return best
+
+def smallest_subset_reaching(S_mean, d, share=0.8):
+    """(mask, S) of the best subset of the SMALLEST size whose closed index
+    reaches `share` (the full set always does)."""
+    for k, (mask, value) in best_subsets(S_mean, d, sizes=range(1, d + 1)).items():
+        if value >= share:
+            return mask, value
+    return 2**d - 1, 1.0
+
+def mask_names(mask, names):
+    return tuple(name for j, name in enumerate(names) if (mask >> j) & 1)
+
+def tail_variance_share(y, threshold=0.0):
+    """Share of Var(y) that would vanish if the tail (y < threshold) were
+    absent from the variance budget: 1 - p_hi Var(y | y >= threshold) /
+    Var(y) (law of total variance: everything except the within-variance of
+    the non-tail group). 0 when there is no tail."""
+    y = np.asarray(y, dtype=float)
+    hi = y[y >= threshold]
+    if hi.size == y.size:
+        return 0.0
+    within_hi = (hi.size/y.size)*np.var(hi) if hi.size else 0.0
+    return float(1.0 - within_hi/np.var(y))
