@@ -11,23 +11,30 @@ IRR contour of the opt_IRR k_13 x inhib_isobutanol-multiplier kinetic sweep
 (enzyme burden ON), marked with the opt_IRR point (k_13 = opt_IRR baseline,
 multiplier = 1.0) -- the financial optimum -- as a star in the same blue the
 kinetic-optimization parameter-sets figure gives the IRR study (HUE_COLORS[0]
-in plot_kin_opt_parameter_sets.py). The view is capped at k_13 = 5 (the grid
-runs to 6.5) and the multiplier axis spans 0-2 (the grid starts at 0.2).
+in plot_kin_opt_parameter_sets.py). The view spans the full k_13 grid 0-8 and
+the multiplier axis spans 0-2 (the grid starts at 0.2).
+
+Since the 2026-09-20 opt_IRR relocation (to metabolic_split_12d trial 1602),
+the opt_IRR baseline k_13 is 4.0 (was ~0.642) and the sweep grid was
+re-centered on it (0 -> 8.0, baseline at the midpoint), so this plotter's
+SWEEP_PREFIX / grid / marker were updated to match. NOTE: the sweep CSVs at the
+relocated point have not yet been regenerated -- re-run
+analyses/evaluate_EtOH_k13_inhib_isobutanol.py before plotting.
 
 The machinery to overlay greedy 8-neighbor optimum markers for the fermentation
 metrics (isobutanol/ethanol yield/titer/productivity) is retained but disabled
 (TRAJECTORY_METRICS is empty); re-populate that list to draw them again.
 
 Consumes the per-metric CSVs written by
-analyses/evaluate_EtOH_k13_inhib_isobutanol.py (20 x 20 grid, opt_IRR baseline,
+analyses/evaluate_EtOH_k13_inhib_isobutanol.py (40 x 40 grid, opt_IRR baseline,
 no feeding-strategy optimization) and runs no biorefinery simulation: the
 plotting module is loaded standalone, never via `import biorefineries.isobutanol`.
 
 IRR styling matches the sweep script's IRR contour: shown in percent on a HARD
-0-25 % scale, a grey under-color for money-losing cells (< 0 %, including the
+0-30 % scale, a grey under-color for money-losing cells (< 0 %, including the
 unsolvable -inf corners, which are pushed just below the lowest level so they
 fill with the under-color instead of rendering blank), a white labeled 0 %
-break-even contour line, black labeled 5/10/15/20 % lines, and % contour labels.
+break-even contour line, black labeled 5/10/15/20/25 % lines, and % contour labels.
 
 Run:  & "$py" biorefineries/isobutanol/plots/plot_greedy_trajectories_k13_inhib_isobutanol.py
 Writes the PNG and a CSV of the trajectory points next to the sweep CSVs in
@@ -51,11 +58,12 @@ RESULTS_DIR = os.path.join(HERE, '..', 'analyses', 'results')
 
 # `file_to_save` prefix of the sweep run: ibo_{steps}_{x}_{y}_{z}_opt=..._max_n=..._
 # (x_label[:5]="k_13", y_label[:5]="inhib", z_label[:5]="Spike"; opt_IRR's
-# default_max_n_glu_spikes is 18). The loader adds the second '_' before the
-# metric name, as the sweep's `csv_file_to_save = file_to_save + f'_{k}'` does.
-SWEEP_PREFIX = 'ibo_(20, 20, 1)_k_13_inhib_Spike_opt=False_max_n=18_'
-STEPS = (20, 20)
-SPEC_1 = np.linspace(0.0, 6.5, STEPS[0])    # k_13                    (x, spec_1)
+# default_max_n_glu_spikes is 50 since the 2026-09-20 relocation). The loader
+# adds the second '_' before the metric name, as the sweep's
+# `csv_file_to_save = file_to_save + f'_{k}'` does.
+SWEEP_PREFIX = 'ibo_(40, 40, 1)_k_13_inhib_Spike_opt=False_max_n=50_'
+STEPS = (40, 40)
+SPEC_1 = np.linspace(0.0, 8.0, STEPS[0])    # k_13                    (x, spec_1)
 SPEC_2 = np.linspace(0.2, 2.0, STEPS[1])    # inhib_isobutanol mult.  (y, spec_2)
 
 # Trajectory start point, snapped to the nearest grid cell by the plotting
@@ -90,7 +98,9 @@ BASELINE_MARKER = ('D', 'white', 7)   # (shape, fill color, size)
 # kinetic-optimization parameter-sets figure (HUE_COLORS[0]). Not hill-climbed;
 # k_13 is opt_IRR's live baseline printed by the sweep (scenarios' opt_IRR
 # workbook), placed at its true data coordinates (not snapped to a grid cell).
-OPT_IRR_K13 = 0.6421409697576548
+# Since the 2026-09-20 relocation to metabolic_split_12d trial 1602 this is 4.0
+# (was 0.6421409697576548).
+OPT_IRR_K13 = 4.0
 OPT_IRR_MULT = 1.0
 OPT_IRR_COLOR = '#18C4DC'
 OPT_IRR_MARKER = ('*', OPT_IRR_COLOR, 15)   # (shape, fill color, size)
@@ -101,19 +111,20 @@ x_label = r"$\mathbf{k}_{13}$"
 y_label = r"$\mathbf{inhib\_isobutanol\ multiplier}$"
 x_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
 y_units = r""   # dimensionless (x opt_IRR baseline of each family member)
-x_ticks = [0, 1, 2, 3, 4, 5]   # x-axis capped at 5 (see XLIM below)
+x_ticks = [0, 2, 4, 6, 8]   # full k_13 grid (see XLIM below)
 y_ticks = [0.0, 0.5, 1.0, 1.5, 2.0]
-XLIM = (0.0, 5.0)   # view limit on k_13 (the grid runs to 6.5)
+XLIM = (0.0, 8.0)   # view limit on k_13 (spans the full re-centered grid)
 YLIM = (0.0, 2.0)   # view limit on the multiplier (the grid runs 0.2 -> 2.0)
 
-# IRR in percent on a HARD 0-25 % scale (matches the sweep's IRR branch):
+# IRR in percent on a HARD 0-30 % scale (matches the sweep's IRR branch; raised
+# from 0-25 % for the 2026-09-20 opt_IRR relocation, baseline IRR ~27.3 %):
 #  - money-losing cells (< 0 %, incl. -inf) render with the grey under-color;
-#  - no over-color (grid max ~23 % < 25 %), so extend only the min side;
+#  - no over-color (grid max ~27 % < 30 %), so extend only the min side;
 #  - 0 % break-even is a WHITE labeled contour line (comparison_lines);
-#  - 5/10/15/20 % are black labeled contour lines (w_ticks).
-IRR_w_levels = np.arange(0.0, 25.0001, 25.0 / 80)
-IRR_cbar_ticks = np.arange(0.0, 25.0001, 5.0)          # 0,5,...,25
-IRR_w_ticks = [5.0, 10.0, 15.0, 20.0]                  # black labeled lines
+#  - 5/10/15/20/25 % are black labeled contour lines (w_ticks).
+IRR_w_levels = np.arange(0.0, 30.0001, 30.0 / 80)
+IRR_cbar_ticks = np.arange(0.0, 30.0001, 5.0)          # 0,5,...,30
+IRR_w_ticks = [5.0, 10.0, 15.0, 20.0, 25.0]            # black labeled lines
 IRR_comparison_lines = [0.0]                           # white 0 % break-even
 fmt_percent = lambda v, pos=None: f'{v:.0f}%'
 
@@ -222,9 +233,9 @@ def main():
             markerfacecolor=om_color, markeredgecolor='k', markeredgewidth=0.8,
             markersize=om_size, zorder=700, clip_on=False)
 
-    # cap the k_13 view at 5 (the grid runs to 6.5); the cropped region is the
-    # money-losing dark corner. The multiplier view spans 0-2 (the grid starts
-    # at 0.2, so 0-0.2 shows as blank ground).
+    # the k_13 view spans the full re-centered grid 0-8 (baseline 4.0 at the
+    # midpoint). The multiplier view spans 0-2 (the grid starts at 0.2, so
+    # 0-0.2 shows as blank ground).
     ax.set_xlim(*XLIM)
     ax.set_ylim(*YLIM)
 
