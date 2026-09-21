@@ -739,14 +739,14 @@ if plot:
             curr_metric_cbar_ticks = np.arange(0.5, 3.5001, 0.5)
             curr_metric_w_ticks = [0.75, 0.9, 1.2, 1.5, 2.0, 3.0]
         elif 'irr' in lccm:
-            # IRR colormap fixed to 0-15%, NO under/over colors: cells outside
-            # [0, 0.15] (money-losing corners below 0, any point above 0.15)
-            # render blank rather than clamped to an extend colour.
+            # IRR colormap fixed to 0-15%, UNDER color on / over color off:
+            # cells below 0 (money-losing corners, incl. -inf pushed down
+            # below) fill with the under colour; cells above 0.15 render blank.
             curr_metric_w_levels = np.arange(0.0, 0.15001, 0.005)
             curr_metric_cbar_ticks = np.arange(0.0, 0.15001, 0.05)
             curr_metric_w_ticks = [0.0, 0.05, 0.10, 0.15]
-            extend_cmap = 'neither'
-            cmap_under_color = None
+            extend_cmap = 'min'
+            cmap_under_color = colors.grey_dark.shade(40).RGBn
             cmap_over_color = None
         # curr_metric_w_levels = np.arange(0., 15.5, 0.5)
 
