@@ -51,19 +51,24 @@ def inflight_mtime(path):
     except OSError: return None
 
 
-def run_attempt(script, inflight, stall_timeout_s, poll_s=5.0):
-    """Run one child to its exit; kill it if its in-flight sidecar goes
-    stale. Returns (exit code, killed for a stall)."""
+def run_attempt(script, inflight, stall_timeout_s, stale_mtime=None, poll_s=5.0):
+    """Run one child to its exit; kill it if the in-flight sidecar THIS child
+    wrote goes stale. `stale_mtime` is the sidecar's mtime before the child
+    started: a leftover from a previous crash (the child logs it LOST and
+    clears it during load) must not be read as a stall, or the child is killed
+    mid-load before it can clear it. Returns (exit code, killed for a stall)."""
     child = subprocess.Popen([sys.executable, script])
     while True:
         try:
             return child.wait(timeout=poll_s), False
         except subprocess.TimeoutExpired:
             pass
-        try:
-            age = time.time() - os.path.getmtime(inflight)
-        except OSError:
-            continue # no simulation in flight (load, plots, between points)
+        mtime = inflight_mtime(inflight)
+        if mtime is None or mtime == stale_mtime:
+            # no simulation in flight (load, plots, between points), or the
+            # previous crash's sidecar this child has not cleared yet
+            continue
+        age = time.time() - mtime
         if age > stall_timeout_s:
             print(f'\n[supervisor] in-flight point stalled for {age/60:.1f} min; '
                   'killing the child.', flush=True)
@@ -91,7 +96,8 @@ def main():
         mtime_before = inflight_mtime(inflight)
         print(f'\n[supervisor] attempt {attempt}/{args.max_attempts}: '
               f'{n_before} checkpointed points.', flush=True)
-        code, stalled = run_attempt(script, inflight, args.stall_timeout_min*60.)
+        code, stalled = run_attempt(script, inflight, args.stall_timeout_min*60.,
+                                    stale_mtime=mtime_before)
         if code == 0 and not stalled:
             print(f'\n[supervisor] sweep complete (attempt {attempt}).', flush=True)
             return 0
