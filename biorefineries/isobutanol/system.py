@@ -1109,7 +1109,7 @@ def _add_facility_group_metrics(unit_groups_dict, BT, system, tea):
     _metric(unit_groups_dict['natural gas (for steam generation)'], OPERATING).getter = \
         lambda: BT.natural_gas_price*BT.natural_gas.F_mass
     _metric(unit_groups_dict['natural gas (for product drying)'], OPERATING).getter = \
-        lambda: sum([(i.utility_cost or 0.) - i.power_utility.cost for i in dryers])
+        lambda: sum([_stream_utility_cost(i) for i in dryers])
     _metric(unit_groups_dict['fixed operating cost'], OPERATING).getter = \
         lambda: tea.FOC/tea.operating_hours
     # negative = credit for sold power
