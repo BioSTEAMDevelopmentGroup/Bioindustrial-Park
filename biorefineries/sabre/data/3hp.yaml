@@ -1,16 +1,7 @@
 # Model Assumptions: 3-HP Fermentation and Crystallization
-#
-# See sabre/units/_3hp.py (HPFermentation, CaHPCrystallizer) and
-# docs/superpowers/specs/2026-09-18-sabre-3hp-sargassum-design.md (secs. 7-8)
-# for the design this file backs.
 
 # Overrides sabre.units._preprocessing's EnzymaticPress instance in
-# systems/_3hp_system.py only -- data/preprocessing.yaml's own
-# cake_solids_wt_frac (0.15, shared by every other sabre system's Press)
-# is left unchanged there, since fixing it package-wide would shift
-# TCI/MSP for all 5 other systems too and require recomputing their
-# tests.py golden-value baselines; user decision 2026-09-18 was to scope
-# this fix to 3hp only.
+# systems/_3hp_system.py only.
 press_cake_solids_wt_frac_override: 0.27  # see sources below
 
 sources:
@@ -20,20 +11,12 @@ sources:
       data/preprocessing.yaml's own press.sources.performance citation
       (Vincent Corporation seaweed pressing notes) says "Sargassum-specific
       pressing data indicate cake solids around 26-29 wt% TS; 27 wt% TS
-      selected as central baseline" -- but the coded
-      press.cake_solids_wt_frac value (0.15) doesn't match that citation
-      at all (not even within the cited 18-29% range). 0.27 is that
-      citation's own "central baseline" pick, applied here as an override
-      rather than fixing the shared default.
+      selected as central baseline". 0.27 is applied here as an override.
 
 
 pressate_concentrator:
-  # Retargets sabre.units.PressateConcentrator (the same class
-  # biostimulant.yaml's own instance uses) at the EnzymaticPress pressate's
-  # fermentable sugars (Glucose, Mannitol, AlginateMonomer) instead of
-  # biostimulant's solute set -- a separate instance/yaml section per the
-  # design spec (sec. 6), not a shared one, since the two pathways retain
-  # different solutes.
+  # Retargets sabre.units.PressateConcentrator at the EnzymaticPress pressate's
+  # fermentable sugars (Glucose, Mannitol, AlginateMonomer).
   enabled: true
   retained_solute_IDs: [Glucose, Mannitol, AlginateMonomer]
   water_recovery_to_permeate: 0.93  # same basis as biostimulant.yaml's own instance
@@ -49,19 +32,14 @@ pressate_concentrator:
   sources:
     reused_from_biostimulant:
       key: same_membrane_physics
-      note: "Flux/electricity/capex/maintenance bases are the same UF membrane literature already cited in data/biostimulant.yaml's pressate_concentrator section (Sievers et al. 2017, Diaz-Reinoso and Dominguez 2020, Sethi and Wiesner 2000, Nguyen and Yoshikawa 2020, Cheryan 1998) -- not re-derived here, since this is the same physical membrane-concentration operation applied to a different solute set."
+      note: "Flux/electricity/capex/maintenance bases are the same UF membrane literature already cited in data/biostimulant.yaml's pressate_concentrator section (Sievers et al. 2017, Diaz-Reinoso and Dominguez 2020, Sethi and Wiesner 2000, Nguyen and Yoshikawa 2020, Cheryan 1998)."
 
 
 fermentation_feed_evaporator:
-  # Retargets sabre.units.BiostimulantEvaporator (same class, different
-  # yaml section) to hit the ~20 wt% dissolved-solids concentration this
-  # design spec (sec. 6) calls for as the fermentation medium target --
-  # analogous to biorefineries.HP's EnzymeHydrolysateMixer.solid_loading =
-  # 0.20.
   target_solids_wt_frac: 0.20
   boiling_temperature_K: 333.15  # mild vacuum evaporation ~60 C; same basis as biostimulant.yaml
   condensing_temperature_K: 310.15  # ~37 C; same basis as biostimulant.yaml
-  nonwater_recovery_to_product: 1.0  # not 0.995 like biostimulant.yaml's own instance -- see sources.nonwater_recovery below
+  nonwater_recovery_to_product: 1.0  # not 0.995 like biostimulant.yaml's own instance
   tau: 0.25  # hr; nominal vessel holdup time; no literature/prior-yaml grounding
   vacuum_system_preference: "Liquid-ring pump"
 
@@ -71,19 +49,14 @@ fermentation_feed_evaporator:
       note: "biorefineries.HP.units.EnzymeHydrolysateMixer targets solid_loading=0.20 for its own pre-fermentation hydrolysate; reused here as the 'concentration match' requested for this pathway's fermentation feed."
     nonwater_recovery:
       key: bugfix
-      note: "1.0 (not biostimulant.yaml's 0.995) so raw_vapor carries pure Water only. At 0.995, trace escaped solids (Ash/Protein/Glucan/Alginate/Fucoidan, which slip past EnzymaticPress's solids_capture_frac into the pressate) or Enzyme end up with nonzero flow in the vapor-phase raw_vapor stream, and thermosteam's Gas_Enthalpy_Ref_Solid fallback crashes (TypeError: unsupported operand types for +: float and NoneType) trying to compute their gas-phase enthalpy, since none of those chemicals were ever given a Hvap/gas-phase Cn model (they're not expected to vaporize). This path was never exercised in data/biostimulant.yaml's own instance, since that instance's target_solids_wt_frac is null (the unit is a bypass there) -- confirmed by direct testing. 1.0 is also the physically correct choice regardless: none of these dissolved solutes should meaningfully volatilize under vacuum evaporation."
+      note: "1.0 (not biostimulant.yaml's 0.995) so raw_vapor carries pure Water only."
 
 
 broth_evaporator:
-  # bst.units.MultiEffectEvaporator instantiation (F401 in the design
-  # spec), concentrating the cell-mass-free fermentation broth to the
-  # patent's crystallization threshold before CaHPCrystallizer -- not a
-  # new unit class, just the target concentration and effect pressures for
-  # whoever wires the system script (mirrors
-  # systems._microbial_oil_system._create_vfa_fermentation_system's own
-  # Ev607 bisection-on-V pattern for hitting a target concentration).
-  target_product_concentration_g_per_L: 450.0  # midpoint of the patent's 300-600 g/L crystallization threshold
-  P_Pa: [101325, 69682, 47057, 30953]  # same 4-effect pressure profile as systems._microbial_oil_system's Ev607
+  # bst.units.MultiEffectEvaporator instantiation, concentrating the cell-mass-free fermentation broth to the
+  # patent's crystallization threshold before CaHPCrystallizer.
+  target_product_concentration_g_per_L: 450.0  # midpoint of the patent's 300-600 g/L crystallization threshold, solubility noted as 450 g/L in the patent
+  P_Pa: [101325, 69682, 47057, 30953]  # same 4-effect pressure profile as systems._microbial_oil_system's fermentation-broth multi-effect evaporator
   V: 0.90  # initial guess; overridden by the bisection specification at simulation time
 
   sources:
@@ -92,7 +65,7 @@ broth_evaporator:
       note: "Patent reports 300-600 g/L as the crystallization-feed 3-HP(salt) concentration range; 450 g/L (midpoint) selected as the target."
     effect_pressures:
       key: microbial_oil_precedent
-      note: "Reuses the same 4-effect pressure profile as systems._microbial_oil_system's Ev607, which has no independent literature grounding of its own either -- kept only for consistency of MultiEffectEvaporator staging across sabre systems."
+      note: "Reuses the same 4-effect pressure profile as systems._microbial_oil_system's fermentation-broth multi-effect evaporator, which has no independent literature grounding of its own either -- kept only for consistency of MultiEffectEvaporator staging across sabre systems."
 
 
 fermentation:
@@ -106,10 +79,7 @@ fermentation:
   # *this* reaction only). Each substrate also has an independent, much
   # smaller cell-mass-forming conversion (see biomass_conversion /
   # biomass_yield_kg_per_kg_consumed below) drawn from the same original
-  # available pool -- mirroring biorefineries.HP's BatchCoFermentation,
-  # which runs "Glucose -> 2 HP" (X=.49) and "Glucose -> 6 FermMicrobe +
-  # 2.4 H2O" (X=.05) as two independent reactions on the same Glucose pool
-  # via a ParallelReaction, not a sequential depletion of one by the other.
+  # available pool.
   #
   # Glucose -> 2 HP is exactly mass-balanced (2 * HP's MW == Glucose's MW,
   # both 180.15588), so its hp_yield_kg_per_kg_consumed is exactly 1.0.
@@ -120,10 +90,7 @@ fermentation:
   # avoid that, HPFermentation computes these two substrates' HP
   # formation imperatively (consumed * mass yield, mirroring sabre's own
   # YarrowiaLipidFermenter._run_reactions pattern) using the MW-derived
-  # mass yield below, rather than a thermosteam Reaction object. This is
-  # the "mass-yield scaling against MW" simplification flagged in the
-  # design spec sec. 7/12, since neither chemical carries an exact atomic
-  # formula in this preliminary chemical set.
+  # mass yield below.
   substrates:
     Glucose:
       hp_conversion: 0.49
@@ -141,21 +108,18 @@ fermentation:
       biomass_conversion: 0.05
       biomass_yield_kg_per_kg_consumed: 0.7675171366554135
 
-  # tau = titer / productivity [hr], computed by HPFermentation itself
-  # (a self-contained simplification of HP's external
-  # TiterAndInhibitorsSpecification / ProcessSpecification pattern -- no
-  # inhibitor-concentration cap logic carried over, flagged in the design
-  # spec sec. 7/12).
-  titer_g_per_L: 62.5
+  # Batch time tau = simulated titer / productivity [hr], computed by
+  # HPFermentation itself in _run from the actual HP formed per broth volume
+  # (a self-contained simplification of HP's external.
+  # There is deliberately no titer parameter here: the
+  # earlier 62.5 g/L value only ever set tau and did not match the ~83 g/L
+  # HP-equivalent the simulated broth actually reaches, so tau ended up
+  # inconsistent with the simulated concentration. The broth concentration
+  # is set by fermentation_feed_evaporator.target_solids_wt_frac above.
   productivity_g_per_L_per_h: 0.76
 
-  # In-situ neutralization with Ca(OH)2 (not NaOH), consistent with the
-  # patent's Example 1 -- this is what supplies the calcium the
-  # crystallization step needs. Dosed to the exact stoichiometric demand of
-  # the HP formed (2 HP : 1 CalciumDihydroxide), plus a small excess,
-  # mirroring EnzymaticPress's own enzyme-excess pattern rather than HP's
-  # fixed per-volume lime loading (which is decoupled from the acid
-  # actually formed).
+  # In-situ neutralization with Ca(OH)2
+  # Dosed based on the stoichiometric demand plus a small excess.
   neutralization_conversion: 0.999999999  # 1 - 1e-9, matches HP's own Rxn(..., 'HP', 1-1e-9)
   lime_excess_frac: 0.02
 
@@ -166,11 +130,10 @@ fermentation:
   sources:
     conversions_and_titer:
       key: user_specified
-      note: "Substrate conversions (Glucose/Xylose 0.49, Mannitol/Alginate 0.40), titer (62.5 g/L), and productivity (0.76 g/L/hr) given directly by the user, following the values reported in a 3-HP process flowsheet; not independently derived here."
-      note_2: "biorefineries.HP itself uses 0.49 for its own Glucose/Xylose -> HP conversions and 0.76 g/L/hr as its default BatchCoFermentation.productivity, confirming these are shared literature/flowsheet values, not novel to this feedstock."
+      note: "Assumptions; biorefineries.HP itself uses 0.49 for its own Glucose/Xylose -> HP conversions and 0.76 g/L/hr as its default BatchCoFermentation.productivity, confirming these are shared literature/flowsheet values, not novel to this feedstock."
     biomass_yield:
       key: analogous_to_HP
-      note: "Biomass-forming side reaction retained per the design spec (sec. 7), analogous to HP's 'Glucose -> 6 FermMicrobe + 2.4 H2O' (X=0.05). Coefficient here (6 mol CellMass per mol substrate, since both FermMicrobe and CellMass formulas carry exactly 1 carbon per formula unit like Glucose's 6) is scaled to sabre's own CellMass MW (24.8342 g/mol) rather than HP's FermMicrobe MW (24.2062 g/mol); no independent literature source for Sargassum-derived substrates specifically."
+      note: "Analogous to HP's 'Glucose -> 6 FermMicrobe + 2.4 H2O' (X=0.05). Coefficient here (6 mol CellMass per mol substrate) is scaled to sabre's own CellMass MW (24.8342 g/mol); no independent literature source for Sargassum-derived substrates specifically."
     neutralization:
       key: HP_precedent
       note: "biorefineries.HP.units.BatchCoFermentation neutralizes lactic-acid-family products with Ca(OH)2 via Rxn('2 HP + CalciumDihydroxide -> CalciumLactate + 2 H2O', 'HP', 1-1e-9); reused here verbatim (X and reactant choice) but forming Ca3HP2 instead of CalciumLactate, and dosed to exact stoichiometric demand instead of HP's fixed lime_mol_per_L_loading, since this preliminary model has no other use for excess lime."
@@ -182,16 +145,9 @@ fermentation:
 crystallization:
   product_ID: Ca3HP2
 
-  # Fixed recovery fraction (not a temperature-solubility correlation): the
+  # Fixed recovery fraction: the
   # patent reports fixed recovery/purity at specified conditions (room
-  # temperature, ~300 rpm stirring) rather than a solubility-vs-temperature
-  # curve, so a fixed-recovery split is the fidelity level the design spec
-  # (sec. 8) calls for -- same simplification level as
-  # biorefineries.succinic's SuccinicAcidCrystallizer /
-  # biorefineries.TAL's TALCrystallizer structurally (single two-phase
-  # outlet, phase split done in CaHPCrystallizer._run), but those two use a
-  # solubility-vs-T correlation for the split fraction where this uses a
-  # constant.
+  # temperature, ~300 rpm stirring).
   target_recovery: 0.91  # midpoint of the patent's reported ~90-92% range
 
   T_K: 298.15  # room temperature, per the patent's Examples 1/2
@@ -208,10 +164,9 @@ crystallization:
 
 
 cell_mass_centrifuge:
-  # bst.units.SolidsCentrifuge instantiation (S401 in the design spec):
+  # bst.units.SolidsCentrifuge:
   # separates CellMass (formed as a small side product in HPFermentation)
-  # from the clarified broth, before the broth_evaporator/CaHPCrystallizer
-  # chain -- not a new unit class.
+  # from the clarified broth before the broth_evaporator/CaHPCrystallizer chain.
   cellmass_split_to_cake: 0.98  # fraction of CellMass captured to the solids-rich outlet; same basis as EnzymaticPress/Press's own solids_capture_frac
   moisture_content: 0.65  # scoping placeholder for a wet cell-mass cake; no source found for this value
 
@@ -222,28 +177,29 @@ cell_mass_centrifuge:
 
 
 crystal_separator:
-  # Downstream bst.units.SolidsCentrifuge instantiation (S402 in the
-  # design spec), same class already used for the cell-mass centrifuge
-  # (S401) -- not a new unit class, just documented dosing/split targets
-  # for whoever wires the system script. The split fraction here (not the
-  # feed stream's own phase tags -- confirmed by direct testing that
-  # bst.units.SolidsCentrifuge collapses a multi-phase feed's per-chemical
-  # mol across phases before splitting, ignoring which phase it already
-  # arrived in) is what actually enforces crystallization.target_recovery
-  # downstream of CaHPCrystallizer; the crystallizer's own phase split is
-  # for internal reporting only (design_results), not a physical
-  # separation the centrifuge inherits automatically.
+  # Downstream bst.units.SolidsCentrifuge instantiation.
   moisture_content: 0.05  # crystal-cake moisture leaving the centrifuge
 
   sources:
     purity:
       key: user_specified_patent
-      note: "Patent reports ~93-99% crystal purity after this separation step; moisture_content selected to be consistent with the low end of that range for a preliminary model."
+      note: "Patent reports ~93-99% crystal purity after this separation step. Purity is NOT modeled here: the crystal separator's split moves only Ca3HP2 (and the moisture water) to the cake, so the simulated cake is essentially pure Ca3HP2 by construction (~99.95% after drying), regardless of moisture_content. moisture_content is just a plausible cake-moisture placeholder."
+
+
+mother_liquor_recycle:
+  # Fraction of the crystal separator's mother liquor recycled back into the
+  # broth evaporator feed, ahead of the concentration target. The remainder is purged
+  # as liquid waste.
+  recycle_frac: 0.5
+
+  sources:
+    recycle_frac:
+      key: scoping_placeholder
+      note: "No literature source; 0.5 as a placeholder."
 
 
 dryer:
-  # Downstream bst.units.DrumDryer instantiation (F402 in the design
-  # spec) -- not a new unit class.
+  # Downstream bst.units.DrumDryer instantiation.
   target_moisture_content: 0.0005  # 500 ppm, mid-range of the patent's ~200-5000 ppm dried product
 
   sources:
