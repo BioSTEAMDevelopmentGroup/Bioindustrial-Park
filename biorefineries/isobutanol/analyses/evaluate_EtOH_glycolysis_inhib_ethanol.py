@@ -11,30 +11,33 @@
 (x-axis) vs the grouped ``inhib_ethanol`` family MULTIPLIER (y-axis), on the
 scenario-A baseline, WITH the enzyme burden turned ON.
 
-It generalizes the sibling ``evaluate_EtOH_k1e_inhib_ethanol.py`` (whose
-x-axis was the single member ``k_1e``) to the whole glycolysis family, so the
-x-axis covers exactly the range that group takes as ONE decision variable in
-the kinetic optimizer's ``metabolic_14d`` study.
-
-Both axes span the SAME bounds the kinetic optimizer's ``metabolic_14d``
-study uses:
+BOTH grouped multipliers are widened well past the study's default bands. The
+x-axis (glycolysis multiplier) spans **1e-3x-4x** the scenario-A baseline
+instead of the study's 0.2x-4x (reaching down to effective glycolysis
+knock-out), and the y-axis (inhib_ethanol multiplier) spans **1e-3x-2x**
+instead of 0.75x-1.5x (reaching down to effectively no ethanol inhibition).
+(This was the both-axes-wide variant
+``evaluate_EtOH_glycolysis_wide_inhib_ethanol_wide.py``; the narrower-band
+siblings -- study bands, and wide inhib band only -- were deleted 2026-09-20 as
+redundant and this script took over their name.) Output filenames carry both an
+``_rb{lo}-{hi}`` glycolysis-band tag and an ``_ib{lo}-{hi}`` inhib-band tag, so
+this run's CSVs / plots coexist with those earlier narrower-band runs' under
+analyses/results/.
 
 * **glycolysis multiplier (x-axis):** the grouped CAPACITY decision variable
   (``kinetic_optimization.METABOLIC_14D_RATE_GROUPS['glycolysis']`` = k_1l,
-  k_1h, k_1e) on its **0.2x-4x** multiplier band
-  (``STUDY_TYPE_OPTIONS['metabolic_14d']['group_multiplier_bounds']
-  ['glycolysis']``). Every member is set to its scenario-A baseline x the
-  multiplier, so intra-family ratios are preserved (exactly
-  ``kinetic_optimization.expand_grouped_values`` for the single glycolysis
-  group). The axis is the dimensionless multiplier.
+  k_1h, k_1e), here swept over a WIDER **1e-3x-4x** band than the study's
+  0.2x-4x -- 1e-3x is effective glycolysis knock-out. Every member is set to
+  its scenario-A baseline x the multiplier, so intra-family ratios are
+  preserved (exactly ``kinetic_optimization.expand_grouped_values`` for the
+  single glycolysis group). The axis is the dimensionless multiplier.
 * **inhib_ethanol multiplier (y-axis):** the same grouped decision variable
   the study uses (``METABOLIC_MINIMAL_SUBSET_GROUPS['inhib_ethanol']`` =
-  k_1ie, k_4ie, k_7ie, k_10ie, k_16ie), which in ``metabolic_14d`` takes the
-  default group band **0.75x-1.5x**
-  (``kinetic_optimization.DEFAULT_GROUP_MULTIPLIER_BOUNDS``). Every member is
-  set to its scenario-A baseline x the multiplier, so intra-family ratios are
-  preserved (exactly ``kinetic_optimization.expand_grouped_values`` for a
-  single group).
+  k_1ie, k_4ie, k_7ie, k_10ie, k_16ie), here swept over a WIDER **1e-3x-2x**
+  band than the study's default 0.75x-1.5x -- 1e-3x is effectively NO ethanol
+  inhibition. Every member is set to its scenario-A baseline x the multiplier,
+  so intra-family ratios are preserved (exactly
+  ``kinetic_optimization.expand_grouped_values`` for a single group).
 
 Both axes are linear grids over the metabolic_14d bounds (the optimizer draws
 them log-uniform; a contour sweep spaces them evenly, matching the sibling
@@ -49,15 +52,19 @@ glycolysis members are rate capacities, so a high glycolysis multiplier raises
 the modeled proteome pool ``Phi_M``; the ``inhib_ethanol`` coefficients are not
 pools, so they do not enter the burden.
 
-OBSERVED (2026-09-20, 40x40 grid): the ENTIRE grid is burden-FEASIBLE -- 0 NaN
-cells, no ``EnzymeBurdenInfeasibleError``. Even at 4x the whole glycolysis
-family the modeled pool (~0.21 g/gDCW) stays below the flexible-sector cap
-``F_flex`` = 0.245, so no infeasible band appears (unlike the expectation the
-sibling ``evaluate_EtOH_k1e_inhib_ethanol.py`` docstring carried); the burden
-only derates growth at every point rather than pruning any. Near-baseline
-(glycolysis 1.0, inhib_ethanol 1.0) reproduces the scenario-A ethanol MPSP
-0.86233; across the grid: ethanol MPSP 0.85-2.68 $/kg, IRR -0.75-0.14, EtOH
-titer 41-134 g/L, cell loading up to ~65 g/L at the high-glycolysis corner.
+Burden feasibility is driven by the x-axis (glycolysis capacity) alone -- the
+``inhib_ethanol`` coefficients are not proteome pools. The glycolysis high end
+is unchanged at 4x, which the 2026-09-20 narrower-band runs found fully feasible in
+scenario A (Phi_M ~0.21 < ``F_flex`` = 0.245 at 4x), and lowering glycolysis
+only shrinks ``Phi_M`` further, so the whole grid is again expected to be
+burden-feasible (0 infeasible cells); the burden only derates growth
+(``k_7``/``k_8``) at every point. The NEW territory is the low-glycolysis edge:
+at 1e-3x (near glycolysis knock-out) glucose uptake all but stops, so those
+points may make little ethanol and/or trip a non-burden physical guard (e.g.
+the fed-batch volume or yield-ceiling checks) -- such points are caught and
+NaN'd, and only non-whitelisted messages are flagged as genuine issues. The
+earlier wide-inhib-band run (glycolysis 0.2x-4x) had 5 such NaN cells, all in the
+high-glycolysis x low-inhibition corner (yield over theoretical maximum).
 """
 
 import numpy as np
@@ -254,16 +261,18 @@ results = {i: [] for i in metrics.keys()}
 
 steps = (40, 40, 1)
 
-# metabolic_14d glycolysis-group band (0.2x-4x): the dimensionless multiplier
-# range the grouped glycolysis capacity decision variable spans in that study.
-GLYCOLYSIS_MULTIPLIER_BOUNDS = ko.STUDY_TYPE_OPTIONS['metabolic_14d'][
-    'group_multiplier_bounds']['glycolysis']  # (0.2, 4.0)
+# WIDE glycolysis band: 1e-3x-4x the scenario-A baseline (vs the study's
+# metabolic_14d group band 0.2x-4x), reaching down to effective glycolysis
+# knock-out. Linear grid (matching the sibling evaluate_* sweeps).
+GLYCOLYSIS_MULTIPLIER_BOUNDS = (1e-3, 4.0)
 spec_1 = glycolysis_multipliers = np.linspace(GLYCOLYSIS_MULTIPLIER_BOUNDS[0],
                                               GLYCOLYSIS_MULTIPLIER_BOUNDS[1],
                                               steps[0])
 
-# metabolic_14d inhibition-family band = the default group band (0.75x-1.5x).
-INHIB_ETHANOL_MULTIPLIER_BOUNDS = ko.DEFAULT_GROUP_MULTIPLIER_BOUNDS  # (0.75, 1.5)
+# WIDE inhib_ethanol band: 1e-3x-2x the scenario-A baseline (vs the study's
+# default 0.75x-1.5x), reaching down to effectively no ethanol inhibition.
+# Linear grid (matching the sibling evaluate_* sweeps).
+INHIB_ETHANOL_MULTIPLIER_BOUNDS = (1e-3, 2.0)
 spec_2 = inhib_ethanol_multipliers = np.linspace(INHIB_ETHANOL_MULTIPLIER_BOUNDS[0],
                                                  INHIB_ETHANOL_MULTIPLIER_BOUNDS[1],
                                                  steps[1])
@@ -281,11 +290,11 @@ spec_3 = spike_concs =\
 
 x_label = "glycolysis multiplier" # title of the x axis
 x_units = r"" # dimensionless (x scenario-A baseline of each member)
-x_ticks = [1.0, 2.0, 3.0, 4.0]
+x_ticks = [0.0, 1.0, 2.0, 3.0, 4.0]
 
 y_label = "inhib_ethanol multiplier" # title of the y axis
 y_units = r"" # dimensionless (x scenario-A baseline of each member)
-y_ticks = [0.5, 1.0, 1.5, 2.0]
+y_ticks = [0.0, 0.5, 1.0, 1.5, 2.0]
 
 z_label = "Spike feed glucose concentration" # title of the x axis
 z_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
@@ -371,7 +380,12 @@ def tickmarks(dmin, dmax, accuracy=50, N_points=5):
 #%%
 minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
 # file_to_save = f'_{steps}_steps_'+'etoh_fbs_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
-file_to_save = f'ibo_{steps}_{x_label[:5]}_{y_label[:5]}_{z_label[:5]}_opt={perform_feeding_strategy_opt}_max_n={ferm_reactor.nsk_kinetic_model.default_max_n_glu_spikes}_'
+# `_rb{lo}-{hi}` / `_ib{lo}-{hi}` tag the (wide) glycolysis rate band and the
+# (wide) inhib_ethanol band so this run's CSVs / plots do not collide with the
+# earlier 0.2x-4x-glycolysis runs' (all share the same x/y/z labels).
+_rb_tag = f'_rb{GLYCOLYSIS_MULTIPLIER_BOUNDS[0]:g}-{GLYCOLYSIS_MULTIPLIER_BOUNDS[1]:g}'
+_ib_tag = f'_ib{INHIB_ETHANOL_MULTIPLIER_BOUNDS[0]:g}-{INHIB_ETHANOL_MULTIPLIER_BOUNDS[1]:g}'
+file_to_save = f'ibo_{steps}_{x_label[:5]}_{y_label[:5]}_{z_label[:5]}{_rb_tag}{_ib_tag}_opt={perform_feeding_strategy_opt}_max_n={ferm_reactor.nsk_kinetic_model.default_max_n_glu_spikes}_'
 
 # Set IBO_SWEEP_REPLOT_FROM_CSV=1 to skip the grid simulations and rebuild
 # the contour plots from the per-metric CSVs a previous run of this script
@@ -384,7 +398,10 @@ replot_from_csv = os.environ.get('IBO_SWEEP_REPLOT_FROM_CSV', '') == '1'
 if not replot_from_csv:
     print('\n\nSimulating the initial point to avoid bugs ...')
     curr_spec = fbs_spec.current_specifications
-    apply_glycolysis_multiplier(glycolysis_multipliers[1])
+    # Warm up on the scenario-A baseline (glycolysis 1.0x, inhib_ethanol 1.0x)
+    # -- a known-good point. The wide 1e-3x lower bound would otherwise put
+    # glycolysis_multipliers[1] at ~0.10x (near knock-out), a fragile warmup.
+    apply_glycolysis_multiplier(1.0)
     apply_inhib_ethanol_multiplier(1.0)  # baseline inhib_ethanol (known-good)
     model_specification(**curr_spec,
         n_sims=3,
@@ -722,15 +739,15 @@ if plot:
             curr_metric_cbar_ticks = np.arange(0.5, 3.5001, 0.5)
             curr_metric_w_ticks = [0.75, 0.9, 1.2, 1.5, 2.0, 3.0]
         elif 'irr' in lccm:
-            # shared with evaluate_EtOH_k13_k7ii.py (grid IRR -0.12 to 0.19);
-            # the under-color catches anything below -0.1
-            curr_metric_w_levels = np.arange(-0.1, 0.2001, 0.005)
-            curr_metric_cbar_ticks = np.arange(-0.1, 0.2001, 0.05)
-            curr_metric_w_ticks = [0.0, 0.05, 0.10, 0.15, 0.18]
-            # IRR can fall far below the lowest level (money-losing corners);
-            # fill those cells rather than leaving them blank
-            extend_cmap = 'both'
-            cmap_under_color = colors.grey_dark.shade(40).RGBn
+            # IRR colormap fixed to 0-15%, NO under/over colors: cells outside
+            # [0, 0.15] (money-losing corners below 0, any point above 0.15)
+            # render blank rather than clamped to an extend colour.
+            curr_metric_w_levels = np.arange(0.0, 0.15001, 0.005)
+            curr_metric_cbar_ticks = np.arange(0.0, 0.15001, 0.05)
+            curr_metric_w_ticks = [0.0, 0.05, 0.10, 0.15]
+            extend_cmap = 'neither'
+            cmap_under_color = None
+            cmap_over_color = None
         # curr_metric_w_levels = np.arange(0., 15.5, 0.5)
 
 
