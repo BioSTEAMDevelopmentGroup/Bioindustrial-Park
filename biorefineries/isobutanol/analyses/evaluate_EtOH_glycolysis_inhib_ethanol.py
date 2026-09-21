@@ -87,6 +87,16 @@ filterwarnings('ignore')
 import contourplots
 get_rounded_str = contourplots.utils.get_rounded_str
 
+# contourplots 0.4.0's comparison_range path iterates `cs.collections`, an
+# attribute matplotlib removed in 3.10 (a ContourSet IS a Collection now, so
+# every setter it calls -- set_facecolor/edgecolor/linewidth/zorder/alpha --
+# lives on the object itself). Restore the attribute as a single-element list
+# so the hatched market-price band renders under matplotlib 3.11 without
+# editing the read-only package.
+from matplotlib.contour import ContourSet as _ContourSet
+if not hasattr(_ContourSet, 'collections'):
+    _ContourSet.collections = property(lambda self: [self])
+
 from biosteam.utils import  colors
 
 from  matplotlib.colors import LinearSegmentedColormap
@@ -744,9 +754,12 @@ if plot:
     #%% MPSP
 
     # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-    MPSP_w_levels = np.arange(0.25, 1.0001, 0.01)
-    MPSP_cbar_ticks = np.arange(0.25, 1.0001, 0.05)
-    MPSP_w_ticks = [0.4, 0.6, 0.8]
+    # Ethanol-MPSP colormap fixed to 0.8-2.0 $/kg (extend 'max': cells above
+    # 2.0 fill with the over colour; the baseline sits at ~0.86, ~0.1 % of
+    # cells fall below 0.8).
+    MPSP_w_levels = np.arange(0.8, 2.0001, 0.02)
+    MPSP_cbar_ticks = np.arange(0.8, 2.0001, 0.2)
+    MPSP_w_ticks = [0.9, 1.0, 1.2, 1.5, 2.0]
     # MPSP_w_levels = np.arange(0., 15.5, 0.5)
 
 
@@ -783,7 +796,7 @@ if plot:
                                     clabel_fontsize = clabel_fontsize,
                                     default_fontsize = default_fontsize,
                                     axis_tick_fontsize = axis_tick_fontsize,
-                                    # comparison_range=EtOH_market_range,
+                                    comparison_range=EtOH_market_range,
                                     n_minor_ticks = 1,
                                     cbar_n_minor_ticks = 4,
                                     units_on_newline = (False, False, False, False), # x,y,z,w
@@ -795,6 +808,7 @@ if plot:
     for curr_metric, val in metrics.items():
         extend_cmap = 'max'
         cmap_under_color = None
+        curr_comparison_range = []
         lccm = curr_metric.lower()
         if 'spike' in lccm or 'q sugar' in lccm or 'target sugars' in lccm:
             if not perform_feeding_strategy_opt:
@@ -840,11 +854,15 @@ if plot:
                             curr_metric_non_nans.max()]))
         curr_metric_w_ticks.sort(reverse=False)
         if 'mpsp' in lccm: # ethanol and isobutanol MPSPs share the same scale
-            # bounds shared with evaluate_EtOH_k13_k7ii.py (fitted to its 20x20
-            # scenario-B grid: EtOH MPSP 0.70-3.49 $/kg, IBO MPSP 1.13-2.43)
-            curr_metric_w_levels = np.arange(0.5, 3.5001, 0.05)
-            curr_metric_cbar_ticks = np.arange(0.5, 3.5001, 0.5)
-            curr_metric_w_ticks = [0.75, 0.9, 1.2, 1.5, 2.0, 3.0]
+            # colormap fixed to 0.8-2.0 $/kg (extend 'max': cells above 2.0
+            # fill with the over colour; the ethanol baseline sits at ~0.86).
+            curr_metric_w_levels = np.arange(0.8, 2.0001, 0.02)
+            curr_metric_cbar_ticks = np.arange(0.8, 2.0001, 0.2)
+            curr_metric_w_ticks = [0.9, 1.0, 1.2, 1.5, 2.0]
+            if curr_metric == 'MPSP':
+                # ethanol market price band on the ethanol-MPSP colour axis only
+                # (not IBO MPSP, whose price basis differs)
+                curr_comparison_range = EtOH_market_range
         elif 'irr' in lccm:
             # IRR colormap fixed to 0-15%, UNDER color on / over color off:
             # cells below 0 (money-losing corners, incl. -inf pushed down
@@ -905,7 +923,7 @@ if plot:
                                         clabel_fontsize = clabel_fontsize,
                                         default_fontsize = default_fontsize,
                                         axis_tick_fontsize = axis_tick_fontsize,
-                                        # comparison_range=EtOH_market_range,
+                                        comparison_range=curr_comparison_range,
                                         n_minor_ticks = 1,
                                         cbar_n_minor_ticks = 3,
                                         units_on_newline = (False, False, False, False), # x,y,z,w
