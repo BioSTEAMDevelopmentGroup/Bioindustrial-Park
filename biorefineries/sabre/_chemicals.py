@@ -40,18 +40,7 @@ def create_chemicals(set_thermo: bool = True, include_hp3: bool = False):
     include_hp3 : bool
         If True, also construct and include the chemicals used only by
         the EnzymaticPress/3-HP-from-Sargassum pathway (Glucose,
-        AlginateMonomer, Enzyme, ...). False by default so every existing
-        system (biostimulant, Biomethane, VFA, Microbial oil)
-        keeps exactly the chemical roster -- and therefore the exact
-        floating-point behavior -- it always has. Adding chemicals to a
-        shared Chemicals object changes NumPy's pairwise-summation array
-        length for every mixture-property calculation package-wide, which
-        can nudge iterative solvers (recycle convergence, MSP root-finding)
-        by a small but nonzero amount even for chemicals with zero flow in
-        a given system -- confirmed by testing that this is insensitive to
-        *where* in the chemical list the new species are inserted. Keeping
-        the 3-HP-only chemicals out of the default roster avoids that
-        drift for every pathway that doesn't need them.
+        AlginateMonomer, Enzyme, ...).
     """
     Water = bst.Chemical("Water")
 
@@ -61,31 +50,12 @@ def create_chemicals(set_thermo: bool = True, include_hp3: bool = False):
     # ('NEGLECT_P') is invalid at process T/P, the same issue this file
     # already works around for KH2PO4/MagnesiumSulfate below,
     # approximated with Water's viscosity for the same reason.
-    #
-    # HHV=0/LHV=0 passed to the constructor do NOT actually take effect
-    # for a real database chemical -- CaO.Hf/HHV/LHV all still come back
-    # as its real (nonzero) database value of -634900 J/mol (confirmed by
-    # direct testing). This was dormant/harmless everywhere Ash's moles
-    # are only ever split/mixed, never reacted (every non-3hp sabre
-    # pathway), since Hf cancels out across any non-reactive step
-    # regardless of its value. It stopped being harmless once
-    # sabre/systems/_3hp_system.py added a real BoilerTurbogenerator:
-    # thermosteam auto-generates a combustion "reaction" for every
-    # chemical (even non-combustible ones), and for CaO that comes out as
-    # the nonsensical `Ash -> 0.5 Oxygen` (thermosteam's default
-    # combustion-reaction heuristic assumes any formula oxygen in excess
-    # of what's needed to oxidize C/H/S/N is released as O2, which isn't
-    # physically real for a metal oxide) -- with CaO's real, large
-    # negative Hf, BT's simulated energy balance saw this as a
-    # substantial *endothermic* heat sink (~318 GJ/h at this pathway's
-    # scale) that isn't physically real. Explicitly zeroing Hf (not just
-    # the ineffective HHV/LHV kwargs) fixes both: Ash becomes a true
-    # energy-inert pass-through regardless of what nonsense reaction
-    # thermosteam invents for it.
-    CaO = bst.Chemical("CaO", phase="s", HHV=0, LHV=0)
+    CaO = bst.Chemical("CaO", phase="s")
     CaO.Hf = 0.0
     CaO.copy_models_from(Water, ["mu"])
-    Ash = CaO.copy(ID="Ash")
+    Ash = bst.Chemical("Ash", search_db=False, default=True, phase="s",
+                        MW=CaO.MW, HHV=0, LHV=0, Hf=0.0)
+    Ash.copy_models_from(CaO, ["Cn", "V", "mu"])
 
     # Hf/Cp from biorefineries.cellulosic.chemicals (Humbird et al. 2011 NREL report)
     Glucan = _structural_solid("Glucan", "C6H10O5", -233200)
@@ -100,11 +70,9 @@ def create_chemicals(set_thermo: bool = True, include_hp3: bool = False):
 
     # Alginic acid uronic-acid repeat unit, dehydrated (C6H10O7 - H2O); MW is
     # computed from the formula. No database entry or literature Hf found for
-    # alginic acid or its mannuronic/guluronic acid monomers (checked NIST
-    # WebBook and general literature), so Hf borrows Glucan's structural-
-    # carbohydrate value as the least-bad available proxy; Cn/V likewise
-    # reuse Glucan's Cp/density basis rather than bst.Chemical's generic
-    # (and here badly wrong -- implied density ~1e6 kg/m3) default estimates.
+    # alginic acid or its mannuronic/guluronic acid monomers,
+    # so Hf borrows Glucan's structural-carbohydrate value;
+    # Cn/V likewise reuse Glucan's Cp/density basis.
     Alginate = _structural_solid("Alginate", "C6H8O6", -233200)
     # Fucose repeat unit, dehydrated (C6H12O5 - H2O); ignores fucoidan's sulfate
     # substitution. No literature Hf found for fucoidan or its L-fucose
@@ -113,29 +81,17 @@ def create_chemicals(set_thermo: bool = True, include_hp3: bool = False):
     Fucoidan = _structural_solid("Fucoidan", "C6H10O4", -233200)
     Mannitol = bst.Chemical("Mannitol")
     # No known formula/composition for this lumped catch-all; treated as
-    # generically Glucan-like (same MW/Cn/V/Hf), consistent with how
-    # Mannan/Galactan already borrow Glucan's properties above.
+    # generically Glucan-like (same MW/Cn/V/Hf).
     OtherSolids = Glucan.copy("OtherSolids")
 
-    # EnzymaticPress/3-HP-only chemicals (sabre/units/_preprocessing.py).
-    # Gated behind include_hp3 -- see create_chemicals()'s docstring for
-    # why these aren't unconditionally in the default roster.
+    # EnzymaticPress/3-HP-only chemicals.
     hp3_chemicals = []
     if include_hp3:
-        # Real database chemical -- soluble hydrolysis product of Glucan
-        # (Glucan + Water -> Glucose is atom-balanced against Glucan's
-        # C6H10O5 formula above).
         Glucose = bst.Chemical("Glucose")
 
         # Free monomer form of Alginate (mannuronic/guluronic acid, hydrated:
         # Alginate's C6H8O6 repeat unit + H2O -> C6H10O7), formed by
-        # enzymatic hydrolysis in EnzymaticPress. No literature Hf found
-        # for the free monomer either, so Hf/Cp borrow the same generic
-        # structural-carbohydrate basis already used for Alginate above.
-        # Unlike Alginate, this is modeled as phase="l" (dissolved, not
-        # solid-locked) since it must follow the "solubles" split path
-        # once hydrolyzed, not the "solids" path -- see
-        # utils.get_solids_group_IDs(). Liquid density is a rough
+        # enzymatic hydrolysis in EnzymaticPress. Liquid density is a rough
         # concentrated-sugar-acid-solution proxy (1200 kg/m3, vs. Glucan's
         # solid-phase 1540 kg/m3), and viscosity borrows Water's model for
         # the same NEGLECT_P-workaround reason as the nutrient salts below.
@@ -149,9 +105,8 @@ def create_chemicals(set_thermo: bool = True, include_hp3: bool = False):
         # alginate lyase, dosed in EnzymaticPress) -- same formula/Hf
         # convention biorefineries.cellulosic uses for its own 'Enzyme'
         # chemical (CH1.59O0.42N0.24S0.01, Hf shared with Protein-like
-        # chemicals), also standing in for alginate lyase since no separate
-        # property data exists for it. Modeled as phase="l" (dosed as a dilute
-        # aqueous enzyme prep, not solid-locked), with Water-like density/
+        # chemicals). Modeled as phase="l" (dosed as a dilute
+        # aqueous enzyme prep), with Water-like density/
         # viscosity as a dilute-solute proxy (same technique used for
         # KH2PO4/MagnesiumSulfate below).
         Enzyme = bst.Chemical("Enzyme", search_db=False, default=True, phase="l",
@@ -164,28 +119,21 @@ def create_chemicals(set_thermo: bool = True, include_hp3: bool = False):
         # product (HPFermentation, sabre/units/_3hp.py).
         HP = bst.Chemical("HP", search_ID="3-Hydroxypropionic acid")
 
-        # Real database chemical: fermentation neutralization base, forming
+        # Fermentation neutralization base, forming
         # Ca3HP2 in situ (HPFermentation). Dosed into a liquid-phase
         # broth, but its database liquid-volume/viscosity correlations
-        # ('NEGLECT_P') are invalid at process T/P -- same issue this file
-        # already works around for KH2PO4/MagnesiumSulfate/NaOH below, fixed
-        # the same way (dilute-solute density/viscosity proxy).
+        # ('NEGLECT_P') are invalid at process T/P, fixed with a dilute-solute density/viscosity proxy.
         CalciumDihydroxide = bst.Chemical("CalciumDihydroxide", search_ID="Calcium hydroxide")
         CalciumDihydroxide.V.l.add_model(
             tmo.functional.rho_to_V(1e5, CalciumDihydroxide.MW), top_priority=True
         )
         CalciumDihydroxide.copy_models_from(Water, ["mu"])
 
-        # Calcium 3-hydroxypropionate, the crystallized final product
-        # (CaHPCrystallizer, sabre/units/_3hp.py). 3-HP and lactic acid are
-        # structural isomers (both C3H6O3), so their calcium salts share the
-        # exact same molecular formula (CaC6H10O6) -- properties borrowed
-        # from the database's real "Calcium lactate" entry as the best
-        # available proxy (same borrowing technique used for Alginate/
-        # Fucoidan above, but via a formula-identical real analog here
-        # rather than an approximate one). Locked to phase="s" (the
-        # crystallized/dried state this chemical is always tracked in);
-        # the database entry has no Hf, so one is estimated assuming the
+        # Calcium 3-hydroxypropionate, the crystallized final product. 3-HP and lactic acid are
+        # structural isomers (both C3H6O3), properties borrowed
+        # from database's real "Calcium lactate" entry as the best
+        # available proxy.
+        # The database entry has no Hf, so one is estimated assuming the
         # neutralization reaction (2 HP + Ca(OH)2 -> Ca3HP2 + 2 H2O) is
         # thermoneutral (no literature heat of reaction found):
         # Hf(Ca3HP2) = 2*Hf(HP) + Hf(Ca(OH)2) - 2*Hf(Water). The database
@@ -193,40 +141,17 @@ def create_chemicals(set_thermo: bool = True, include_hp3: bool = False):
         # borrows the same generic structural-solid proxy (_rho_solids)
         # used for Glucan/Alginate/etc. above. Its database liquid-
         # viscosity correlation ('NEGLECT_P') is invalid outside
-        # atmospheric pressure (confirmed by testing: a downstream Pump
-        # operating this stream under vacuum raised a RuntimeError even
-        # though this chemical is locked to phase="s") -- same NEGLECT_P
-        # issue this file already works around for KH2PO4/MagnesiumSulfate/
-        # NaOH/CalciumDihydroxide above, fixed the same way.
+        # atmospheric pressure, fixed assuming water.
         Ca3HP2 = bst.Chemical("Ca3HP2", search_ID="Calcium lactate", phase="s")
         Ca3HP2.Hf = 2 * HP.Hf + CalciumDihydroxide.Hf - 2 * Water.Hf
         Ca3HP2.V.add_model(tmo.functional.rho_to_V(_rho_solids, Ca3HP2.MW), top_priority=True)
         Ca3HP2.copy_models_from(Water, ["mu"])
 
-        # Combustion product of the sulfur atoms in Protein/Enzyme's
-        # formulas (both already S-bearing), needed only because
-        # bst.BoilerTurbogenerator (sabre/systems/_3hp_system.py's BT,
-        # burning pressed_cake/milling_losses/cell_mass) calls
-        # chemicals.get_combustion_reactions() at simulation time, which
-        # raises UndefinedChemicalAlias('SO2') without this -- confirmed
-        # by direct testing. Gated behind include_hp3 like the rest of
-        # this block (not the default roster) even though Protein/Enzyme's
-        # sulfur isn't itself 3-HP-specific, since no other sabre system
-        # has a BT yet and adding any chemical to the default roster
-        # drifts the other pathways' regression tests (see this function's
-        # own docstring).
+        # Combustion product of the sulfur atoms.
         SO2 = bst.Chemical("SO2", phase="g")
 
-        # Same issue, for the phosphorus in KH2PO4's formula (KH2PO4 is
-        # already in the default roster below, for nutrient dosing, but
-        # this combustion byproduct is only ever needed by BT, so it's
-        # gated here rather than added alongside KH2PO4 itself). Never
-        # actually flows in this pathway (HPFermentation doesn't dose
-        # KH2PO4 at all -- only biorefineries.sabre's microbial_oil
-        # pathway does), but get_combustion_reactions() builds a reaction
-        # for every chemical in the compiled roster regardless of whether
-        # it's ever present in a real stream, and the database's real
-        # entry is missing Psat/Tb/Hvap (confirmed by testing) -- since
+        # Combustion product of phosphorus atoms. The database's real
+        # entry is missing Psat/Tb/Hvap, since
         # the exact values are irrelevant for a chemical that never flows,
         # Water's own models are borrowed as a placeholder rather than
         # sourcing real P4O10 property data.
@@ -266,23 +191,14 @@ def create_chemicals(set_thermo: bool = True, include_hp3: bool = False):
     # MicrobialOil: real properties of triolein (TAG), the standard
     # microbial/single-cell-oil proxy used across biorefineries.cane,
     # biorefineries.HP, and biorefineries.OHFA (oleaginous-yeast fermentation
-    # yields are tracked directly as TAG in those biorefineries). The
-    # database entry for triolein itself has no Hf (confirmed by testing
-    # bst.Chemical('Triolein').Hf is None), so biorefineries.cane doesn't
-    # rely on a lookup either -- it hardcodes the same literature value
-    # (Hf_triolein) used here, in create_acyl_olein().
+    # yields are tracked directly as TAG in those biorefineries).
     MicrobialOil = bst.Chemical("MicrobialOil", search_ID="Triolein")
     MicrobialOil.Hf = -1776e3
 
-    # CellMass: matches biorefineries.actag's 'Cells' chemical (chemicals.yaml),
-    # which is explicitly a Yarrowia lipolytica stand-in (synonym
-    # 'YarrowiaLipolytica') -- same organism as sabre's fermentation step.
+    # CellMass: matches biorefineries.actag's 'Cells' chemical (chemicals.yaml).
     # Its formula is the generic-yeast composition also used for
     # biorefineries.cane's 'Yeast' chemical, while its Hf is the same
-    # Humbird et al. 2011 value used for Z_mobilis (-31169.39 cal/mol);
-    # actag pairs that Hf with the yeast formula rather than Z_mobilis's
-    # own bacterial formula, which is a better match for Yarrowia than the
-    # bacterium-based placeholder used here previously.
+    # Humbird et al. 2011 value used for Z_mobilis (-31169.39 cal/mol).
     CellMass = bst.Chemical("CellMass", search_db=False, default=True, phase="s",
                              formula="CH1.61O0.56N0.16", Hf=-31169.39 * _cal2joule)
     CellMass.V.add_model(tmo.functional.rho_to_V(_rho_solids, CellMass.MW), top_priority=True)
@@ -326,11 +242,10 @@ def create_chemicals(set_thermo: bool = True, include_hp3: bool = False):
     chems.compile()
 
     # "solids" group derived directly from which chemicals are actually
-    # locked to phase='s' above -- the single source of truth for which
+    # locked to phase='s' above, determines which
     # chemicals count as solids in unit simulations (Press,
     # VFAMicrofilter, DigestateDecanterCentrifuge via
-    # utils.get_solids_group_IDs()) is the chemical models themselves, not
-    # a separately-maintained ID list that could drift out of sync with them.
+    # utils.get_solids_group_IDs()).
     solid_IDs = [c.ID for c in chems if c.locked_state == "s"]
     if solid_IDs:
         chems.define_group("solids", solid_IDs)
