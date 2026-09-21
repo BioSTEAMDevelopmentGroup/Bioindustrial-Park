@@ -44,13 +44,20 @@ baseline point.
 
 Enzyme burden: installed A-referenced via ``scenarios.load_scenario('A',
 burden=True)`` (``system.set_active_burden``), so the ``load_simulate`` choke
-point derates ``k_7``/``k_8`` for every simulated point. The glycolysis
-members are rate capacities, so a high glycolysis multiplier raises the modeled
-proteome pool ``Phi_M`` past the flexible-sector cap and the point becomes
-burden-INFEASIBLE (``EnzymeBurdenInfeasibleError`` -> caught -> NaN); the
-``inhib_ethanol`` coefficients are not pools, so they do not enter the burden
--- expect a roughly vertical infeasible (NaN) band at high glycolysis
-multiplier.
+point derates ``k_7``/``k_8`` (growth) for every simulated point. The
+glycolysis members are rate capacities, so a high glycolysis multiplier raises
+the modeled proteome pool ``Phi_M``; the ``inhib_ethanol`` coefficients are not
+pools, so they do not enter the burden.
+
+OBSERVED (2026-09-20, 40x40 grid): the ENTIRE grid is burden-FEASIBLE -- 0 NaN
+cells, no ``EnzymeBurdenInfeasibleError``. Even at 4x the whole glycolysis
+family the modeled pool (~0.21 g/gDCW) stays below the flexible-sector cap
+``F_flex`` = 0.245, so no infeasible band appears (unlike the expectation the
+sibling ``evaluate_EtOH_k1e_inhib_ethanol.py`` docstring carried); the burden
+only derates growth at every point rather than pruning any. Near-baseline
+(glycolysis 1.0, inhib_ethanol 1.0) reproduces the scenario-A ethanol MPSP
+0.86233; across the grid: ethanol MPSP 0.85-2.68 $/kg, IRR -0.75-0.14, EtOH
+titer 41-134 g/L, cell loading up to ~65 g/L at the high-glycolysis corner.
 """
 
 import numpy as np
