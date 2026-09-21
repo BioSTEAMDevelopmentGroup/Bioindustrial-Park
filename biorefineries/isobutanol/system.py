@@ -141,7 +141,7 @@ def load(simulate_baseline=True,
         default builds both (the gated-parallel baseline configuration).
         Whatever a mode does not build is represented by an empty, zero-cost
         placeholder (empty dangling `isobutanol` feed into V514, empty
-        'isobutanol separation' unit group), so the public surface --
+        'isobutanol purification' unit group), so the public surface --
         registered product streams, unit-group keys, solve_TEA behavior
         (nan MPSP for an empty product) -- is identical in every mode.
 
@@ -877,16 +877,47 @@ def load(simulate_baseline=True,
     wastewater_treatment_group = bst.UnitGroup('wastewater treatment',
                                                units=[M501] + list(wastewater_treatment_sys.units))
 
-    # define IBO separation units EXPLICITLY (a leftover-based definition would
-    # sweep the entire integrated separation train here): the stripper ->
-    # decanter-loop -> drying-column chain that finishes the isobutanol product.
-    # Always registered (stable unit_groups_dict keys / metrics-table shape
-    # across modes); empty when the IBO/EtOH train is absent.
-    isobutanol_separation_group = bst.UnitGroup('isobutanol separation',
-                                                units=([sep_udct['D103'], sep_udct['M301'],
-                                                        sep_udct['H301'], sep_udct['S301'],
-                                                        sep_udct['D104'], sep_udct['H302']]
-                                                       if has_IBO_EtOH else []))
+    # Separation is reported as THREE exclusive-membership groups (spec
+    # 2026-09-19-facility-unit-groups-design.md section 4a), with NO
+    # allocation of the shared units: a genuinely joint cost gets its own row.
+    #
+    # 'isobutanol purification' -- EXPLICIT: the stripper -> decanter-loop ->
+    # drying-column chain that finishes the isobutanol product. Always
+    # registered (stable unit_groups_dict keys / metrics-table shape across
+    # modes); empty when the IBO/EtOH train is absent.
+    IBO_EtOH_train_keys = ('D101', 'M201', 'D102', 'H202', 'MS201', 'H201',
+                           'D103', 'M301', 'H301', 'S301', 'D104', 'H302')
+    isobutanol_purification_group = bst.UnitGroup('isobutanol purification',
+                                                  units=([sep_udct[i] for i in
+                                                          ('D103', 'M301', 'H301',
+                                                           'S301', 'D104', 'H302')]
+                                                         if has_IBO_EtOH else []))
+
+    # 'ethanol purification' -- EXPLICIT: the integrated train's dedicated
+    # ethanol tail (superheater H202, sieve MS201, condenser H201); the WHOLE
+    # in-system ethanol-primary train (it is ethanol-dedicated -- its IBO is
+    # lost to WWT, not recovered -- so its beer column and rectifier belong
+    # here, not in the shared group; its storage/denaturant tail is orphaned
+    # off-system and filtered out by the in-system test); and the
+    # ethanol-only merge MX6 + day-tank pump P512, which exist in every mode.
+    # NOTE: sep_udct maps BOTH factory ID -> unit AND unit.line -> unit
+    # (biosteam SystemFactory udct=True), so a repeated line (Pump, Mixer,
+    # Distillation, ...) resolves to a LIST and units are renamed on the
+    # flowsheet AFTER the dict is built. Select the leftover ethanol-primary
+    # units by OBJECT identity off separation_sys.units (unique, live IDs),
+    # excluding the IBO/EtOH train and the gating splitter, so the membership
+    # is exactly the brief's intent without touching the line-keyed entries.
+    in_system_units = set(corn_EtOH_IBO_sys.units)
+    IBO_EtOH_train_units = set([sep_udct[i] for i in IBO_EtOH_train_keys if i in sep_udct]
+                               + ([sep_udct['S201']] if 'S201' in sep_udct else []))
+    ethanol_purification_group = bst.UnitGroup('ethanol purification',
+                                               units=([sep_udct[i] for i in ('H202', 'MS201', 'H201')]
+                                                      if has_IBO_EtOH else [])
+                                                   + ([unit for unit in separation_sys.units
+                                                       if unit in in_system_units
+                                                       and unit not in IBO_EtOH_train_units]
+                                                      if has_EtOH_primary else [])
+                                                   + [MX6, u.P512])
 
     storage_and_handling_group = bst.UnitGroup('storage and handling', 
                                                units = [i for i in corn_EtOH_IBO_sys.units
@@ -900,58 +931,190 @@ def load(simulate_baseline=True,
                                                            + list(corn_EtOH_IBO_sys.facilities)
                                                            + wastewater_treatment_group.units + [M510]])
 
-    # leftover-based: resolves to the EtOH side of the integrated train (P301,
-    # D101 beer column, M201, D102 rectifier, H202, MS201, H201) + P512, the
-    # gating splitter S201 and the whole in-system ethanol-primary train
-    # (beer pump/column, rectifier, sieve, condenser) + MX6/MX7, the
-    # vent-scrubber-recycle mixer MX8, plus the long-standing strays PX,
-    # V409, P410, MX5 (kept here so every in-system unit stays covered by
-    # exactly one group).
-    ethanol_separation_group = bst.UnitGroup('ethanol separation',
+    heat_exchanger_network_group = bst.UnitGroup('heat exchanger network',
+                                                     units=(u.HXN1001,))
+
+    # BT801 is ONE bst.BoilerTurbogenerator, so it cannot be split by unit
+    # membership: 'boiler' OWNS it (plus the boiler-solids mixer M510) and
+    # the unit-less 'turbogenerator' group reads BT801's 'Turbogenerator'
+    # cost item and turbine-condenser duty directly; the two sum exactly to
+    # BT801 + M510 (getters: _add_facility_group_metrics).
+    boiler_group = bst.UnitGroup('boiler', units=[u.BT801, M510])
+    turbogenerator_group = bst.UnitGroup('turbogenerator')
+    cooling_utility_facilities_group = bst.UnitGroup('cooling utility facilities',
+                                                     units=[u.CT901, u.CWP901])
+
+    # the facilities no other group claims (PWC901, CIP901, ADP901, FWT901),
+    # so a future facility still lands somewhere
+    other_facilities_group = bst.UnitGroup('other facilities',
+                                        units=[i for i in list(corn_EtOH_IBO_sys.facilities)
+                                               if not i in heat_exchanger_network_group.units
+                                                         + boiler_group.units
+                                                         + cooling_utility_facilities_group.units])
+
+    # 'alcohol recovery' -- LEFTOVER-based, the SHARED group serving both
+    # products: resolves, in the default build, to the broth pump P301, the
+    # vent-scrubber recycle (V409, P410, MX8), the gating splitter S201, the
+    # beer column D101 (takes BOTH alcohols overhead), M201 + the rectifier
+    # D102 (which ARE the ethanol/isobutanol split; D102 also carries the
+    # isobutanol loop's load through the decanter aqueous recycle), the
+    # stillage merge MX7, and the long-standing strays PX, MX5. The leftover
+    # rule lives HERE so a future stray lands in the shared group, never
+    # mislabeled as one product's; analyses/test_unit_groups.py pins this
+    # membership by object identity, so a stray surfaces with its ID. In
+    # ('ethanol',) builds only the mode-independent units remain.
+    alcohol_recovery_group = bst.UnitGroup('alcohol recovery',
                                  units= [i for i in corn_EtOH_IBO_sys.units
                                 if not i in list(corn_EtOH_IBO_sys.facilities)
                                             + feedstock_acquisition_group.units + feedstock_saccharification_group.units
                                             + sugar_solution_preparation_group.units + fermentation_group.units
-                                            + isobutanol_separation_group.units + storage_and_handling_group.units
+                                            + ethanol_purification_group.units + isobutanol_purification_group.units
+                                            + storage_and_handling_group.units
                                             + DDGS_recovery_group.units
                                             + wastewater_treatment_group.units + [M510]]
                                  )
 
-    heat_exchanger_network_group = bst.UnitGroup('heat exchanger network', 
-                                                     units=(u.HXN1001,))
+    # Cost pseudo-groups (HP pattern, biorefineries/TAL/_general_utils.py):
+    # unit-less rows whose only non-zero metric is 'Operating cost', so the
+    # column x operating_hours sums to tea.AOC (spec section 5).
+    natural_gas_steam_group = bst.UnitGroup('natural gas (for steam generation)')
+    natural_gas_drying_group = bst.UnitGroup('natural gas (for product drying)')
+    fixed_operating_cost_group = bst.UnitGroup('fixed operating cost')
+    excess_electricity_group = bst.UnitGroup('excess electricity')
 
-    other_facilities_group = bst.UnitGroup('other facilities',
-                                        units=[i for i in list(corn_EtOH_IBO_sys.facilities)
-                                               if not i in heat_exchanger_network_group.units]
-                                             + [M510])
     unit_groups = [
         feedstock_acquisition_group,
         feedstock_saccharification_group,
         sugar_solution_preparation_group,
         fermentation_group,
-        isobutanol_separation_group,
-        ethanol_separation_group,
+        alcohol_recovery_group,
+        ethanol_purification_group,
+        isobutanol_purification_group,
         storage_and_handling_group,
         DDGS_recovery_group,
         wastewater_treatment_group,
         heat_exchanger_network_group,
+        boiler_group,
+        turbogenerator_group,
+        cooling_utility_facilities_group,
         other_facilities_group,
+        natural_gas_steam_group,
+        natural_gas_drying_group,
+        fixed_operating_cost_group,
+        excess_electricity_group,
         ]
 
     unit_groups_dict = {}
     for i in unit_groups:
         unit_groups_dict[i.name] = i
-        i.autofill_metrics(shorthand=False, 
-                           electricity_production=False, 
+        i.autofill_metrics(shorthand=False,
+                           electricity_production=False,
                            electricity_consumption=True,
                            material_cost=True)
 
     unit_groups_dict['heat exchanger network'].filter_savings=False
 
+    _add_facility_group_metrics(unit_groups_dict, BT=u.BT801,
+                                system=corn_EtOH_IBO_sys,
+                                tea=corn_EtOH_IBO_sys_tea)
+
     _loaded = True
     _published = dict(locals())
     globals().update(_published)
     return _published
+
+def _stream_utility_cost(unit):
+    """USD/hr of `unit`'s define_utility stream cash flows (boiler fuel, ash
+    disposal, dryer natural gas, RO water): its utility cost less its heat-
+    and power-utility costs. biosteam books these in unit.utility_cost, not
+    in any stream.cost, so UnitGroup.get_material_cost never sees them."""
+    return ((unit.utility_cost or 0.)
+            - sum([i.cost for i in unit.heat_utilities])
+            - unit.power_utility.cost)
+
+def _add_facility_group_metrics(unit_groups_dict, BT, system, tea):
+    """Rename every group's 'Material cost' metric to 'Operating cost' and
+    install the facility / pseudo-group getters of spec
+    2026-09-19-facility-unit-groups-design.md (sections 4-5). Rule: each
+    priced feed and each utility cash flow is counted in exactly ONE group,
+    so the Operating-cost column x tea.operating_hours sums to tea.AOC.
+    Metrics are addressed BY NAME (never by index); getters are closures over
+    the live objects, read at call time, so they track every re-simulation.
+    Reporting only: no getter mutates state."""
+    INSTALLED, COOLING, ELECTRICITY, MATERIAL, OPERATING = (
+        'Installed equipment cost', 'Cooling duty', 'Electricity consumption',
+        'Material cost', 'Operating cost')
+
+    def _metric(group, name):
+        for m in group.metrics:
+            if m.name == name: return m
+        raise KeyError(f"unit group {group.name!r} has no metric {name!r}")
+
+    for group in unit_groups_dict.values():
+        _metric(group, MATERIAL).name = OPERATING
+
+    # corn is dosed into 'feedstock acquisition' and flows on into
+    # 'feedstock saccharification'; with extend_feed_ends the saccharification
+    # group traces it back to the corn origin and double-counts it (a
+    # pre-existing overlap the old 'Material cost' column also had). Book each
+    # shared upstream feed once, to 'feedstock acquisition', by not extending
+    # saccharification's feeds past its own units. Reporting only; corn's
+    # enzymes/acids are dosed directly into saccharification units, so they are
+    # still traced.
+    unit_groups_dict['feedstock saccharification'].extend_feed_ends = False
+
+    zero = lambda: 0.
+
+    # boiler / turbogenerator: one bst.BoilerTurbogenerator, split by cost
+    # item. Fuel is NOT here (its own pseudo-group); ash disposal is a
+    # define_utility OUTLET the native material cost misses, added HP-style.
+    boiler = unit_groups_dict['boiler']
+    turbogenerator = unit_groups_dict['turbogenerator']
+    get_turbogenerator_installed_cost = lambda: BT.installed_costs['Turbogenerator']/1e6
+    _metric(boiler, INSTALLED).getter = lambda: (boiler.get_installed_cost()
+                                                 - get_turbogenerator_installed_cost())
+    _metric(boiler, COOLING).getter = zero
+    _metric(boiler, OPERATING).getter = lambda: (boiler.get_material_cost()
+                                                 + abs(BT.ash_disposal_price*BT.ash_disposal.F_mass))
+    _metric(turbogenerator, INSTALLED).getter = get_turbogenerator_installed_cost
+    # the turbine condenser; BT.cooling_duty <= 0 kJ/hr -> positive GJ/hr
+    _metric(turbogenerator, COOLING).getter = lambda: abs(BT.cooling_duty)/1e6
+
+    # cooling utility facilities: the facility's duty is the process groups'
+    # duty, already counted there (HP). Operating cost stays NATIVE (the
+    # priced cooling-tower chemicals), unlike HP's blanket zero.
+    cooling = unit_groups_dict['cooling utility facilities']
+    _metric(cooling, COOLING).getter = zero
+    _metric(cooling, ELECTRICITY).getter = lambda: sum([i.power_utility.rate
+                                                        for i in cooling.units])/1e3
+
+    # other facilities: PWC901's RO-water charge is a define_utility inlet,
+    # invisible to the native material cost.
+    other = unit_groups_dict['other facilities']
+    _metric(other, OPERATING).getter = lambda: (other.get_material_cost()
+                                                + sum([_stream_utility_cost(i)
+                                                       for i in other.units]))
+
+    # DDGS recovery: X611 (thermal oxidizer) burns supplemental natural gas to
+    # combust the DDGS-dryer acid overhead -- a define_utility stream cash flow
+    # the native material cost misses. Home it here (where the unit lives),
+    # excluding the DrumDryer whose fuel the drying pseudo-group already books.
+    ddgs = unit_groups_dict['DDGS recovery']
+    _metric(ddgs, OPERATING).getter = lambda: (ddgs.get_material_cost()
+        + sum([_stream_utility_cost(i) for i in ddgs.units
+               if not isinstance(i, bst.DrumDryer)]))
+
+    # cost pseudo-groups
+    dryers = [i for i in system.units if isinstance(i, bst.DrumDryer)]
+    _metric(unit_groups_dict['natural gas (for steam generation)'], OPERATING).getter = \
+        lambda: BT.natural_gas_price*BT.natural_gas.F_mass
+    _metric(unit_groups_dict['natural gas (for product drying)'], OPERATING).getter = \
+        lambda: sum([(i.utility_cost or 0.) - i.power_utility.cost for i in dryers])
+    _metric(unit_groups_dict['fixed operating cost'], OPERATING).getter = \
+        lambda: tea.FOC/tea.operating_hours
+    # negative = credit for sold power
+    _metric(unit_groups_dict['excess electricity'], OPERATING).getter = \
+        lambda: system.power_utility.cost
 
 def __getattr__(name):
     # PEP 562: only called when normal module attribute lookup fails, i.e.
