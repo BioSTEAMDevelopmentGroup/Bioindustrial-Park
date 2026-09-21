@@ -65,6 +65,10 @@ the fed-batch volume or yield-ceiling checks) -- such points are caught and
 NaN'd, and only non-whitelisted messages are flagged as genuine issues. The
 earlier wide-inhib-band run (glycolysis 0.2x-4x) had 5 such NaN cells, all in the
 high-glycolysis x low-inhibition corner (yield over theoretical maximum).
+
+Crash resilience: the grid is checkpointed per point and resumes on relaunch
+(see the 'Checkpoint + resume' cell). Launch through ``supervise_sweep.py
+<this script>`` to have a crashed or hung process relaunched automatically.
 """
 
 import numpy as np
@@ -94,6 +98,8 @@ from datetime import datetime
 from math import log
 
 import os
+import csv
+import json
 
 
 import biosteam as bst
@@ -393,6 +399,97 @@ file_to_save = f'ibo_{steps}_{x_label[:5]}_{y_label[:5]}_{z_label[:5]}{_rb_tag}{
 # saved under analyses/results/. Only the plot styling below then matters.
 replot_from_csv = os.environ.get('IBO_SWEEP_REPLOT_FROM_CSV', '') == '1'
 
+#%% Checkpoint + resume (crash resilience)
+# A native integrator crash (CVODE segfault; exit code 5, no traceback) kills
+# the process and cannot be caught by the sweep loop's try/except, so the grid
+# is checkpointed PER POINT and a relaunch resumes it (same cell as
+# evaluate_EtOH_k13_inhib_isobutanol.py):
+# - <script stem>_checkpoint.csv: one flushed row per evaluated grid point
+#   (grid indices, axis values, state OK / ERROR / LOST, every metric). Points
+#   already in it are not re-simulated.
+# - <script stem>_inflight.json: written right before each point's simulation
+#   and removed once its row is logged. One found at start-up marks the point
+#   the previous process died in: it is logged as a LOST (all-NaN) row and
+#   skipped, so a deterministic crash is stepped past (the kinetic-BO
+#   supervisor's sidecar pattern).
+# Paths depend only on the script name, so analyses/supervise_sweep.py (the
+# auto-relaunching wrapper) can find them without loading the model. The
+# checkpoint is deleted when the script finishes (plots included); set
+# IBO_SWEEP_FRESH=1 to discard a leftover one and start over. Its axis values
+# are verified against this grid, so a checkpoint of other bounds raises.
+_script_stem = os.path.splitext(os.path.basename(__file__))[0]
+checkpoint_filepath = isobutanol_results_filepath + _script_stem + '_checkpoint.csv'
+inflight_filepath = isobutanol_results_filepath + _script_stem + '_inflight.json'
+checkpoint_x_column, checkpoint_y_column = 'glycolysis_multiplier', 'inhib_ethanol_multiplier'
+checkpoint_fieldnames = ['i_row', 'i_col', checkpoint_x_column, checkpoint_y_column,
+                         'state'] + list(metrics.keys())
+
+def append_checkpoint_row(i2, i1, state, metric_values):
+    is_new = not os.path.exists(checkpoint_filepath)
+    with open(checkpoint_filepath, 'a', newline='') as fh:
+        writer = csv.DictWriter(fh, fieldnames=checkpoint_fieldnames)
+        if is_new: writer.writeheader()
+        writer.writerow({'i_row': i2, 'i_col': i1,
+                         checkpoint_x_column: repr(float(spec_1[i1])),
+                         checkpoint_y_column: repr(float(spec_2[i2])),
+                         'state': state,
+                         **{k: repr(float(v)) for k, v in metric_values.items()}})
+        fh.flush()
+        os.fsync(fh.fileno())
+
+def load_checkpoint():
+    points = {}
+    if not os.path.exists(checkpoint_filepath): return points
+    with open(checkpoint_filepath, newline='') as fh:
+        reader = csv.DictReader(fh)
+        if reader.fieldnames != checkpoint_fieldnames:
+            raise RuntimeError(f'Checkpoint columns do not match this sweep: {checkpoint_filepath} '
+                               '(delete it or set IBO_SWEEP_FRESH=1).')
+        for row in reader:
+            if None in row.values() or '' in row.values(): continue # truncated last line
+            i2, i1 = int(row['i_row']), int(row['i_col'])
+            if not (i2 < len(spec_2) and i1 < len(spec_1)
+                    and np.isclose(float(row[checkpoint_x_column]), spec_1[i1])
+                    and np.isclose(float(row[checkpoint_y_column]), spec_2[i2])):
+                raise RuntimeError(f'Checkpoint is of a different grid: {checkpoint_filepath} '
+                                   '(delete it or set IBO_SWEEP_FRESH=1).')
+            points[(i2, i1)] = {k: float(row[k]) for k in metrics.keys()}
+    return points
+
+def write_inflight(i2, i1):
+    with open(inflight_filepath, 'w') as fh:
+        json.dump({'i_row': i2, 'i_col': i1,
+                   checkpoint_x_column: float(spec_1[i1]),
+                   checkpoint_y_column: float(spec_2[i2])}, fh)
+        fh.flush()
+        os.fsync(fh.fileno())
+
+def clear_inflight():
+    if os.path.exists(inflight_filepath): os.remove(inflight_filepath)
+
+checkpointed_points = {}
+if not replot_from_csv:
+    assert len(spec_3)==1, 'the checkpoint assumes a single spike concentration'
+    if os.environ.get('IBO_SWEEP_FRESH', '') == '1':
+        for _path in (checkpoint_filepath, inflight_filepath):
+            if os.path.exists(_path): os.remove(_path)
+    checkpointed_points = load_checkpoint()
+    if os.path.exists(inflight_filepath):
+        with open(inflight_filepath) as fh: _lost = json.load(fh)
+        _lost_point = (_lost['i_row'], _lost['i_col'])
+        if _lost_point not in checkpointed_points:
+            print(f'\nThe previous process died at grid point {_lost_point} '
+                  f'({checkpoint_x_column} = {_lost[checkpoint_x_column]}, '
+                  f'{checkpoint_y_column} = {_lost[checkpoint_y_column]}); '
+                  'logging it as LOST (NaN).')
+            checkpointed_points[_lost_point] = {k: np.nan for k in metrics.keys()}
+            append_checkpoint_row(*_lost_point, 'LOST', checkpointed_points[_lost_point])
+        clear_inflight()
+    if checkpointed_points:
+        print(f'\nRESUMING from {checkpoint_filepath}: {len(checkpointed_points)} of '
+              f'{len(spec_1)*len(spec_2)} grid points already evaluated '
+              '(set IBO_SWEEP_FRESH=1 for a fresh sweep).')
+
 #%% Initial simulation
 
 if not replot_from_csv:
@@ -443,11 +540,17 @@ else:
 for s3 in spec_3_to_run:
     for v in list(results.values()): v.append([])
 
-    for s2 in spec_2:
+    for i2, s2 in enumerate(spec_2):
         for v in list(results.values()): v[-1].append([])
-        for s1 in spec_1:
+        for i1, s1 in enumerate(spec_1):
             curr_no +=1
+            if (i2, i1) in checkpointed_points:
+                # evaluated by a previous process (or LOST in its crash)
+                for k, v in list(results.items()):
+                    v[-1][-1].append(checkpointed_points[(i2, i1)][k])
+                continue
             error_message = None
+            write_inflight(i2, i1)
             try:
                 # if round(s1,2)==round(spec_1[1],2) and round(s2,2)==round(spec_2[4],2):
                 #     breakpoint()
@@ -486,6 +589,10 @@ for s3 in spec_3_to_run:
                     errors_dict[(s1, s2, s3)] = str_e
                     # breakpoint()
                     # raise e
+
+            append_checkpoint_row(i2, i1, 'ERROR' if error_message else 'OK',
+                                  {k: v[-1][-1][-1] for k, v in results.items()})
+            clear_inflight()
 
             if curr_no%print_status_every_n_simulations==0 or error_message:
                 print_status(curr_no, total_no,
@@ -805,3 +912,8 @@ if plot:
                                         units_opening_brackets = [" (",] * 4,
                                         units_closing_brackets = [")",] * 4,
                                         )
+
+#%% Sweep complete (per-metric CSVs + plots saved): drop the checkpoint
+if not replot_from_csv:
+    for _path in (checkpoint_filepath, inflight_filepath):
+        if os.path.exists(_path): os.remove(_path)
