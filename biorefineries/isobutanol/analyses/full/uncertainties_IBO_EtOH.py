@@ -67,14 +67,14 @@ plot_spearman_matrix = isobutanol.plots.spearman_matrix.plot_spearman_matrix
 
 #%%
 
-scenario = 'B'
+scenario = 'A'
 
 modes=[
-       scenario, 
-        # 'B', 
+       scenario,
+        # 'B',
         # 'C', 'D',
        ]
-N_simulations_per_mode=200
+N_simulations_per_mode=6000
 notification_interval=50
 plot_TOC_fig=False
 
