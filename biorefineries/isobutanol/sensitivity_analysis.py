@@ -20,6 +20,7 @@ S_u = Var(E[Y | X_u]) / Var(Y) (pick-freeze with conditional rejection
 sampling) and the exact Shapley effects built from all 2^d of them."""
 import dataclasses
 import math
+import warnings
 
 import numpy as np
 
@@ -368,6 +369,7 @@ def fit_surrogates(U, y, *, seed=0, n_folds=5):
     take hours. Its CV Q2 therefore carries a mild hyper-parameter leak; the
     trees' does not."""
     from sklearn.ensemble import HistGradientBoostingRegressor
+    from sklearn.exceptions import ConvergenceWarning
     from sklearn.gaussian_process import GaussianProcessRegressor
     from sklearn.gaussian_process.kernels import ConstantKernel, Matern, WhiteKernel
     from sklearn.model_selection import KFold
@@ -380,7 +382,9 @@ def fit_surrogates(U, y, *, seed=0, n_folds=5):
               + WhiteKernel(1e-3, (1e-8, 1e1)))
     tuned = GaussianProcessRegressor(kernel, normalize_y=True,
                                      n_restarts_optimizer=1, random_state=seed)
-    tuned.fit(U[sub], y[sub])
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore', ConvergenceWarning)
+        tuned.fit(U[sub], y[sub])
     makers = {
         'gp': lambda: GaussianProcessRegressor(tuned.kernel_, optimizer=None,
                                                normalize_y=True),

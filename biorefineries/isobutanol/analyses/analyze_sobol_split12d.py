@@ -139,8 +139,8 @@ def _style():
         'font.family': 'sans-serif', 'font.sans-serif': ['Arial', 'DejaVu Sans'],
         'mathtext.fontset': 'custom', 'mathtext.rm': 'Arial', 'mathtext.it': 'Arial:italic',
         'mathtext.bf': 'Arial:bold', 'mathtext.fallback': 'stixsans',
-        'axes.labelsize': 12, 'axes.titlesize': 12, 'xtick.labelsize': 12,
-        'ytick.labelsize': 12, 'legend.fontsize': 9})
+        'axes.labelsize': 12, 'axes.titlesize': 12, 'xtick.labelsize': 10,
+        'ytick.labelsize': 10, 'legend.fontsize': 9})
 
 def _ticks(ax):
     """Project tick style: ticks on all four sides, major 4 pt / minor 2 pt;
