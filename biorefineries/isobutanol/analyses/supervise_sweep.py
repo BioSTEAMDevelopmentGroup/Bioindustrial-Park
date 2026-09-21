@@ -31,6 +31,9 @@ resumes after it. This wrapper does the relaunching:
 Usage::
 
     python supervise_sweep.py evaluate_EtOH_k13_inhib_isobutanol.py
+
+    python supervise_sweep.py evaluate_sobol_split12d.py \
+        --stem <study name> --checkpoint-suffix _trajectory.csv
 """
 
 import argparse
@@ -82,12 +85,18 @@ def main():
     parser.add_argument('--max-attempts', type=int, default=25)
     parser.add_argument('--max-empty-attempts', type=int, default=3)
     parser.add_argument('--stall-timeout-min', type=float, default=10.0)
+    parser.add_argument('--stem', default=None,
+                        help='basename of the checkpoint / in-flight files '
+                             '(default: the script stem)')
+    parser.add_argument('--checkpoint-suffix', default='_checkpoint.csv',
+                        help="checkpoint file suffix (the Sobol' sampler logs "
+                             "to '<stem>_trajectory.csv')")
     args = parser.parse_args()
 
     script = os.path.abspath(args.script)
-    stem = os.path.splitext(os.path.basename(script))[0]
+    stem = args.stem or os.path.splitext(os.path.basename(script))[0]
     results = os.path.join(os.path.dirname(script), 'results')
-    checkpoint = os.path.join(results, stem + '_checkpoint.csv')
+    checkpoint = os.path.join(results, stem + args.checkpoint_suffix)
     inflight = os.path.join(results, stem + '_inflight.json')
 
     empty_streak = 0
