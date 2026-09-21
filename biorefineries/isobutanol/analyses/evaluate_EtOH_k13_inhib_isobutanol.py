@@ -24,10 +24,14 @@ baseline x the multiplier, so intra-family ratios are preserved (exactly
 ``(k_13 = opt_IRR baseline, multiplier = 1.0)`` the grid reproduces the
 ``opt_IRR`` baseline point.
 
-Baseline: ``opt_IRR`` reproduces the best-IRR trial of the 2026-09-07
-``metabolic_minimal_subset`` IRR study (a high-isobutanol optimum, ~70 g/L IBO;
-IRR ~0.235). Its baseline kinetics + feeding strategy (18 spikes / 286.77 /
-300.0) come from ``scenarios.SCENARIOS['opt_IRR']``.
+Baseline: ``opt_IRR`` was RELOCATED 2026-09-20 to trial 1602 of the
+2026-09-16 scenario-A-anchored ``metabolic_split_12d`` PI (log-tail) GP study
+(the campaign's highest-IRR point, a co-production optimum: IBO 41.7 + EtOH
+29.2 g/L, tau 28.35 h, IRR ~0.273). Its baseline kinetics + feeding strategy
+(50-spike cap / 170.91 / 175.91, 1 actual spike) come from
+``scenarios.SCENARIOS['opt_IRR']`` -- this script reads them live, so it tracks
+the relocation automatically. Its baseline ``k_13`` is now 4.0 (top of the
+split-preset rate band), not the previous point's ~0.642.
 
 Enzyme burden: installed A-referenced via ``scenarios.load_scenario('opt_IRR',
 burden=True)`` (the ``BurdenModel`` is ALWAYS built from scenario A's kinetics,
@@ -39,13 +43,17 @@ derates growth (``k_7``/``k_8``); the ``inhib_isobutanol`` coefficients are
 product-inhibition / lethality terms, not pools, so they do not enter the
 burden.
 
-Empirical result (2026-09-10 20x20 run): across ``k_13`` in [0, 6.5] (~10x the
-opt_IRR baseline 0.642) the r13 pool never pushed ``Phi_M`` over ``F_flex``, so
-NO point was burden-INFEASIBLE (0 exceptions) -- the anticipated vertical
-infeasible (NaN) band did NOT appear. Instead the high-``k_13`` /
-high-multiplier corner is uneconomic: 137/400 cells have an unsolvable,
-money-losing IRR (reported -inf) and 155/400 are profitable (IRR > 0). The
-``k_13 = 0`` column makes no isobutanol, so its IBO MPSP is NaN (20 cells).
+The k_13 axis has been re-centered on the relocated baseline: it now spans
+``k_13`` in [0, 8.0] (full knockout at 0 -> baseline 4.0 at the midpoint ->
+2x baseline) on a 40x40 grid, replacing the previous [0, 6.5] / 20x20 grid
+that was centered on the old ~0.642 baseline.
+
+The prior empirical characterization (2026-09-10 20x20 run at the old opt_IRR
+point: 0 burden-infeasible exceptions across the grid; the high-k_13 /
+high-multiplier corner uneconomic; the k_13 = 0 column making no isobutanol
+-> NaN IBO MPSP) was of that superseded point and grid. The result grid at the
+relocated point has not yet been regenerated -- re-run this script to refresh
+the CSVs / figures under analyses/results/ before quoting fresh numbers.
 """
 
 import numpy as np
@@ -124,8 +132,8 @@ isobutanol_results_filepath = isobutanol_filepath + '\\analyses\\results\\'
 
 #%% opt_IRR baseline + enzyme burden ON
 # load_scenario('opt_IRR', burden=True) loads opt_IRR's workbook (baseline
-# kinetics + distributions), sets opt_IRR's feeding strategy (18 spikes /
-# 286.77 / 300.0) from scenarios.SCENARIOS, installs the A-referenced
+# kinetics + distributions), sets opt_IRR's feeding strategy (50-spike cap /
+# 170.91 / 175.91, 1 actual spike) from scenarios.SCENARIOS, installs the A-referenced
 # active enzyme burden (system.set_active_burden), and runs one baseline
 # model_specification. After it returns, r holds opt_IRR's baseline kinetics.
 # (opt_IRR's burden_default is already True, so burden=True is explicit but
@@ -244,13 +252,14 @@ metrics = {'MPSP': {'f': get_product_MPSP, 'units': '$/kg'}, # ethanol MPSP
 # results = {i: [] for i in range(len(metrics.values()))}
 results = {i: [] for i in metrics.keys()}
 
-steps = (20, 20, 1)
+steps = (40, 40, 1)
 
-# x-axis: k_13, the Ehrlich-entry rate capacity. opt_IRR baseline ~0.642
-# g/L/h; the range 0 -> 6.5 spans a full knockout (k_13 = 0, no isobutanol)
-# up to ~10x the baseline (the metabolic_minimal_subset preset's upper rate
-# band). The high-k_13 end is where the burden pushes Phi_M over F_flex.
-spec_1 = nsk_k_13es = np.linspace(0.0, 6.5, steps[0])
+# x-axis: k_13, the Ehrlich-entry rate capacity. opt_IRR baseline 4.0 g/L/h
+# (top of the split-preset rate band) since the 2026-09-20 relocation; the
+# range 0 -> 8.0 spans a full knockout (k_13 = 0, no isobutanol) up through
+# the baseline at the midpoint to 2x the baseline. The high-k_13 end is where
+# the burden pushes Phi_M toward F_flex.
+spec_1 = nsk_k_13es = np.linspace(0.0, 8.0, steps[0])
 
 spec_2 = inhib_isobutanol_multipliers = np.linspace(0.2, 2.0, steps[1])
 
@@ -267,7 +276,7 @@ spec_3 = spike_concs =\
 
 x_label = "k_13" # title of the x axis
 x_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
-x_ticks = [0, 1, 2, 3, 4, 5, 6]
+x_ticks = [0, 2, 4, 6, 8]
 
 y_label = "inhib_isobutanol multiplier" # title of the y axis
 y_units = r"" # dimensionless (x opt_IRR baseline of each member)
@@ -605,8 +614,8 @@ if plot:
     #%% All metrics
     # (Unlike the k_1e x inhib_ethanol reference, this script does NOT
     # hardcode the MPSP / IRR contour bounds -- those were fitted to a
-    # scenario-B grid and would clip opt_IRR's ranges (EtOH MPSP ~0.40,
-    # IBO MPSP ~1.28, IRR ~0.235). Every metric's levels/ticks are derived
+    # scenario-B grid and would clip opt_IRR's ranges (EtOH MPSP ~0.36,
+    # IBO MPSP ~1.16, IRR ~0.273). Every metric's levels/ticks are derived
     # from its own finite grid data below; IRR keeps the under-color /
     # -inf handling for money-losing corners.)
     for curr_metric, val in metrics.items():
@@ -664,20 +673,23 @@ if plot:
         scale_percent = False
 
         if 'irr' in lccm:
-            # IRR is shown as a PERCENTAGE (x100) on a HARD 0-25% colour scale:
+            # IRR is shown as a PERCENTAGE (x100) on a HARD 0-30% colour scale
+            #  (raised from 0-25% for the 2026-09-20 opt_IRR relocation, whose
+            #  baseline IRR ~27.3% -- the campaign's highest-IRR point and so
+            #  effectively this grid's max -- exceeded the old 25% top):
             #  - gray UNDER-colour for money-losing cells (< 0%, incl. the
             #    -inf unsolvable corners), extend_cmap='min';
-            #  - NO over-colour: the grid max (~23%) is below 25%, so nothing
+            #  - NO over-colour: the grid max (~27%) is below 30%, so nothing
             #    extends past the top of the bar;
             #  - break-even (0%) drawn as a WHITE labeled contour line via
-            #    comparison_lines; black labeled lines mark 5/10/15/20%;
+            #    comparison_lines; black labeled lines mark 5/10/15/20/25%;
             #  - every contour label carries the % symbol.
             scale_percent = True
             curr_w_units = '%'
             curr_fmt_clabel = lambda cvalue: f'{cvalue:.0f}%'
-            curr_metric_w_levels = np.arange(0.0, 25.0001, 25.0/80)
-            curr_metric_cbar_ticks = np.arange(0.0, 25.0001, 5.0)
-            curr_metric_w_ticks = [5.0, 10.0, 15.0, 20.0]
+            curr_metric_w_levels = np.arange(0.0, 30.0001, 30.0/80)
+            curr_metric_cbar_ticks = np.arange(0.0, 30.0001, 5.0)
+            curr_metric_w_ticks = [5.0, 10.0, 15.0, 20.0, 25.0]
             extend_cmap = 'min'
             cmap_under_color = colors.grey_dark.shade(40).RGBn
             cmap_over_color = None
