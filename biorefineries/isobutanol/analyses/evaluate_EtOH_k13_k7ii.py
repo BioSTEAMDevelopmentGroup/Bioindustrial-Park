@@ -817,35 +817,39 @@ if plot:
         # curr_metric_w_levels = np.arange(0., 15.5, 0.5)
         
         if 'mpsp' in lccm:
-            # opt_IRR 20x20 k_13 x k_7ii grid: IBO MPSP spans 1.41-2.92 $/kg
-            # (isobutanol is the primary product here); ethanol MPSP spans
-            # 0.55-8552 (ethanol is a trace co-product, MPSP median ~365).
-            # Give each its own scale rather than a shared one.
+            # STALE BOUNDS (from the OLD opt_IRR 20x20 k_13 x k_7ii grid, IBO
+            # MPSP 1.41-2.92, EtOH 0.55-8552): the 2026-09-20 relocation moved
+            # opt_IRR's baseline (IBO MPSP ~1.16, EtOH ~0.36 $/kg), so the floors
+            # were lowered (IBO 1.4 -> 1.0, EtOH 0.5 -> 0.3) to keep the new
+            # baseline from clipping below the scale. Re-derive these spans from
+            # the regenerated grid data (as evaluate_EtOH_k13_inhib_isobutanol.py
+            # does) before quoting them.
             if 'ibo' in lccm:
-                curr_metric_w_levels = np.arange(1.4, 3.0001, 0.02)
-                curr_metric_cbar_ticks = np.arange(1.4, 3.0001, 0.2)
-                curr_metric_w_ticks = [1.5, 1.8, 2.1, 2.4, 2.7]
+                curr_metric_w_levels = np.arange(1.0, 3.0001, 0.02)
+                curr_metric_cbar_ticks = np.arange(1.0, 3.0001, 0.2)
+                curr_metric_w_ticks = [1.2, 1.6, 2.0, 2.4, 2.8]
             else: # ethanol: focus on the EtOH-producing low corner, rest over-colors
-                curr_metric_w_levels = np.arange(0.5, 3.0001, 0.05)
-                curr_metric_cbar_ticks = np.arange(0.5, 3.0001, 0.5)
-                curr_metric_w_ticks = [0.75, 1.0, 1.5, 2.0, 2.5]
+                curr_metric_w_levels = np.arange(0.3, 3.0001, 0.05)
+                curr_metric_cbar_ticks = np.arange(0.3, 3.0001, 0.5)
+                curr_metric_w_ticks = [0.5, 1.0, 1.5, 2.0, 2.5]
             cbar_n_minor_ticks = 4
         elif 'irr' in lccm:
             # opt_IRR grid: plot IRR as a PERCENTAGE (e.g. 20%, not 0.20) --
             # scale the fractional data + all levels/ticks by 100, label the
             # colorbar in % and give the contour labels a % sign. Color bar
-            # 0-25%. Everything below 0% (money-losing finite IRRs AND the
-            # unsolvable -inf cells) collapses into the gray under-color; the
-            # scale is capped at 25% (no over-color).
+            # 0-30% (raised from 0-25% for the 2026-09-20 relocation, baseline
+            # IRR ~27.3%, which exceeded the old 25% top). Everything below 0%
+            # (money-losing finite IRRs AND the unsolvable -inf cells) collapses
+            # into the gray under-color; capped at 30% (no over-color).
             w_scale = 100.0
             curr_w_units = '%'
             curr_fmt_clabel = lambda cvalue: f'{cvalue:.0f}%'
-            curr_metric_w_levels = np.arange(0.0, 25.001, 0.5)
-            curr_metric_cbar_ticks = np.arange(0.0, 25.001, 5.0)
-            curr_metric_w_ticks = [5.0, 10.0, 15.0, 20.0]
+            curr_metric_w_levels = np.arange(0.0, 30.001, 0.5)
+            curr_metric_cbar_ticks = np.arange(0.0, 30.001, 5.0)
+            curr_metric_w_ticks = [5.0, 10.0, 15.0, 20.0, 25.0]
             cbar_n_minor_ticks = 4
             # Keep the under-color (IRR < 0, incl. -inf money-losing corners);
-            # cap at 25% with no over-color.
+            # cap at 30% with no over-color.
             extend_cmap = 'min'
             cmap_under_color = colors.grey_dark.shade(40).RGBn
             cmap_over_color = None
