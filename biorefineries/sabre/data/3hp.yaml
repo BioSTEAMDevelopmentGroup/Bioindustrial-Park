@@ -177,13 +177,15 @@ cell_mass_centrifuge:
 
 
 crystal_separator:
-  # Downstream bst.units.SolidsCentrifuge instantiation.
-  moisture_content: 0.05  # crystal-cake moisture leaving the centrifuge
+  # sabre.units.CrystalCentrifuge instantiation. The wet cake carries mother
+  # liquor (impurities included) at this water content, so product purity
+  # follows from moisture_content and the mother-liquor composition.
+  moisture_content: 0.05  # crystal-cake moisture (water mass fraction) leaving the centrifuge
 
   sources:
     purity:
       key: user_specified_patent
-      note: "Patent reports ~93-99% crystal purity after this separation step. Purity is NOT modeled here: the crystal separator's split moves only Ca3HP2 (and the moisture water) to the cake, so the simulated cake is essentially pure Ca3HP2 by construction (~99.95% after drying), regardless of moisture_content. moisture_content is just a plausible cake-moisture placeholder."
+      note: "Patent reports ~93-99% crystal purity after this separation step. Purity is modeled through liquor entrainment in the cake (sugars, enzyme, ash, etc. dissolved in the mother liquor dry onto the crystals); it is not an input. Higher moisture_content -> lower purity. 0.05 is a plausible cake-moisture placeholder with no literature source; a cake wash would raise purity and is not modeled."
 
 
 mother_liquor_recycle:

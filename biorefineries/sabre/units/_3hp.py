@@ -11,13 +11,14 @@ from biosteam.units import BatchBioreactor
 
 from biorefineries.sabre.utils import load_assumptions
 
-__all__ = ('HPFermentation', 'CaHPCrystallizer')
+__all__ = ('HPFermentation', 'CaHPCrystallizer', 'CrystalCentrifuge')
 
 # Loaded assumptions
 _3HP_YAML = load_assumptions("3hp.yaml")
 _FERMENTATION = _3HP_YAML["fermentation"]
 _SUBSTRATES = _FERMENTATION["substrates"]
 _CRYSTALLIZATION = _3HP_YAML["crystallization"]
+_CRYSTAL_SEPARATOR = _3HP_YAML["crystal_separator"]
 
 
 class HPFermentation(BatchBioreactor):
@@ -242,8 +243,8 @@ class CaHPCrystallizer(bst.BatchCrystallizer):
     `bst.units.SolidsCentrifuge` -> `bst.units.DrumDryer` chain (the
     dryer's own internal 'g'-phase auxiliary streams raise
     `UndefinedPhase` when fed a MultiStream upstream of them). The actual
-    separation is enforced entirely by the downstream centrifuge's own
-    `split` fraction (set to this unit's `target_recovery` by whoever
+    separation is enforced entirely by the downstream `CrystalCentrifuge`'s
+    own `product_recovery` (set to this unit's `target_recovery` by whoever
     wires the system script -- see data/3hp.yaml `crystal_separator`'s
     comment); `target_recovery` here only determines what this unit
     reports in `design_results`.
@@ -313,3 +314,110 @@ class CaHPCrystallizer(bst.BatchCrystallizer):
         self.design_results["Product recovered to solids (kg/h)"] = (
             solid_mol * feed.chemicals[self.product_ID].MW
         )
+
+
+class CrystalCentrifuge(bst.units.SolidsCentrifuge):
+    """
+    Solid/liquid separation of the crystal slurry, in which the wet cake
+    carries mother liquor along with the crystals (so the dried product is
+    not 100% pure).
+
+    `bst.units.SolidsCentrifuge`'s own `moisture_content` handling only
+    moves pure water into the cake, leaving every dissolved species
+    (sugars, salts, enzyme, ...) in the liquid-rich outlet, which makes any
+    product downstream come out essentially 100% pure by construction. This
+    subclass instead sends `product_recovery` of the product to the cake as
+    crystals, then entrains just enough *whole* mother liquor (all
+    remaining species, water included, at the liquor's own composition) for
+    the cake's water content to equal `moisture_content` (a wet-basis mass
+    fraction, as in `SolidsCentrifuge`). The impurities dissolved in that
+    entrained liquor stay with the crystals through the downstream dryer,
+    which removes only water. Costing and sizing are inherited from
+    `bst.units.SolidsCentrifuge` unchanged.
+
+    The cake's liquor fraction `phi` follows from the water balance
+    `phi * W = moisture_content * (crystals + phi * L)`, where W is the
+    feed's water and L its non-crystal mass, so it adjusts automatically to
+    the feed composition (e.g. through a recycle loop) instead of being a
+    fixed input. The entrained liquor also carries its small share of
+    dissolved product, so the cake's product is slightly above
+    `product_recovery` * feed.
+
+    Parameters
+    ----------
+    ins : stream
+        Crystal slurry from `CaHPCrystallizer`.
+    outs : tuple[stream, stream]
+        Crystal cake (crystals + entrained mother liquor) and mother
+        liquor.
+    product_ID : str
+        Chemical ID of the crystallized product (Ca3HP2).
+    product_recovery : float
+        Fraction of the feed's product recovered to the cake as crystals
+        (before the small extra amount carried in the entrained liquor).
+    moisture_content : float
+        Water mass fraction of the wet cake.
+    **kwargs
+        Forwarded to `bst.units.SolidsCentrifuge.__init__`.
+
+    See Also
+    --------
+    Refer to data/3hp.yaml (`crystal_separator`) for the default values and
+    references.
+    """
+
+    def __init__(
+        self,
+        ID: str = "",
+        ins=None,
+        outs=(),
+        *,
+        product_ID: str = _CRYSTALLIZATION["product_ID"],
+        product_recovery: float = _CRYSTALLIZATION["target_recovery"],
+        moisture_content: float = _CRYSTAL_SEPARATOR["moisture_content"],
+        **kwargs,
+    ):
+        super().__init__(
+            ID, ins, outs,
+            split={product_ID: product_recovery},
+            moisture_content=moisture_content,
+            **kwargs,
+        )
+        self.product_ID = product_ID
+        self.product_recovery = float(product_recovery)
+
+    def _run(self):
+        feed, = self.ins
+        cake, liquor = self.outs
+
+        cake.empty()
+        liquor.empty()
+        cake.phase = liquor.phase = "l"
+        if feed.isempty():
+            return
+
+        rho = self.product_recovery
+        m = self.moisture_content
+        product_ID = self.product_ID
+
+        crystals_kg = rho * float(feed.imass[product_ID])
+        water_kg = float(feed.imass["Water"])
+        liquor_feed_kg = float(feed.F_mass) - crystals_kg
+
+        denominator = water_kg - m * liquor_feed_kg
+        if denominator <= 0:
+            raise RuntimeError(
+                f"{self.ID}: feed has too little water ({water_kg:.1f} kg/h of "
+                f"{liquor_feed_kg:.1f} kg/h non-crystal mass) to form a cake at "
+                f"moisture_content={m}."
+            )
+        phi = min(m * crystals_kg / denominator, 1.0)
+
+        cake.mol[:] = phi * feed.mol
+        cake.imol[product_ID] = float(feed.imol[product_ID]) * (rho + phi * (1.0 - rho))
+        liquor.mol[:] = feed.mol - cake.mol
+        cake.T = liquor.T = feed.T
+        cake.P = liquor.P = feed.P
+
+        self.design_results["Entrained liquor fraction"] = phi
+        self.design_results["Entrained liquor (kg/h)"] = phi * liquor_feed_kg

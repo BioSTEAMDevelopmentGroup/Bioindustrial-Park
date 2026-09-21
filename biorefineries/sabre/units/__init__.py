@@ -29,6 +29,7 @@
 .. autoclass:: biorefineries.sabre.units.OilExtraction
 .. autoclass:: biorefineries.sabre.units.HPFermentation
 .. autoclass:: biorefineries.sabre.units.CaHPCrystallizer
+.. autoclass:: biorefineries.sabre.units.CrystalCentrifuge
 """
 from . import _ad
 from . import _preprocessing

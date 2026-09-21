@@ -22,12 +22,16 @@ Pathway:
       -> M_ML (mixes in recycled mother liquor)
       -> broth_evaporator (MultiEffectEvaporator: concentrates to the
          patent's ~300-600 g/L crystallization threshold)
-      -> CaHPCrystallizer -> S402 (SolidsCentrifuge: separates crystal
-         cake from mother liquor)
+      -> CaHPCrystallizer -> S402 (CrystalCentrifuge: separates crystal
+         cake, which entrains some mother liquor and so its impurities,
+         from the mother liquor)
       -> SP_ML (splits mother liquor: `mother_liquor_recycle` back to M_ML,
          data/3hp.yaml mother_liquor_recycle.recycle_frac; remainder
          `mother_liquor_purge` -> disposal_wastewater)
-      -> DrumDryer -> dried Ca(3HP)2 product
+      -> DrumDryer -> dried_product (Ca3HP2 + entrained impurities)
+      -> PS (MockSplitter, accounting only: `ca3hp2_product` = the pure
+         Ca3HP2 content, priced and used for MSP; `product_impurities` =
+         the rest, unpriced)
     (M_ML ... SP_ML form a recycle loop, built as the `ml_loop` subsystem.)
 
     milling_losses, pressed_cake, cell_mass (all combustible biomass) --
@@ -63,7 +67,7 @@ from biorefineries.sabre.utils import (
 )
 from biorefineries.sabre.units import (
     Mill, EnzymaticPress, PressateConcentrator, BiostimulantEvaporator,
-    HPFermentation, CaHPCrystallizer,
+    HPFermentation, CaHPCrystallizer, CrystalCentrifuge,
 )
 from biorefineries.sabre._tea import create_tea
 
@@ -92,14 +96,16 @@ def create_3hp_system(
     Build the full feedstock-to-product system: raw Sargassum -> Mill ->
     EnzymaticPress -> pressate concentration -> HPFermentation ->
     cell-mass removal -> broth concentration -> CaHPCrystallizer ->
-    crystal separation -> drying -> dried Ca(3HP)2.
+    crystal separation -> drying -> dried Ca(3HP)2, split (accounting
+    only) into a pure-Ca3HP2 stream and an impurities stream.
 
     Parameters
     ----------
     feedstock : str
         Feedstock type (data/feedstock.yaml `feedstock_type`).
     ca3hp2_price : float, optional
-        Price (USD/kg) to set on the dried Ca(3HP)2 product stream.
+        Price (USD/kg of pure Ca3HP2) to set on the `ca3hp2_product`
+        stream, i.e. on the Ca3HP2 content of the dried product only.
         Defaults to data/tea.yaml `price.3hp.baseline` when not given.
 
     Returns
@@ -360,16 +366,16 @@ def create_3hp_system(
         V=_CRYSTALLIZATION["V_m3"],
     )
 
-    # See data/3hp.yaml crystal_separator's own comment: the split fraction
-    # here -- not C401's own phase tags -- is what actually enforces
-    # target_recovery downstream (confirmed by direct testing that
-    # bst.units.SolidsCentrifuge collapses a multi-phase feed's per-chemical
-    # mol across phases before splitting).
-    S402 = bst.units.SolidsCentrifuge(
+    # The recovery fraction here -- not C401's own phase tags -- is what
+    # actually enforces target_recovery downstream. The cake also entrains
+    # mother liquor at `moisture_content` water, so the dried product carries
+    # the liquor's dissolved impurities (see data/3hp.yaml crystal_separator
+    # and CrystalCentrifuge's own docstring).
+    S402 = CrystalCentrifuge(
         "S402",
         ins=C401 - 0,
         outs=("crystal_cake", "mother_liquor"),
-        split=dict(Ca3HP2=_CRYSTALLIZATION["target_recovery"]),
+        product_recovery=_CRYSTALLIZATION["target_recovery"],
         moisture_content=_CRYSTAL_SEPARATOR["moisture_content"],
     )
 
@@ -395,18 +401,40 @@ def create_3hp_system(
     F403 = bst.units.DrumDryer(
         "F403",
         ins=S402 - 0,
-        outs=("ca3hp2_product", "dryer_vent"),
+        outs=("dried_product", "dryer_vent"),
         split={"Water": 1},
         moisture_content=_DRYER["target_moisture_content"],
     )
-    F403.outs[0].price = (
+
+    # Accounting split only (MockSplitter: no cost, no physical separation).
+    # The dried product ships with the impurities entrained from the mother
+    # liquor (see CrystalCentrifuge), but only its Ca3HP2 content is priced,
+    # so `ca3hp2_product` (the pure-Ca3HP2 stream, and the stream MSP is
+    # solved on) is credited at the product price and `product_impurities`
+    # earns nothing.
+    PS = bst.MockSplitter(
+        "PS", ins=F403 - 0, outs=("ca3hp2_product", "product_impurities"),
+    )
+    PS.outs[0].price = (
         _TEA_PRICE["3hp"]["baseline"] if ca3hp2_price is None
         else float(ca3hp2_price)
     )
 
+    @PS.add_specification(run=True)
+    def split_pure_product():
+        dried = PS.ins[0]
+        pure, impurities = PS.outs
+        pure.empty()
+        impurities.empty()
+        pure.phase = impurities.phase = dried.phase
+        pure.imol["Ca3HP2"] = dried.imol["Ca3HP2"]
+        impurities.mol[:] = dried.mol - pure.mol
+        pure.T = impurities.T = dried.T
+        pure.P = impurities.P = dried.P
+
     path = [
         MI, PR, PFS, PC, DIL, EV,
-        F401, S401, ml_loop, F403,
+        F401, S401, ml_loop, F403, PS,
     ]
     HXN = bst.HeatExchangerNetwork(
         "HXN",
