@@ -11,18 +11,31 @@
 ``k_13`` (x-axis) vs the grouped ``inhib_isobutanol`` family MULTIPLIER
 (y-axis), on the ``opt_IRR`` baseline, WITH the enzyme burden turned ON.
 
-Structurally parallel to ``evaluate_EtOH_k1e_inhib_ethanol.py`` (which sweeps
-``k_1e`` x ``inhib_ethanol`` on scenario A); only the baseline scenario and the
-two swept dimensions differ.
+It is the isobutanol-inhibition analog of the sibling ``k_3`` / ``k_6`` x
+``inhib_ethanol`` sweeps (individual rate on x, grouped inhibition multiplier
+on y, same wider USER-SPECIFIED multiplier bands), swapping in the Ehrlich-entry
+rate ``k_13`` and the ``inhib_isobutanol`` family, and running on the
+isobutanol-producing ``opt_IRR`` baseline (scenario A makes no isobutanol, so
+its isobutanol-inhibition coefficients are inert):
 
-The y-axis multiplier is the same grouped decision variable the kinetic
-optimizer's ``metabolic_minimal_subset`` study uses
-(``kinetic_optimization.METABOLIC_MINIMAL_SUBSET_GROUPS['inhib_isobutanol']`` =
-k_1ii, k_4ii, k_6ii, k_7ii, k_10ii): every member is set to its ``opt_IRR``
-baseline x the multiplier, so intra-family ratios are preserved (exactly
-``kinetic_optimization.expand_grouped_values`` for a single group). At
-``(k_13 = opt_IRR baseline, multiplier = 1.0)`` the grid reproduces the
-``opt_IRR`` baseline point.
+* **k_13 (x-axis):** swept over its ``opt_IRR`` baseline x **[1e-3, 4.0]**. The
+  span matches the split-preset rate band (``kinetic_optimization`` assigns
+  ``capacity``-role rate constants a [1e-3x, 4x] band in the split presets), so
+  the axis reaches an effective knock-out at the low end (near-zero isobutanol)
+  and 4x the fitted rate at the high end.
+* **inhib_isobutanol multiplier (y-axis):** the grouped decision variable
+  (``kinetic_optimization.METABOLIC_MINIMAL_SUBSET_GROUPS['inhib_isobutanol']``
+  = k_1ii, k_4ii, k_6ii, k_7ii, k_10ii), swept over **[1e-3, 1.5]** x each
+  member's ``opt_IRR`` baseline. The lower bound reaches near-complete
+  de-inhibition (1e-3x the fitted coefficients); the upper bound matches the
+  ``metabolic_14d`` default group band ceiling. Every member is set to its
+  ``opt_IRR`` baseline x the multiplier, so intra-family ratios are preserved
+  (exactly ``kinetic_optimization.expand_grouped_values`` for a single group).
+
+Both axes are linear grids over these bounds (a contour sweep spaces them
+evenly, matching the sibling ``evaluate_*`` scripts). ``(k_13 = opt_IRR
+baseline, inhib_isobutanol multiplier = 1.0)`` lies on the grid interior and
+reproduces the ``opt_IRR`` baseline point.
 
 Baseline: ``opt_IRR`` was RELOCATED 2026-09-20 to trial 1602 of the
 2026-09-16 scenario-A-anchored ``metabolic_split_12d`` PI (log-tail) GP study
@@ -30,8 +43,8 @@ Baseline: ``opt_IRR`` was RELOCATED 2026-09-20 to trial 1602 of the
 29.2 g/L, tau 28.35 h, IRR ~0.273). Its baseline kinetics + feeding strategy
 (50-spike cap / 170.91 / 175.91, 1 actual spike) come from
 ``scenarios.SCENARIOS['opt_IRR']`` -- this script reads them live, so it tracks
-the relocation automatically. Its baseline ``k_13`` is now 4.0 (top of the
-split-preset rate band), not the previous point's ~0.642.
+the relocation automatically. Its baseline ``k_13`` is 4.0 (top of the
+split-preset rate band), so the x-axis spans [0.004, 16.0] g/L/h.
 
 Enzyme burden: installed A-referenced via ``scenarios.load_scenario('opt_IRR',
 burden=True)`` (the ``BurdenModel`` is ALWAYS built from scenario A's kinetics,
@@ -39,21 +52,14 @@ never from ``opt_IRR``'s own baseline; ``system.set_active_burden``), so the
 ``load_simulate`` choke point derates ``k_7``/``k_8`` for every simulated point.
 ``k_13`` keys the Ehrlich step ``r13`` in ``enzyme_burden.EHRLICH_STEPS``, so it
 IS a proteome pool: raising ``k_13`` raises the modeled pool ``Phi_M``, which
-derates growth (``k_7``/``k_8``); the ``inhib_isobutanol`` coefficients are
-product-inhibition / lethality terms, not pools, so they do not enter the
-burden.
+derates growth (``k_7``/``k_8``) and, at the high end, can push a point past the
+flexible-sector cap (``EnzymeBurdenInfeasibleError`` -> caught -> NaN); the
+``inhib_isobutanol`` coefficients are product-inhibition / lethality terms, not
+pools, so they do not enter the burden.
 
-The k_13 axis has been re-centered on the relocated baseline: it now spans
-``k_13`` in [0, 8.0] (full knockout at 0 -> baseline 4.0 at the midpoint ->
-2x baseline) on a 40x40 grid, replacing the previous [0, 6.5] / 20x20 grid
-that was centered on the old ~0.642 baseline.
-
-The prior empirical characterization (2026-09-10 20x20 run at the old opt_IRR
-point: 0 burden-infeasible exceptions across the grid; the high-k_13 /
-high-multiplier corner uneconomic; the k_13 = 0 column making no isobutanol
--> NaN IBO MPSP) was of that superseded point and grid. The result grid at the
-relocated point has not yet been regenerated -- re-run this script to refresh
-the CSVs / figures under analyses/results/ before quoting fresh numbers.
+Re-run this script to (re)generate the CSVs / figures under analyses/results/;
+a prior 40x40 run used an absolute k_13 axis in [0, 8.0], not this multiplier
+band, so those artifacts are superseded.
 """
 
 import numpy as np
@@ -254,14 +260,21 @@ results = {i: [] for i in metrics.keys()}
 
 steps = (40, 40, 1)
 
-# x-axis: k_13, the Ehrlich-entry rate capacity. opt_IRR baseline 4.0 g/L/h
-# (top of the split-preset rate band) since the 2026-09-20 relocation; the
-# range 0 -> 8.0 spans a full knockout (k_13 = 0, no isobutanol) up through
-# the baseline at the midpoint to 2x the baseline. The high-k_13 end is where
-# the burden pushes Phi_M toward F_flex.
-spec_1 = nsk_k_13es = np.linspace(0.0, 8.0, steps[0])
+# USER-SPECIFIED band: k_13 x [1e-3, 4.0] its opt_IRR baseline (the
+# split-preset capacity-rate band; effective knock-out / near-zero isobutanol
+# at the low end). opt_IRR baseline k_13 = 4.0, so the axis spans [0.004, 16.0]
+# g/L/h. The high-k_13 end is where the burden pushes Phi_M toward F_flex.
+K_13_MULTIPLIER_BOUNDS = (1e-3, 4.0)
+spec_1 = nsk_k_13es = np.linspace(K_13_MULTIPLIER_BOUNDS[0]*baseline_k_13,
+                                  K_13_MULTIPLIER_BOUNDS[1]*baseline_k_13,
+                                  steps[0])
 
-spec_2 = inhib_isobutanol_multipliers = np.linspace(0.2, 2.0, steps[1])
+# USER-SPECIFIED band: inhib_isobutanol multiplier x [1e-3, 1.5] (near-complete
+# de-inhibition at the low end; metabolic_14d default group ceiling at the top).
+INHIB_ISOBUTANOL_MULTIPLIER_BOUNDS = (1e-3, 1.5)
+spec_2 = inhib_isobutanol_multipliers = np.linspace(INHIB_ISOBUTANOL_MULTIPLIER_BOUNDS[0],
+                                                    INHIB_ISOBUTANOL_MULTIPLIER_BOUNDS[1],
+                                                    steps[1])
 
 
 spec_3 = spike_concs =\
@@ -276,11 +289,12 @@ spec_3 = spike_concs =\
 
 x_label = "k_13" # title of the x axis
 x_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
-x_ticks = [0, 2, 4, 6, 8]
+# k_13 range is baseline-dependent (1e-3x-4x baseline); derive round ticks.
+x_ticks = [float(np.round(t, 1)) for t in np.linspace(spec_1[0], spec_1[-1], 5)]
 
 y_label = "inhib_isobutanol multiplier" # title of the y axis
 y_units = r"" # dimensionless (x opt_IRR baseline of each member)
-y_ticks = [0.2, 0.6, 1.0, 1.4, 1.8, 2.0]
+y_ticks = [0.0, 0.5, 1.0, 1.5]
 
 z_label = "Spike feed glucose concentration" # title of the x axis
 z_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
@@ -379,7 +393,7 @@ replot_from_csv = os.environ.get('IBO_SWEEP_REPLOT_FROM_CSV', '') == '1'
 if not replot_from_csv:
     print('\n\nSimulating the initial point to avoid bugs ...')
     curr_spec = fbs_spec.current_specifications
-    r.k_13 = nsk_k_13es[1]
+    r.k_13 = baseline_k_13  # baseline k_13 (known-good; low grid points are near-knockouts)
     apply_inhib_isobutanol_multiplier(1.0)  # baseline inhib_isobutanol (known-good)
     model_specification(**curr_spec,
         n_sims=3,
