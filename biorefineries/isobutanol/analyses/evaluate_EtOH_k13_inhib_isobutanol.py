@@ -25,12 +25,12 @@ its isobutanol-inhibition coefficients are inert):
   and 4x the fitted rate at the high end.
 * **inhib_isobutanol multiplier (y-axis):** the grouped decision variable
   (``kinetic_optimization.METABOLIC_MINIMAL_SUBSET_GROUPS['inhib_isobutanol']``
-  = k_1ii, k_4ii, k_6ii, k_7ii, k_10ii), swept over **[1e-3, 1.5]** x each
-  member's ``opt_IRR`` baseline. The lower bound reaches near-complete
-  de-inhibition (1e-3x the fitted coefficients); the upper bound matches the
-  ``metabolic_14d`` default group band ceiling. Every member is set to its
-  ``opt_IRR`` baseline x the multiplier, so intra-family ratios are preserved
-  (exactly ``kinetic_optimization.expand_grouped_values`` for a single group).
+  = k_1ii, k_4ii, k_6ii, k_7ii, k_10ii), swept over **[0.75, 1.5]** x each
+  member's ``opt_IRR`` baseline -- the ``metabolic_14d`` default group band
+  (0.75x baseline at the floor, its ceiling at the top). Every member is set to
+  its ``opt_IRR`` baseline x the multiplier, so intra-family ratios are
+  preserved (exactly ``kinetic_optimization.expand_grouped_values`` for a
+  single group).
 
 Both axes are linear grids over these bounds (a contour sweep spaces them
 evenly, matching the sibling ``evaluate_*`` scripts). ``(k_13 = opt_IRR
@@ -277,9 +277,9 @@ spec_1 = nsk_k_13es = np.linspace(K_13_MULTIPLIER_BOUNDS[0]*baseline_k_13,
                                   K_13_MULTIPLIER_BOUNDS[1]*baseline_k_13,
                                   steps[0])
 
-# USER-SPECIFIED band: inhib_isobutanol multiplier x [1e-3, 1.5] (near-complete
-# de-inhibition at the low end; metabolic_14d default group ceiling at the top).
-INHIB_ISOBUTANOL_MULTIPLIER_BOUNDS = (1e-3, 1.5)
+# USER-SPECIFIED band: inhib_isobutanol multiplier x [0.75, 1.5] (metabolic_14d
+# default group band: 0.75x baseline at the low end, ceiling at the top).
+INHIB_ISOBUTANOL_MULTIPLIER_BOUNDS = (0.75, 1.5)
 spec_2 = inhib_isobutanol_multipliers = np.linspace(INHIB_ISOBUTANOL_MULTIPLIER_BOUNDS[0],
                                                     INHIB_ISOBUTANOL_MULTIPLIER_BOUNDS[1],
                                                     steps[1])
@@ -302,7 +302,7 @@ x_ticks = [float(np.round(t, 1)) for t in np.linspace(spec_1[0], spec_1[-1], 5)]
 
 y_label = "inhib_isobutanol multiplier" # title of the y axis
 y_units = r"" # dimensionless (x opt_IRR baseline of each member)
-y_ticks = [0.0, 0.5, 1.0, 1.5]
+y_ticks = [0.75, 1.0, 1.25, 1.5]
 
 z_label = "Spike feed glucose concentration" # title of the x axis
 z_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
