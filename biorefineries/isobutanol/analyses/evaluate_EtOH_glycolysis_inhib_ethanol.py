@@ -146,7 +146,10 @@ broth = ferm_reactor.outs[1]
 # part of the recoverable product (a broth-only denominator reads >100 %).
 vent = ferm_reactor.outs[0]
 
-EtOH_market_range=np.array([0.7, 1.0])
+# Ethanol market price range (matches analyses/full/uncertainties_IBO_EtOH.py):
+# Jan 2021 - Dec 2025 5-year low and high, tradingeconomics.com/commodity/ethanol
+# (1.5475 and 3.4500 $/gal / (3.7854 L/gal * 0.789 kg/L)).
+EtOH_market_range=np.array([0.52, 1.15])
 
 #%% Filepaths
 isobutanol_filepath = isobutanol.__file__.replace('\\__init__.py', '')
@@ -797,6 +800,10 @@ if plot:
                                     default_fontsize = default_fontsize,
                                     axis_tick_fontsize = axis_tick_fontsize,
                                     comparison_range=EtOH_market_range,
+                                    # opaque white so the band's boundary lines
+                                    # read white like the hatching (the default
+                                    # (1,1,1,0.25) makes a solid line look grey)
+                                    comparison_range_rgba=(1, 1, 1, 1),
                                     n_minor_ticks = 1,
                                     cbar_n_minor_ticks = 4,
                                     units_on_newline = (False, False, False, False), # x,y,z,w
@@ -924,6 +931,7 @@ if plot:
                                         default_fontsize = default_fontsize,
                                         axis_tick_fontsize = axis_tick_fontsize,
                                         comparison_range=curr_comparison_range,
+                                        comparison_range_rgba=(1, 1, 1, 1),
                                         n_minor_ticks = 1,
                                         cbar_n_minor_ticks = 3,
                                         units_on_newline = (False, False, False, False), # x,y,z,w
