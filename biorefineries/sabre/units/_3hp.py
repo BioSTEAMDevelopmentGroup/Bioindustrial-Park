@@ -81,10 +81,12 @@ class HPFermentation(BatchBioreactor):
         `tmo.Reaction` requires X < 1).
     lime_excess_frac : float
         Excess lime dosed beyond the exact stoichiometric demand.
-    titer_g_per_L : float
-        Target product titer; used only to compute `tau`.
     productivity_g_per_L_per_h : float
-        Target volumetric productivity; used only to compute `tau`.
+        Target volumetric productivity. `tau` (batch time) is computed in
+        `_run` as the simulated titer (HP formed per effluent volume, i.e.
+        HP-equivalent since neutralization to Ca3HP2 is ~complete) divided
+        by this productivity, so it always tracks the actual broth
+        concentration rather than an independently-specified titer.
     T : float
         Operating temperature [K] (`BatchBioreactor`'s own attribute name).
     P : float
@@ -116,7 +118,6 @@ class HPFermentation(BatchBioreactor):
         product_salt_ID: str = _FERMENTATION["product_salt_ID"],
         neutralization_conversion: float = _FERMENTATION["neutralization_conversion"],
         lime_excess_frac: float = _FERMENTATION["lime_excess_frac"],
-        titer_g_per_L: float = _FERMENTATION["titer_g_per_L"],
         productivity_g_per_L_per_h: float = _FERMENTATION["productivity_g_per_L_per_h"],
         T: float = _FERMENTATION["T_K"],
         P: float = _FERMENTATION["P_Pa"],
@@ -133,9 +134,7 @@ class HPFermentation(BatchBioreactor):
         self.product_salt_ID = product_salt_ID
         self.neutralization_conversion = float(neutralization_conversion)
         self.lime_excess_frac = float(lime_excess_frac)
-        self.titer_g_per_L = float(titer_g_per_L)
         self.productivity_g_per_L_per_h = float(productivity_g_per_L_per_h)
-        self.tau = self.titer_g_per_L / self.productivity_g_per_L_per_h
 
         self.neutralization_rxn = tmo.Reaction(
             f"2 {product_ID} + {lime_ID} -> {product_salt_ID} + 2 Water",
@@ -158,6 +157,13 @@ class HPFermentation(BatchBioreactor):
 
         effluent.T = vent.T = self.T
         effluent.P = vent.P = self.P
+
+        # Batch time from the simulated titer (kg HP/h over m3 broth/h =
+        # g/L), not an independently-specified one -- see the class
+        # docstring's `productivity_g_per_L_per_h` entry.
+        titer_g_per_L = self.design_results["HP formed (kg/h)"] / effluent.F_vol
+        self.design_results["Titer (g HP-equivalent/L)"] = titer_g_per_L
+        self.tau = titer_g_per_L / self.productivity_g_per_L_per_h
 
     def _run_reactions(self, effluent):
         ids = set(self.chemicals.IDs)

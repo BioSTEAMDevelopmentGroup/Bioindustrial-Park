@@ -19,11 +19,16 @@ Pathway:
       -> HPFermentation (Ca(OH)2 dosed in situ; Ca3HP2 already formed by
          the time broth leaves this unit)
       -> S401 (SolidsCentrifuge: removes CellMass)
+      -> M_ML (mixes in recycled mother liquor)
       -> broth_evaporator (MultiEffectEvaporator: concentrates to the
          patent's ~300-600 g/L crystallization threshold)
       -> CaHPCrystallizer -> S402 (SolidsCentrifuge: separates crystal
-         cake from mother liquor; mother liquor -> disposal_wastewater)
+         cake from mother liquor)
+      -> SP_ML (splits mother liquor: `mother_liquor_recycle` back to M_ML,
+         data/3hp.yaml mother_liquor_recycle.recycle_frac; remainder
+         `mother_liquor_purge` -> disposal_wastewater)
       -> DrumDryer -> dried Ca(3HP)2 product
+    (M_ML ... SP_ML form a recycle loop, built as the `ml_loop` subsystem.)
 
     milling_losses, pressed_cake, cell_mass (all combustible biomass) --
     mixed together (M_BT) -> BoilerTurbogenerator (BT, a facility, not in
@@ -50,6 +55,7 @@ from pathlib import Path
 
 import biosteam as bst
 import flexsolve as flx
+import numpy as np
 
 from biorefineries.sabre._chemicals import create_chemicals
 from biorefineries.sabre.utils import (
@@ -72,6 +78,7 @@ _BROTH_EVAPORATOR = _3HP_YAML["broth_evaporator"]
 _CELL_MASS_CENTRIFUGE = _3HP_YAML["cell_mass_centrifuge"]
 _CRYSTALLIZATION = _3HP_YAML["crystallization"]
 _CRYSTAL_SEPARATOR = _3HP_YAML["crystal_separator"]
+_ML_RECYCLE = _3HP_YAML["mother_liquor_recycle"]
 _DRYER = _3HP_YAML["dryer"]
 
 FRESH_WATER_PRICE_USD_PER_KG = bst.stream_utility_prices['Process water']
@@ -93,13 +100,13 @@ def create_3hp_system(
         Feedstock type (data/feedstock.yaml `feedstock_type`).
     ca3hp2_price : float, optional
         Price (USD/kg) to set on the dried Ca(3HP)2 product stream.
-        Defaults to data/tea.yaml `price.ca3hp2.baseline` when not given.
+        Defaults to data/tea.yaml `price.3hp.baseline` when not given.
 
     Returns
     -------
     sys : bst.System
         Key streams and units are accessible via `sys.flowsheet.stream`
-        and `sys.flowsheet.unit` (e.g. 'feed', 'pressed_cake',
+        and `sys.flowsheet.unit` (e.g. 'sargassum_feed', 'pressed_cake',
         'ca3hp2_product', 'MI', 'PR', 'F401', 'C401').
     """
     # Always rebuilds the include_hp3 chemical superset -- see module
@@ -279,9 +286,16 @@ def create_3hp_system(
     # -------------------------------------------------
     # Broth concentration ahead of crystallization
     # -------------------------------------------------
+    # Mother-liquor recycle enters here, ahead of F402, so the evaporator's
+    # concentration target (adjust_evaporation below) sees the recycled
+    # solutes too. `ml_recycle` is an empty placeholder until SP_ML (below)
+    # takes it over as its first outlet.
+    ml_recycle = bst.Stream("mother_liquor_recycle")
+    M_ML = bst.Mixer("M_ML", ins=(S401 - 1, ml_recycle), outs=("broth_to_evaporator",))
+
     F402 = bst.MultiEffectEvaporator(
         "F402",
-        ins=S401 - 1,
+        ins=M_ML - 0,
         outs=("broth_concentrate", "F402_evaporator_vapor"),
         P=tuple(_BROTH_EVAPORATOR["P_Pa"]),
         V=_BROTH_EVAPORATOR["V"],
@@ -320,7 +334,6 @@ def create_3hp_system(
         F402._load_components()
         for i in range(1, N):
             if _concentration_objective(1e-6) < 0.0:
-                import numpy as np
                 F402.P = tuple(np.linspace(Pstart, Plast, N - 1))
                 F402._reload_components = True
             else:
@@ -359,7 +372,22 @@ def create_3hp_system(
         split=dict(Ca3HP2=_CRYSTALLIZATION["target_recovery"]),
         moisture_content=_CRYSTAL_SEPARATOR["moisture_content"],
     )
-    S402.outs[1].price = _TEA_PRICE["disposal_wastewater"]["baseline"]
+
+    # Mother-liquor split: `recycle_frac` back to M_ML (crystallization
+    # only, NOT to the fermenter -- see data/3hp.yaml mother_liquor_recycle),
+    # remainder purged as liquid waste. Nothing in this loop consumes the
+    # unconverted sugars, so the purge carries all of them out at steady
+    # state whatever recycle_frac is.
+    SP_ML = bst.Splitter(
+        "SP_ML", ins=S402 - 1,
+        outs=(ml_recycle, "mother_liquor_purge"),
+        split=_ML_RECYCLE["recycle_frac"],
+    )
+    SP_ML.outs[1].price = _TEA_PRICE["disposal_wastewater"]["baseline"]
+
+    ml_loop = bst.System(
+        "ml_loop", path=[M_ML, F402, F402_P, C401, S402, SP_ML], recycle=ml_recycle,
+    )
 
     # -------------------------------------------------
     # Drying
@@ -372,15 +400,21 @@ def create_3hp_system(
         moisture_content=_DRYER["target_moisture_content"],
     )
     F403.outs[0].price = (
-        _TEA_PRICE["ca3hp2"]["baseline"] if ca3hp2_price is None
+        _TEA_PRICE["3hp"]["baseline"] if ca3hp2_price is None
         else float(ca3hp2_price)
     )
 
     path = [
         MI, PR, PFS, PC, DIL, EV,
-        F401, S401, F402, F402_P, C401, S402, F403,
+        F401, S401, ml_loop, F403,
     ]
-    HXN = bst.HeatExchangerNetwork("HXN", units=tuple(path))
+    HXN = bst.HeatExchangerNetwork(
+        "HXN",
+        units=(
+            MI, PR, PFS, PC, DIL, EV,
+            F401, S401, M_ML, F402, F402_P, C401, S402, SP_ML, F403,
+        ),
+    )
     path.append(HXN)
 
     # -------------------------------------------------
@@ -396,9 +430,13 @@ def create_3hp_system(
     # ChilledWaterPackage, CIPpackage, AirDistributionPackage,
     # FireWaterTank -- none of which exist anywhere else in sabre either).
     # bst defaults (boiler_efficiency=0.80, turbogenerator_efficiency=0.85,
-    # ash_disposal_price=-0.0318, fuel_price=0.218) are used as-is; these
-    # are standard literature baseline values already, not sabre-specific
-    # assumptions, so they're not threaded through data/3hp.yaml.
+    # fuel_price=0.218) are used as-is; these are standard literature
+    # baseline values already, not sabre-specific assumptions, so they're
+    # not threaded through data/3hp.yaml. The one exception is
+    # ash_disposal_price, which is set to sabre's own
+    # data/tea.yaml price.disposal_solid baseline (not bst's default
+    # -0.0318) so BT's ash is charged on the same basis as every other
+    # sabre solid waste stream.
     M_BT = bst.Mixer(
         "M_BT",
         ins=(PR - 0, MI - 1, S401 - 0),
@@ -406,7 +444,10 @@ def create_3hp_system(
     )
     path.append(M_BT)
 
-    BT = bst.BoilerTurbogenerator("BT", ins=(M_BT - 0,))
+    BT = bst.BoilerTurbogenerator(
+        "BT", ins=(M_BT - 0,),
+        ash_disposal_price=_TEA_PRICE["disposal_solid"]["baseline"],
+    )
     # BT.outs: [0] emissions (gas, vents to atmosphere -- unpriced, same
     # convention as every other sabre vent/off-gas stream); [1] blowdown
     # water (genuine liquid waste, priced as disposal_wastewater, same as
