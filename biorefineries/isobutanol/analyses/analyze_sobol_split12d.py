@@ -17,6 +17,12 @@ cache state (also on a partially complete stage-1 CSV).
 
     python analyze_sobol_split12d.py --study-name <STUDY_NAME>
     python analyze_sobol_split12d.py --self-test        # synthetic, no data needed
+
+--gp-metrics names the metrics whose surrogate may be a Gaussian process
+(default: the two PI metrics); every other metric is fitted with gradient
+boosting only, because one GP prediction of the design costs ~0.6 s and every
+metric needs 2^d - 2 subsets x n_replicates of them (hours per GP metric),
+while the trees predict in milliseconds at a CV Q2 within ~0.02 of the GP's.
 """
 import argparse
 import importlib.util
@@ -47,6 +53,9 @@ HEADLINE = 'PI'
 #: Never analysed: IRR is -inf at most points (variance undefined); the
 #: convergence diagnostics are solver bookkeeping, not model outputs.
 EXCLUDED_METRICS = ('IRR', 'spike_feed_residual', 'n_sims_run', 'final_drift')
+#: Metrics a GP may be fitted for by default (--gp-metrics); every other metric
+#: uses gradient boosting only -- a GP costs hours of predictions per metric.
+DEFAULT_GP_METRICS = ('PI', 'PI (log-tail)')
 LABELS = {'k_3': 'k$_3$ (Pdc)', 'k_6': 'k$_6$ (Adh1)', 'k_13': 'k$_{13}$ (ALS)',
           'k_17': 'k$_{17}$ (Adh6)', 'glycolysis': 'glycolysis',
           'ehrlich_downstream': 'Ehrlich downstream',
@@ -88,14 +97,31 @@ def eligible_metrics(ok, requested):
 
 #%% Analysis core (shared by the real run, the convergence refits and --self-test)
 
-def analyse(U, Y, vf, *, n_base, n_replicates, seed=0, label=''):
-    """Y = {metric: y}. Returns (surrogates, S {metric: (R, 2^d)}, fallback)."""
+def resolve_gp_metrics(requested):
+    """--gp-metrics -> the collection `analyse` takes: None (the single literal
+    'all') = a GP candidate for every metric; omitted = DEFAULT_GP_METRICS; a
+    bare --gp-metrics (empty list) = none. Names that are not analysed are
+    ignored."""
+    if requested is None:
+        return set(DEFAULT_GP_METRICS)
+    if list(requested) == ['all']:
+        return None
+    return set(requested)
+
+def analyse(U, Y, vf, *, n_base, n_replicates, seed=0, label='', gp_metrics=None):
+    """Y = {metric: y}. `gp_metrics` = the metrics whose surrogate may be a GP
+    (None = all of them); every other metric is fitted with gradient boosting
+    only, which predicts thousands of times faster.
+    Returns (surrogates, S {metric: (R, 2^d)}, fallback)."""
     surrogates = {}
     for m, y in Y.items():
         t0 = time.time()
-        surrogates[m] = sa.fit_surrogates(U, y, seed=seed)
+        candidates = (sa.SURROGATE_CANDIDATES if gp_metrics is None or m in gp_metrics
+                      else ('hgb',))
+        surrogates[m] = sa.fit_surrogates(U, y, seed=seed, candidates=candidates)
         s = surrogates[m]
-        print(f'  {label}{m}: {s.name} (Q2 gp {s.q2["gp"]:.3f}, hgb {s.q2["hgb"]:.3f})'
+        q2_text = ', '.join(f'{k} {v:.3f}' for k, v in s.q2.items())
+        print(f'  {label}{m}: {s.name} (Q2 {q2_text})'
               f'{"" if s.reliable else "  ** UNRELIABLE **"}  [{time.time() - t0:.0f} s]',
               flush=True)
     t0 = time.time()
@@ -214,7 +240,7 @@ def plot_heatmap(table, names, path):
 #%% Summary text
 
 def write_summary(path, *, study_name, counts, n_rows, irr_finite, skipped, names,
-                  surrogates, S, fallback, y_headline):
+                  surrogates, S, fallback, y_headline, gp_metrics=None):
     d, s = len(names), surrogates[HEADLINE]
     mean = S[HEADLINE].mean(axis=0)
     sd = S[HEADLINE].std(axis=0, ddof=1) if len(S[HEADLINE]) > 1 else np.zeros_like(mean)
@@ -254,6 +280,11 @@ def write_summary(path, *, study_name, counts, n_rows, irr_finite, skipped, name
         'bracket the Shapley effect.',
         '  * Indices are of the SURROGATE; Q2 bounds how much of the true variance it carries. '
         'The GP Q2 carries a mild hyper-parameter leak (kernel tuned once on a subsample).',
+        '  * GP-eligible metrics (GP vs gradient boosting by CV Q2): '
+        + ('all of them.' if gp_metrics is None else
+           (', '.join(m for m in surrogates if m in gp_metrics) or 'none')
+           + '; every other metric used gradient boosting only (a GP predicts thousands of '
+             'times more slowly, and each subset needs one prediction).'),
         '  * max_n_spikes is an integer treated as numeric.',
         f'  * Conditional-sampling fallback (partner kept its own coordinates): max '
         f'{fallback.max():.2%} of base points over all subsets.',
@@ -275,11 +306,13 @@ def run(args):
     assert np.allclose(vf.phi_M(U), ok['Phi_M'].to_numpy(dtype=float), rtol=1e-6), \
         'VectorizedFeasibility.phi_M disagrees with the recorded Phi_M column'
     metrics, skipped = eligible_metrics(ok, args.metrics)
+    gp_metrics = resolve_gp_metrics(args.gp_metrics)
     irr = pd.to_numeric(ok['IRR'], errors='coerce').to_numpy(dtype=float)
     Y = {m: pd.to_numeric(ok[m]).to_numpy(dtype=float) for m in metrics}
     print(f'{len(ok)} COMPLETE rows, {len(metrics)} metrics; d = {vf.d}.')
     surrogates, S, fallback = analyse(U, Y, vf, n_base=args.n_base,
-                                      n_replicates=args.n_replicates)
+                                      n_replicates=args.n_replicates,
+                                      gp_metrics=gp_metrics)
     out = os.path.join(RESULTS, args.study_name + '_sobol_')
     table = index_table(names, surrogates, S)
     table.to_csv(out + 'indices.csv', index=False)
@@ -292,7 +325,7 @@ def run(args):
         else:
             sur_n, S_all, _ = analyse(U[:n], {HEADLINE: Y[HEADLINE][:n]}, vf,
                                       n_base=args.n_base, n_replicates=args.n_replicates,
-                                      label=f'[n={n}] ')
+                                      label=f'[n={n}] ', gp_metrics=gp_metrics)
             s_n, S_n = sur_n[HEADLINE], S_all[HEADLINE]
         mean = S_n.mean(axis=0)
         best3 = sa.best_subsets(mean, vf.d, sizes=(3,))[3]
@@ -308,7 +341,7 @@ def run(args):
     write_summary(out + 'summary.txt', study_name=args.study_name, counts=counts,
                   n_rows=len(ok), irr_finite=float(np.isfinite(irr).mean()), skipped=skipped,
                   names=names, surrogates=surrogates, S=S, fallback=fallback,
-                  y_headline=Y[HEADLINE])
+                  y_headline=Y[HEADLINE], gp_metrics=gp_metrics)
     print(f'Outputs: {out}*')
 
 def self_test():
@@ -328,6 +361,12 @@ def self_test():
     assert top2['parameters'] == 'k_13 + ehrlich_downstream' and top2['S_closed'] > 0.9, top2
     shap = table[(table.metric == HEADLINE) & (table['index'] == 'Shapley')]['mean']
     assert abs(shap.sum() - 1.0) < 1e-9
+    # --gp-metrics wiring: only a named metric is GP-eligible, the rest are trees
+    assert resolve_gp_metrics(None) == set(DEFAULT_GP_METRICS)
+    assert resolve_gp_metrics(['all']) is None and resolve_gp_metrics([]) == set()
+    sur_trees, _, _ = analyse(U, {'IBO titer': Y['IBO titer']}, Box(), n_base=64,
+                              n_replicates=1, gp_metrics={HEADLINE})
+    assert set(sur_trees['IBO titer'].q2) == {'hgb'}, sur_trees['IBO titer'].q2
     import tempfile
     with tempfile.TemporaryDirectory() as tmp:
         plot_bars(table, Box.names, 'self-test', os.path.join(tmp, 'bars'))
@@ -338,12 +377,17 @@ def self_test():
                       y_headline=Y[HEADLINE])
         made = sorted(os.listdir(tmp))
         assert made == ['bars.pdf', 'bars.png', 'heat.pdf', 'heat.png', 'summary.txt'], made
+        with open(os.path.join(tmp, 'summary.txt'), encoding='utf-8') as fh:
+            assert 'GP-eligible metrics' in fh.read()
     print('SELF-TEST PASSED')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     parser.add_argument('--study-name')
     parser.add_argument('--metrics', nargs='*', default=None)
+    parser.add_argument('--gp-metrics', nargs='*', default=None,
+                        help="metrics whose surrogate may be a GP (default: PI, "
+                             "'PI (log-tail)'); 'all' = every metric, bare flag = none")
     parser.add_argument('--n-base', type=int, default=4096)
     parser.add_argument('--n-replicates', type=int, default=3)
     parser.add_argument('--min-rows', type=int, default=200)

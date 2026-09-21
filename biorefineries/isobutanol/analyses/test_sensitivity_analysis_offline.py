@@ -220,5 +220,27 @@ print(f'   max fallback fraction over subsets: {fb10.max():.4f}')
 PASS('real split_12d feasible domain: surrogate + all 4094 subsets recover the planted '
      'k_13 x ehrlich_downstream pair as the best 2-subset and the top-2 Shapley effects')
 
+#%% 11. candidate selection: GP skipped unless asked for (the --gp-metrics cost saver)
+rng11 = np.random.default_rng(8)
+U11 = rng11.random((300, 3))
+y11 = np.sin(2*np.pi*U11[:, 0]) + U11[:, 1]**2
+sur_hgb = sa.fit_surrogates(U11, y11, seed=0, candidates=('hgb',))
+assert sur_hgb.name == 'hgb' and set(sur_hgb.q2) == {'hgb'}, sur_hgb.q2
+assert np.isfinite(sur_hgb.predict(U11[:7])).all()
+sur_gp = sa.fit_surrogates(U11, y11, seed=0, candidates=('gp',))
+assert sur_gp.name == 'gp' and set(sur_gp.q2) == {'gp'}, sur_gp.q2
+for bad in ((), ('rf',), ('hgb', 'rf')):
+    try:
+        sa.fit_surrogates(U11, y11, seed=0, candidates=bad)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(f'candidates={bad!r} should raise ValueError')
+sur_both = sa.fit_surrogates(U11, y11, seed=0)
+assert set(sur_both.q2) == {'gp', 'hgb'}, sur_both.q2
+assert sur_both.q2['gp'] == sur_gp.q2['gp'] and sur_both.q2['hgb'] == sur_hgb.q2['hgb']
+PASS('fit_surrogates candidates: hgb-only / gp-only restrict q2 and the choice, an empty or '
+     'unknown candidate raises, the default still cross-validates both at unchanged Q2')
+
 #%% Done
 print(f'ALL {n_pass} CHECKS PASSED')
