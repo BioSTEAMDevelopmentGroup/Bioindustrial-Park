@@ -197,3 +197,126 @@ def format_scenario_spec(name, workbook, feeding, mpsps, objective_name,
         f"'isobutanol': {float(mpsps['isobutanol'])!r}}},\n"
         f"        objective_name={objective_name!r}, "
         f"objective_value={float(objective_value)!r}),")
+
+
+#%% Simulation (needs the built model; called only from main)
+def reload_verify(out_path, feeding, objective_name):
+    """Load the just-written workbook fresh (scenarios.load_scenario's
+    recipe: parameters reset -> load_parameter_distributions ->
+    metrics_at_baseline, which SETS the kinetics), set the trial's feeding,
+    simulate under the still-active A-referenced burden and return
+    dict(ethanol, isobutanol, objective)."""
+    from biorefineries import isobutanol
+    from biorefineries.isobutanol import kinetic_optimization as ko
+    model = isobutanol.models.models_EtOH_IBO_corn.model
+    handles = ko.get_handles()
+    model.parameters = ()
+    model.load_parameter_distributions(out_path,
+                                       isobutanol.models.namespace_dict)
+    model.metrics_at_baseline()
+    handles['fbs_spec'].max_n_spikes = int(feeding['max_n_spikes'])
+    handles['model_specification'](threshold_conc=feeding['threshold'],
+                                   target_conc=feeding['target'],
+                                   spike_conc=feeding['spike'])
+    solution = handles['solve_TEA'](stream_IDs=('ethanol', 'isobutanol'),
+                                    IRR_for_MPSP=0.15)
+    handles['latest_TEA_solution'].update(solution)
+    objective = ko.OBJECTIVE_REGISTRY[objective_name]['getter'](handles)
+    return dict(ethanol=float(solution['MPSPs']['ethanol']),
+                isobutanol=float(solution['MPSPs']['isobutanol']),
+                objective=float(objective))
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
+    parser.add_argument('--study-name', default=STUDY_NAME)
+    parser.add_argument('--trial-number', type=int, default=TRIAL_NUMBER)
+    parser.add_argument('--anchor', default=ANCHOR_SCENARIO)
+    parser.add_argument('--scenario-name', default=SCENARIO_NAME)
+    parser.add_argument('--objective-name', default=OBJECTIVE_NAME)
+    args = parser.parse_args(argv)
+
+    # 1. Build (default both-trains == IBO_EtOH-only at S201 split 1.0).
+    from biorefineries import isobutanol
+    isobutanol.load()
+    from biorefineries.isobutanol import scenarios
+    from biorefineries.isobutanol import kinetic_optimization as ko
+    from biorefineries.isobutanol import system as ibo_system
+    if args.scenario_name not in scenarios.SCENARIOS:
+        raise ValueError(f'{args.scenario_name!r} is not a registered '
+                         f'scenario: {sorted(scenarios.SCENARIOS)}')
+    if args.objective_name not in ko.OBJECTIVE_REGISTRY:
+        raise ValueError(f'{args.objective_name!r} is not in '
+                         'ko.OBJECTIVE_REGISTRY')
+    workbook = scenarios.SCENARIOS[args.scenario_name].workbook
+    out_path = os.path.join(WORKBOOK_DIR, workbook)
+
+    # 2. Anchor snapshot: full live kinetics + isobutanol price.
+    bundle = scenarios.load_scenario(args.anchor)
+    a_snapshot = ko.discover_kinetic_parameters(ko.get_handles()['r_te'])
+    ibo_price = float(bundle['model'].system.flowsheet.V514.isobutanol_price)
+    print(f'Scenario-{args.anchor} snapshot: {len(a_snapshot)} kinetic '
+          f'params; isobutanol price {ibo_price:.6g}')
+
+    # 3. Reproduce the trial (read-only w.r.t. the study) and require it clean.
+    result = ko.reproduce_split12d_trial(
+        args.anchor, args.study_name, args.trial_number, mode='both',
+        burden=True, restore=True)
+    problems = []
+    if result['error'] is not None:
+        problems.append(f"simulation error {result['error']}")
+    if result['recorded_state'] != 'COMPLETE':
+        problems.append(f"recorded state {result['recorded_state']!r}")
+    if result['cross_check']['mismatches']:
+        problems.append(f"cross-check mismatches "
+                        f"{result['cross_check']['mismatches']} (the study "
+                        'likely ran under another anchor / reference)')
+    if result['metric_warnings']:
+        problems.append(f"metric warnings {result['metric_warnings']}")
+    if problems:
+        raise RuntimeError('reproduction is not clean; nothing written: '
+                           + '; '.join(problems))
+    feeding = result['feeding']
+    metrics = result['reproduced']['metrics']
+    if args.objective_name not in metrics:
+        raise KeyError(f'{args.objective_name!r} is not a tracked metric of '
+                       'the reproduction')
+    reproduced = dict(
+        ethanol=float(result['reproduced']['MPSPs']['ethanol']),
+        isobutanol=float(result['reproduced']['MPSPs']['isobutanol']),
+        objective=float(metrics[args.objective_name]))
+
+    # 4. Full kinetic state: trial values over the anchor snapshot.
+    full_applied = merge_applied(a_snapshot, result['applied'])
+
+    # 5. Back up the existing workbook ONCE, then write the new one.
+    backup = out_path[:-len('.xlsx')] + '_pre-relocation-backup.xlsx'
+    if os.path.exists(out_path) and not os.path.exists(backup):
+        shutil.copy2(out_path, backup)
+        print(f'backed up the previous workbook to {backup}')
+    provenance = (f'{args.scenario_name}: trial {result["trial_number"]} of '
+                  f'{os.path.basename(str(args.study_name))} (anchor scenario '
+                  f'{args.anchor}; build_opt_IRR_split12d_workbook.py)')
+    n_kin = write_workbook(B_WORKBOOK, out_path, full_applied, ibo_price,
+                           provenance=provenance)
+    print(f'wrote {out_path} ({n_kin} kinetic rows)')
+
+    # 6. Reload-verify under the still-active A-referenced burden.
+    reloaded = reload_verify(out_path, feeding, args.objective_name)
+    deltas = assert_reload_matches(reproduced, reloaded, RELOAD_VERIFY_TOL)
+    print('reload-verify rel deltas (tol %g): ' % RELOAD_VERIFY_TOL
+          + ', '.join(f'{k} {v:.2e}' for k, v in deltas.items()))
+
+    # 7. The registry entry.
+    print('\n# ---- paste into scenarios.SCENARIOS ----')
+    print(format_scenario_spec(args.scenario_name, workbook, feeding,
+                               reproduced, args.objective_name,
+                               reproduced['objective']))
+    ibo_system.set_active_burden(None)   # cleanliness -- nothing runs after
+    return dict(result=result, full_applied=full_applied,
+                reproduced=reproduced, reloaded=reloaded, deltas=deltas,
+                out_path=out_path)
+
+
+if __name__ == '__main__':
+    main()
