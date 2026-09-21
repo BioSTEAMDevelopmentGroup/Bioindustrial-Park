@@ -226,7 +226,7 @@ metrics = {'MPSP': {'f': get_product_MPSP, 'units': '$/kg'}, # ethanol MPSP
 # results = {i: [] for i in range(len(metrics.values()))}
 results = {i: [] for i in metrics.keys()}
 
-steps = (20, 20, 1)
+steps = (40, 40, 1)
 
 # metabolic_14d glycolysis-group band (0.2x-4x) x the scenario-A baseline k_1e:
 # the range k_1e spans inside that study's glycolysis capacity multiplier.
