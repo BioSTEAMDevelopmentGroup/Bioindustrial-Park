@@ -736,15 +736,15 @@ if plot:
             curr_metric_cbar_ticks = np.arange(0.5, 3.5001, 0.5)
             curr_metric_w_ticks = [0.75, 0.9, 1.2, 1.5, 2.0, 3.0]
         elif 'irr' in lccm:
-            # shared with evaluate_EtOH_k13_k7ii.py (grid IRR -0.12 to 0.19);
-            # the under-color catches anything below -0.1
-            curr_metric_w_levels = np.arange(-0.1, 0.2001, 0.005)
-            curr_metric_cbar_ticks = np.arange(-0.1, 0.2001, 0.05)
-            curr_metric_w_ticks = [0.0, 0.05, 0.10, 0.15, 0.18]
-            # IRR can fall far below the lowest level (money-losing corners);
-            # fill those cells rather than leaving them blank
-            extend_cmap = 'both'
-            cmap_under_color = colors.grey_dark.shade(40).RGBn
+            # IRR colormap fixed to 0-15%, NO under/over colors: cells outside
+            # [0, 0.15] (money-losing corners below 0, any point above 0.15)
+            # render blank rather than clamped to an extend colour.
+            curr_metric_w_levels = np.arange(0.0, 0.15001, 0.005)
+            curr_metric_cbar_ticks = np.arange(0.0, 0.15001, 0.05)
+            curr_metric_w_ticks = [0.0, 0.05, 0.10, 0.15]
+            extend_cmap = 'neither'
+            cmap_under_color = None
+            cmap_over_color = None
         # curr_metric_w_levels = np.arange(0., 15.5, 0.5)
 
 
