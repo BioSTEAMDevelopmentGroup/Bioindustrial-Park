@@ -185,5 +185,40 @@ assert abs(sa.tail_variance_share(y8, 0.0) - share8) < 1e-12
 assert sa.tail_variance_share(np.array([1.0, 2.0, 3.0]), 0.0) == 0.0
 PASS('tail_variance_share: 1 - within-variance of the non-tail group / Var(y)')
 
+#%% 9. surrogate selection: GP wins on a smooth function, trees fit a step, noise is flagged
+rng9 = np.random.default_rng(5)
+U9 = rng9.random((600, 3))
+smooth = np.sin(2*np.pi*U9[:, 0]) + U9[:, 1]**2
+sur_smooth = sa.fit_surrogates(U9, smooth, seed=0)
+assert sur_smooth.name == 'gp' and sur_smooth.q2['gp'] > 0.95 and sur_smooth.reliable
+step = 5.0*((U9[:, 0] > 0.5) & (U9[:, 1] > 0.5))
+sur_step = sa.fit_surrogates(U9, step, seed=0)
+assert sur_step.q2['hgb'] > 0.9 and sur_step.reliable
+assert sur_step.name == max(sur_step.q2, key=sur_step.q2.get)   # chosen = best CV Q2
+noise = rng9.standard_normal(600)
+sur_noise = sa.fit_surrogates(U9, noise, seed=0)
+assert not sur_noise.reliable and max(sur_noise.q2.values()) < sa.RELIABLE_Q2
+assert sur_smooth.predict(U9[:7]).shape == (7,)
+PASS('fit_surrogates: GP chosen for a smooth response, trees fit a step, pure noise flagged unreliable')
+
+#%% 10. end to end on a synthetic response over the REAL feasible split_12d domain
+j13, jed = vf.names.index('k_13'), vf.names.index('ehrlich_downstream')
+truth = lambda U: 4.0*U[:, j13]*U[:, jed] + 0.3*U[:, 0]        # conjunctive, like the Ehrlich pathway
+U10 = sa.sample_feasible(1500, vf.d, vf, np.random.default_rng(6))
+sur10 = sa.fit_surrogates(U10, truth(U10), seed=0)
+assert sur10.reliable, sur10.q2
+# d = 12 -> 4094 subsets: keep the offline check light (small base sample)
+S10, fb10 = sa.all_closed_indices({'y': sur10.predict}, vf, vf.d, n_base=256,
+                                  n_replicates=1, seed=7)
+m10 = S10['y'][0]
+best10 = sa.best_subsets(m10, vf.d, sizes=(2,))
+assert set(sa.mask_names(best10[2][0], vf.names)) == {'k_13', 'ehrlich_downstream'}, best10
+sh10 = sa.shapley_effects(m10, vf.d)
+assert abs(sh10.sum() - 1.0) < 1e-9
+assert set(np.argsort(sh10)[-2:]) == {j13, jed}
+print(f'   max fallback fraction over subsets: {fb10.max():.4f}')
+PASS('real split_12d feasible domain: surrogate + all 4094 subsets recover the planted '
+     'k_13 x ehrlich_downstream pair as the best 2-subset and the top-2 Shapley effects')
+
 #%% Done
 print(f'ALL {n_pass} CHECKS PASSED')

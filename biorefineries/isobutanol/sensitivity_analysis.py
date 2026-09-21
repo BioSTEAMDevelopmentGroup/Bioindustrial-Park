@@ -18,6 +18,7 @@ inputs are DEPENDENT on the feasible domain. The quantities estimated here
 are well defined under dependence: the closed subset index
 S_u = Var(E[Y | X_u]) / Var(Y) (pick-freeze with conditional rejection
 sampling) and the exact Shapley effects built from all 2^d of them."""
+import dataclasses
 import math
 
 import numpy as np
@@ -27,7 +28,8 @@ __all__ = ('campaign_engine_kwargs', 'design_record', 'unit_to_values',
            'sample_feasible', 'conditional_partners', 'closed_index',
            'all_closed_indices', 'first_order', 'total_order',
            'shapley_effects', 'best_subsets', 'smallest_subset_reaching',
-           'mask_names', 'tail_variance_share')
+           'mask_names', 'tail_variance_share',
+           'RELIABLE_Q2', 'GP_HYPER_N', 'Surrogate', 'fit_surrogates')
 
 #%% Campaign space
 
@@ -330,3 +332,68 @@ def tail_variance_share(y, threshold=0.0):
         return 0.0
     within_hi = (hi.size/y.size)*np.var(hi) if hi.size else 0.0
     return float(1.0 - within_hi/np.var(y))
+
+#%% Surrogates
+
+#: Below this cross-validated Q2 a metric's indices are still computed but
+#: flagged unreliable in every output table.
+RELIABLE_Q2 = 0.8
+#: Rows used to optimize the GP's ARD hyper-parameters (then held fixed).
+GP_HYPER_N = 1500
+
+@dataclasses.dataclass
+class Surrogate:
+    name: str          # 'gp' | 'hgb'
+    model: object
+    q2: dict           # {'gp': Q2, 'hgb': Q2} (5-fold CV)
+    reliable: bool
+
+    def predict(self, U, chunk=4096):
+        U = np.asarray(U, dtype=float)
+        if self.name != 'gp':
+            return self.model.predict(U)
+        return np.concatenate([self.model.predict(U[i:i + chunk])
+                               for i in range(0, len(U), chunk)])
+
+def _q2(y, y_hat):
+    return float(1.0 - np.sum((y - y_hat)**2)/np.sum((y - y.mean())**2))
+
+def fit_surrogates(U, y, *, seed=0, n_folds=5):
+    """Fit a GP (constant x Matern-5/2 ARD + white noise, normalized target)
+    and gradient-boosted trees on unit-cube inputs U -> y; return the one
+    with the better `n_folds`-fold CV Q2, refit on all rows. The GP kernel
+    is optimized ONCE on a <= GP_HYPER_N-row subsample and held fixed
+    (optimizer=None) in the folds and the final fit: optimizing ARD
+    hyper-parameters on thousands of rows inside CV for every metric would
+    take hours. Its CV Q2 therefore carries a mild hyper-parameter leak; the
+    trees' does not."""
+    from sklearn.ensemble import HistGradientBoostingRegressor
+    from sklearn.gaussian_process import GaussianProcessRegressor
+    from sklearn.gaussian_process.kernels import ConstantKernel, Matern, WhiteKernel
+    from sklearn.model_selection import KFold
+    U, y = np.asarray(U, dtype=float), np.asarray(y, dtype=float)
+    d = U.shape[1]
+    rng = np.random.default_rng(seed)
+    sub = rng.choice(len(U), size=min(GP_HYPER_N, len(U)), replace=False)
+    kernel = (ConstantKernel(1.0, (1e-3, 1e3))
+              *Matern(length_scale=np.ones(d), length_scale_bounds=(1e-2, 1e2), nu=2.5)
+              + WhiteKernel(1e-3, (1e-8, 1e1)))
+    tuned = GaussianProcessRegressor(kernel, normalize_y=True,
+                                     n_restarts_optimizer=1, random_state=seed)
+    tuned.fit(U[sub], y[sub])
+    makers = {
+        'gp': lambda: GaussianProcessRegressor(tuned.kernel_, optimizer=None,
+                                               normalize_y=True),
+        'hgb': lambda: HistGradientBoostingRegressor(
+            max_iter=500, learning_rate=0.05, early_stopping=True,
+            random_state=seed)}
+    folds = list(KFold(n_folds, shuffle=True, random_state=seed).split(U))
+    q2 = {}
+    for name, make in makers.items():
+        y_hat = np.empty_like(y)
+        for train, test in folds:
+            y_hat[test] = make().fit(U[train], y[train]).predict(U[test])
+        q2[name] = _q2(y, y_hat)
+    name = max(q2, key=q2.get)
+    return Surrogate(name=name, model=makers[name]().fit(U, y), q2=q2,
+                     reliable=q2[name] >= RELIABLE_Q2)
