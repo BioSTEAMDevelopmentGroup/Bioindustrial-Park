@@ -60,9 +60,9 @@ price:
     note: "hydrolysis enzyme cocktail (cellulase + alginate lyase) dosed in EnzymaticPress, sabre/units/_preprocessing.py; same value biorefineries.HP uses for its own 'Enzyme' price, applied here to the whole blended cocktail since no separate published price exists for alginate lyase."
     source: "$6.16/kg protein in 2016$, P25 of Davis et al. (2018), NREL/TP-5100-71949."
   lime:
-    baseline: 1.29
+    baseline: 0.262
     note: "CalciumDihydroxide (Ca(OH)2), dosed in HPFermentation (sabre/units/_3hp.py) for in-situ neutralization; same value biorefineries.HP.process_settings uses for its own 'Lime' price."
-    source: "biorefineries.HP.process_settings.py, lime_price=1.29 (2016$)."
+    source: "biorefineries.HP.process_settings.py, lime_price = 0.1189 * _lb_per_kg (hydrated-lime $/ton at plant, Mineral Commodity Summaries 2020, 2015-2019 average; see the comment block above that line)."
 
   # Waste streams, negative price to indicate as a cost
   disposal_solid:
@@ -139,13 +139,8 @@ price:
     range: [0.6, 1.5]
     distribution: "triangular"
     source: "midpoint of soybean oil $0.62-1.50/kg market price benchmark"
-  ca3hp2:
-    baseline: 1.552
+  3hp:
+    baseline: 1.1
     note: >
-      Calcium 3-hydroxypropionate (dried crystal, final product of
-      sabre/units/_3hp.py's CaHPCrystallizer) has no established commercial
-      market -- it's a patent-described intermediate, not a traded
-      commodity. Priced here as its mass-equivalent free-acid (3-HP) value:
-      baseline = HP_price_usd_per_kg * (2 * HP.MW / Ca3HP2.MW)
-               = 1.88 * (2 * 90.07794 / 218.218) = 1.552.
-    source: "HP_price=1.88 (2016$), the commented-out initial-value citation in biorefineries.HP.process_settings.py (line ~138); no other 3-HP market price found in either project."
+      Back-calculated based on the market price of acrylic acid of $1.3-1.5/kg for North America.
+    source: "Expert Market Research: https://www.expertmarketresearch.com/price-forecast/acrylic-acid-price-trends; IMARC Group: https://www.imarcgroup.com/acrylic-acid-pricing-report"
