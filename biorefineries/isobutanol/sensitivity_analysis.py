@@ -62,6 +62,53 @@ def campaign_engine_kwargs(ko, study_target_products, study_type):
     engine_kwargs['param_bounds_override'] = derived
     return preset, engine_kwargs
 
+#: The pre-optimization SCREENING measure (spec
+#: docs/superpowers/specs/2026-09-21-sobol-screening-measure-design.md): the
+#: three from-zero pathway axes are sampled LINEAR-uniform on [0, ceiling]
+#: (a log band on an axis whose baseline is 0 hangs off an arbitrary
+#: numerical floor and starves the co-production corner: 0.03 % of the
+#: campaign measure), and the three native ethanol-branch axes on a
+#: 0.1x-4x band (the campaign's 1e-3x knock-outs are the failure tail that
+#: carries 100 % of Var(PI); a knock-out is a discrete decision, not a dial).
+SCREENING_LINEAR_AXES = ('k_13', 'k_17', 'ehrlich_downstream')
+SCREENING_NATIVE_AXES = ('k_3', 'k_6', 'glycolysis')
+SCREENING_NATIVE_BAND = (0.1, 4.0)
+
+def screening_search_space(search_space, kinetic_baselines):
+    """A NEW search-space dict (same insertion order) carrying the screening
+    measure: SCREENING_LINEAR_AXES -> {'low': 0.0, 'high': <campaign
+    ceiling>, 'log': False}; 'k_3' / 'k_6' -> SCREENING_NATIVE_BAND x their
+    live baseline, log; 'glycolysis' (a multiplier, baseline 1) ->
+    SCREENING_NATIVE_BAND itself, log; every other entry copied. The
+    measure is then carried by the existing linear branch of unit_to_values
+    / ko.unit_to_external, so VectorizedFeasibility, ko.external_to_unit and
+    design_record need no change. KeyError for a missing axis; ValueError
+    for a nonpositive native baseline or an int-typed axis. `search_space`
+    is not mutated."""
+    m_lo, m_hi = SCREENING_NATIVE_BAND
+    out = {}
+    for name, sp in search_space.items():
+        if name in SCREENING_LINEAR_AXES or name in SCREENING_NATIVE_AXES:
+            if sp.get('int'):
+                raise ValueError(f'{name!r} is an integer axis; the screening '
+                                 'measure re-specifies float axes only')
+        if name in SCREENING_LINEAR_AXES:
+            out[name] = {'low': 0.0, 'high': float(sp['high']), 'log': False}
+        elif name == 'glycolysis':
+            out[name] = {'low': float(m_lo), 'high': float(m_hi), 'log': True}
+        elif name in SCREENING_NATIVE_AXES:
+            base = float(kinetic_baselines[name])
+            if not base > 0.0:
+                raise ValueError(f'{name!r}: the screening band is a multiplier '
+                                 f'of a positive live baseline; got {base!r}')
+            out[name] = {'low': m_lo*base, 'high': m_hi*base, 'log': True}
+        else:
+            out[name] = dict(sp)
+    missing = [n for n in SCREENING_LINEAR_AXES + SCREENING_NATIVE_AXES if n not in out]
+    if missing:
+        raise KeyError(f'screening measure: axes {missing} are not in the search space')
+    return out
+
 def design_record(*, search_space, parameter_groups, group_references,
                   kinetic_baselines, burden_model, eb, baseline_model_kwargs,
                   baseline_max_n_spikes, volume_cap, target_conc_max,

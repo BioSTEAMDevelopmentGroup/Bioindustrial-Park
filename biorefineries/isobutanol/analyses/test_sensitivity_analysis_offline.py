@@ -242,5 +242,67 @@ assert sur_both.q2['gp'] == sur_gp.q2['gp'] and sur_both.q2['hgb'] == sur_hgb.q2
 PASS('fit_surrogates candidates: hgb-only / gp-only restrict q2 and the choice, an empty or '
      'unknown candidate raises, the default still cross-validates both at unchanged Q2')
 
+#%% 12. screening measure: linear from-zero pathway axes, 0.1x-4x native band
+import json
+scr = sa.screening_search_space(space, kb)
+assert list(scr) == list(space), 'insertion order changed'
+for n in sa.SCREENING_LINEAR_AXES:
+    assert scr[n] == {'low': 0.0, 'high': space[n]['high'], 'log': False}, (n, scr[n])
+for n in ('k_3', 'k_6'):
+    m_lo, m_hi = sa.SCREENING_NATIVE_BAND
+    assert scr[n] == {'low': m_lo*kb[n], 'high': m_hi*kb[n], 'log': True}, (n, scr[n])
+assert scr['glycolysis'] == {'low': 0.1, 'high': 4.0, 'log': True}, scr['glycolysis']
+for n in space:
+    if n not in sa.SCREENING_LINEAR_AXES + sa.SCREENING_NATIVE_AXES:
+        assert scr[n] == space[n], n
+assert space['k_13']['log'] is True and space['k_13']['low'] > 0, 'the campaign space was mutated'
+# The measure is carried by the existing linear branch of both maps: vectorized
+# == scalar, external_to_unit inverts it, and u = 0 lands EXACTLY on 0.
+U12 = np.random.default_rng(12).random((50, len(scr)))
+U12[0] = 0.0
+U12[1] = 1.0
+vals12 = sa.unit_to_values(U12, scr)
+assert all(vals12[n][0] == 0.0 for n in sa.SCREENING_LINEAR_AXES)
+for i in (0, 1, 7):
+    ext = ko.unit_to_external(U12[i], scr)
+    for n in scr:
+        assert np.isclose(float(ext[n]), float(vals12[n][i]), rtol=1e-12, atol=1e-12), (n, ext[n], vals12[n][i])
+    back = ko.external_to_unit(ext, scr)
+    for j, n in enumerate(scr):
+        if not scr[n].get('int'):
+            assert abs(back[j] - U12[i, j]) < 1e-9, (n, back[j], U12[i, j])
+# The point of the measure: the co-production corner gets real feasible mass.
+design_scr = json.loads(json.dumps(sa.design_record(
+    search_space=scr, parameter_groups=engine_kwargs['parameter_groups'],
+    group_references=engine_kwargs['group_references'], kinetic_baselines=kb,
+    burden_model=bm, eb=eb, baseline_model_kwargs=BASE_FEED,
+    baseline_max_n_spikes=16, volume_cap=20.0,
+    target_conc_max=ko.TARGET_CONC_MAX, meta={'seed': 7})))
+vf_scr = sa.VectorizedFeasibility.from_design(design_scr)
+assert vf_scr.names == vf.names
+U12b = np.random.default_rng(13).random((20000, vf.d))
+def _corner(v):
+    return ((v['k_13'] >= 2.0) & (v['k_17'] >= 1.0) & (v['ehrlich_downstream'] >= 0.4)
+            & (v['k_3'] >= 0.1*kb['k_3']) & (v['k_6'] >= 0.1*kb['k_6']))
+mass_campaign = float((_corner(sa.unit_to_values(U12b, space)) & vf(U12b)).mean())
+mass_screening = float((_corner(sa.unit_to_values(U12b, scr)) & vf_scr(U12b)).mean())
+print(f'   feasible co-production corner mass: campaign {mass_campaign:.4%}, screening {mass_screening:.2%}')
+assert mass_screening > 0.03 and mass_screening > 20*max(mass_campaign, 1e-5), (mass_campaign, mass_screening)
+assert 0.15 < vf_scr(U12b).mean() < 0.45, vf_scr(U12b).mean()     # burden + volume feasible fraction
+# error paths: a missing axis, a nonpositive native baseline, an int-typed axis
+for bad_space, bad_kb, exc in (
+        ({k: v for k, v in space.items() if k != 'k_17'}, kb, KeyError),
+        (space, {**kb, 'k_3': 0.0}, ValueError),
+        ({**space, 'k_13': {**space['k_13'], 'int': True}}, kb, ValueError)):
+    try:
+        sa.screening_search_space(bad_space, bad_kb)
+    except exc:
+        pass
+    else:
+        raise AssertionError(f'expected {exc.__name__}')
+PASS('screening_search_space: six axes re-specified (linear [0, ceiling] pathway axes, '
+     '0.1x-4x native band), order + other entries unchanged, both unit maps agree and '
+     'invert, the feasible co-production corner mass rises from ~0 to > 3 %, three error paths')
+
 #%% Done
 print(f'ALL {n_pass} CHECKS PASSED')
