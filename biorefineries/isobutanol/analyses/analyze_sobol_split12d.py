@@ -262,7 +262,7 @@ def plot_bars(table, names, q2_text, path):
                color=colour, edgecolor='k', linewidth=0.5, label=label)
     ax.set_xticks(x)
     ax.set_xticklabels([LABELS.get(n, n) for n in order], rotation=40, ha='right')
-    ax.set_ylim(-0.02, 0.6)
+    ax.set_ylim(-0.04, 0.6)
     ax.set_ylabel('Share of PI variance across the\nfeasible campaign space')
     ax.set_title(f'Sensitivity of the profitability index ({q2_text})', fontweight='bold')
     _ticks(ax)
