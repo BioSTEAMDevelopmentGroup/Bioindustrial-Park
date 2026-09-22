@@ -255,8 +255,9 @@ def plot_bars(table, names, q2_text, path):
     width, x = 0.27, np.arange(len(order))
     ax.axhline(0.0, color='k', linewidth=0.8, zorder=0.5)
     for k, (kind, colour, label) in enumerate((
-            ('S1', '#9ecae1', 'first-order'), ('Shapley', '#08519c', 'Shapley effect'),
-            ('ST', '#fdae6b', 'total-order'))):
+            ('S1', '#9ecae1', "first order Sobol' index"),
+            ('Shapley', '#08519c', 'Shapley effects'),
+            ('ST', '#fdae6b', "total order Sobol' index (first order + interactions)"))):
         sub = t[t['index'] == kind].set_index('parameter').loc[order]
         ax.bar(x + (k - 1)*width, sub['mean'], width, yerr=sub['sd'], capsize=2,
                color=colour, edgecolor='k', linewidth=0.5, label=label)
