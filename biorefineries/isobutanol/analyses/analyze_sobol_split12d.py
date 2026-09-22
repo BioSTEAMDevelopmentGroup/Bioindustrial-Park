@@ -73,7 +73,7 @@ LABELS = {'k_3': 'k$_3$ (Pdc)', 'k_6': 'k$_6$ (Adh1)', 'k_13': 'k$_{13}$ (ALS)',
           'inhib_ethanol': 'ethanol inhibition',
           'inhib_isobutanol': 'isobutanol inhibition',
           'inhib_acetate': 'acetate inhibition',
-          'threshold_conc': 'spike threshold', 'target_delta': 'spike target $\\Delta$',
+          'threshold_conc': 'thresh. sugar conc.', 'target_delta': 'target sugar conc.',
           'max_n_spikes': 'max. spikes'}
 
 #%% Data
