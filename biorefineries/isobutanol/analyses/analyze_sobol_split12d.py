@@ -253,6 +253,7 @@ def plot_bars(table, names, q2_text, path):
              .sort_values(ascending=False).index.tolist())
     fig, ax = plt.subplots(figsize=(7.5, 4.6))
     width, x = 0.27, np.arange(len(order))
+    ax.axhline(0.0, color='k', linewidth=0.8, zorder=0.5)
     for k, (kind, colour, label) in enumerate((
             ('S1', '#9ecae1', 'first-order'), ('Shapley', '#08519c', 'Shapley effect'),
             ('ST', '#fdae6b', 'total-order'))):
