@@ -217,7 +217,7 @@ def subset_table(names, S_headline, sizes=(1, 2, 3, 4)):
     return (pd.DataFrame(rows).sort_values(['size', 'S_closed'], ascending=[True, False])
             .reset_index(drop=True))
 
-#%% Figures (project style: Arial, 12/12/10/9 pt, ticks on all sides, legend under the panel)
+#%% Figures (project style: Arial, 12/12/10/9 pt, ticks on all sides; PI bars legend inside the panel)
 
 def _style():
     plt.rcParams.update({
@@ -264,7 +264,8 @@ def plot_bars(table, names, q2_text, path):
     ax.set_ylabel('Share of PI variance across the\nfeasible campaign space')
     ax.set_title(f'Sensitivity of the profitability index ({q2_text})', fontweight='bold')
     _ticks(ax)
-    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.42), ncol=3, frameon=False)
+    # inside the panel: bars are sorted by Shapley effect, so the upper right is empty
+    ax.legend(loc='upper right', frameon=False)
     fig.savefig(path + '.png', dpi=600, bbox_inches='tight')
     fig.savefig(path + '.pdf', bbox_inches='tight')
     plt.close(fig)
