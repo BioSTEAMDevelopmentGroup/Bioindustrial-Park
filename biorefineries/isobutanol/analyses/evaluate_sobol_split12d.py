@@ -23,6 +23,16 @@ the same nested design. Supervised launch:
     python supervise_sweep.py evaluate_sobol_split12d.py \
         --stem <STUDY_NAME> --checkpoint-suffix _trajectory.csv
 
+IBO_SOBOL_MEASURE selects the input measure (spec
+docs/superpowers/specs/2026-09-21-sobol-screening-measure-design.md):
+'campaign' (default) = the campaign's own log-uniform bands; 'screening' =
+sa.screening_search_space -- k_13 / k_17 / ehrlich_downstream linear-uniform
+on [0, ceiling], k_3 / k_6 / glycolysis on 0.1x-4x -- the pre-optimization
+measure that gives the co-production corner real mass. A screening study
+carries '_screening_rb0.1-4_lin0_' in place of the campaign rate-band tag,
+and every design record stores meta.measure and meta.baseline_PI (the
+scenario-A PI at the 15 % hurdle, stage 2's default target threshold).
+
 Stage 2 (sim-safe): analyze_sobol_split12d.py."""
 import json
 import os
@@ -38,6 +48,9 @@ SEED = int(os.environ.get('IBO_SOBOL_SEED', 20260920))
 ANCHOR = 'A'
 STUDY_TARGET_PRODUCTS = 'ethanol_isobutanol'
 STUDY_TYPE = 'metabolic_split_12d'
+MEASURE = os.environ.get('IBO_SOBOL_MEASURE', 'campaign')
+if MEASURE not in ('campaign', 'screening'):
+    raise ValueError(f"IBO_SOBOL_MEASURE must be 'campaign' or 'screening'; got {MEASURE!r}")
 
 #%% Load (fresh kernel; one load per process)
 from biorefineries import isobutanol
@@ -67,10 +80,20 @@ prefix = f'kin_opt_{STUDY_TARGET_PRODUCTS}_{STUDY_TYPE}_pi_'
 assert campaign_name.startswith(prefix), campaign_name
 STUDY_NAME = (f'kin_sobol_{STUDY_TARGET_PRODUCTS}_{STUDY_TYPE}_'
               + campaign_name[len(prefix):] + f'_seed{SEED}')
+if MEASURE == 'screening':
+    # The campaign rate-band tag no longer describes the space: swap it for
+    # the screening tag (native band + 'lin0' = linear-from-zero pathway axes).
+    old_tag = '_rb0.001-4_'
+    assert old_tag in STUDY_NAME, f'campaign rate-band tag {old_tag!r} not in {STUDY_NAME!r}'
+    m_lo, m_hi = sa.SCREENING_NATIVE_BAND
+    STUDY_NAME = STUDY_NAME.replace(old_tag, f'_screening_rb{m_lo:g}-{m_hi:g}_lin0_', 1)
 print(f'STUDY_NAME={STUDY_NAME}', flush=True)
 
 #%% Scenario + evaluation context (the engines' own set-up)
 bundle = scenarios.load_scenario(ANCHOR, burden=True)
+bundle['solve_TEA']()                       # exit state: the TEA at the 15 % hurdle
+BASELINE_PI = float(ko._PI(ko.get_handles()))   # the metric's own definition
+print(f'baseline PI (scenario {ANCHOR}) = {BASELINE_PI:.5f}', flush=True)
 ctx = ko._prepare_optimization(
     'PI', direction=None, level=None, objective_units=None, objective_name=None,
     scenario_label=ANCHOR,
@@ -80,6 +103,10 @@ ctx = ko._prepare_optimization(
     study_name=STUDY_NAME, results_dir=None, handles=None,
     burden_model=bundle['burden_model'], volume_feasibility=True, volume_cap=None,
     seed_from=None, method_tag='', **engine_kwargs)
+if MEASURE == 'screening':
+    # The evaluation site never reads the space; the stream, the design record
+    # and the resume verification all read ctx.search_space.
+    ctx.search_space = sa.screening_search_space(ctx.search_space, ctx.kinetic_baselines)
 is_feasible = ko.feasibility_predicate(
     burden_on=True, volume_on=True, burden_model=ctx.burden_model,
     parameter_groups=ctx.parameter_groups, kinetic_baselines=ctx.kinetic_baselines,
@@ -104,7 +131,8 @@ design = sa.design_record(
     baseline_model_kwargs=ctx.baseline_model_kwargs,
     baseline_max_n_spikes=ctx.baseline_max_n_spikes, volume_cap=ctx.volume_cap,
     target_conc_max=ko.TARGET_CONC_MAX,
-    meta=dict(study_name=STUDY_NAME, seed=SEED, anchor=ANCHOR,
+    meta=dict(study_name=STUDY_NAME, seed=SEED, anchor=ANCHOR, measure=MEASURE,
+              baseline_PI=BASELINE_PI,
               study_target_products=STUDY_TARGET_PRODUCTS, study_type=STUDY_TYPE,
               git_commit=_git_commit(), python=sys.version.split()[0],
               numpy=np.__version__, created=datetime.now().isoformat(timespec='seconds')))
