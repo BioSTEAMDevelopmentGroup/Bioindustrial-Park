@@ -369,8 +369,12 @@ def write_summary(path, *, study_name, counts, n_rows, irr_finite, skipped, name
         '',
         'HOW TO READ THIS',
         '  * Domain: the FEASIBLE part of the campaign box (enzyme burden + volume bound) under '
-        "the campaign's log-uniform measure -- variability across the designs the optimizer was "
-        'allowed to propose, not around any one design.',
+        + ("the campaign's log-uniform measure -- variability across the designs the optimizer "
+           'was allowed to propose, not around any one design.' if measure == 'campaign' else
+           'the SCREENING measure (an engineering prior, not data: k_13 / k_17 / '
+           'ehrlich_downstream linear-uniform from zero, k_3 / k_6 / glycolysis log-uniform on '
+           '0.1x-4x of scenario A) -- variability across the designs a pre-optimization screen '
+           'considers, not around any one design.'),
         '  * The feasibility constraint makes the inputs dependent: a closed index includes '
         'influence mediated through the constraint; Shapley effects are the attribution that '
         'sums to 100 %; first-order / total indices are reported for reference and need not '
@@ -451,6 +455,8 @@ def run(args):
     table = index_table(names, surrogates, S)
     table.to_csv(out + 'indices.csv', index=False)
     subset_table(names, S[HEADLINE]).to_csv(out + 'PI_subsets.csv', index=False)
+    if TARGET in S:
+        subset_table(names, S[TARGET]).to_csv(out + 'PI_target_subsets.csv', index=False)
     if CONDITIONAL in S:
         subset_table(names, S[CONDITIONAL]).to_csv(out + 'PI_conditional_subsets.csv', index=False)
     # Convergence of the headline with the (nested) design size
