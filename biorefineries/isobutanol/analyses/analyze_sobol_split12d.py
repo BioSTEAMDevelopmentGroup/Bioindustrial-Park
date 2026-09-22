@@ -68,9 +68,8 @@ EXCLUDED_METRICS = ('IRR', 'spike_feed_residual', 'n_sims_run', 'final_drift')
 #: uses gradient boosting only -- a GP costs hours of predictions per metric.
 DEFAULT_GP_METRICS = ('PI', 'PI (log-tail)')
 LABELS = {'k_3': 'k$_3$ (Pdc)', 'k_6': 'k$_6$ (Adh1)', 'k_13': 'k$_{13}$ (ALS)',
-          'k_17': 'k$_{17}$ (Adh6)', 'glycolysis': 'glycolysis group expression',
-          'ehrlich_downstream': 'Ehrlich group k$_{14}$ (Ilv5), k$_{15}$ (Ilv3), '
-                                'k$_{16}$ (Aro10)',
+          'k_17': 'k$_{17}$ (Adh6)', 'glycolysis': 'glycolysis (k$_{\\mathrm{1e}}$, k$_{\\mathrm{1l}}$, k$_{\\mathrm{1h}}$)',
+          'ehrlich_downstream': 'k$_{14}$ (Ilv5), k$_{15}$ (Ilv3), k$_{16}$ (Aro10)',
           'inhib_ethanol': 'ethanol inhibition',
           'inhib_isobutanol': 'isobutanol inhibition',
           'inhib_acetate': 'acetate inhibition',
