@@ -56,9 +56,9 @@ price:
     note: "fermentation medium, pH base"
     source: "no literature source cited in legacy scripts"
   enzyme:
-    baseline: 6.16
-    note: "hydrolysis enzyme cocktail (cellulase + alginate lyase) dosed in EnzymaticPress, sabre/units/_preprocessing.py; same value biorefineries.HP uses for its own 'Enzyme' price, applied here to the whole blended cocktail since no separate published price exists for alginate lyase."
-    source: "$6.16/kg protein in 2016$, P25 of Davis et al. (2018), NREL/TP-5100-71949."
+    baseline: 2.68
+    note: "$6.16/kg hydrolysis enzyme cocktail (cellulase + alginate lyase) dosed in EnzymaticPress, sabre/units/_preprocessing.py; priced as soy protein (isolate) since no separate published price exists for this cocktail, applied on the same $/kg protein basis as the prior Davis et al. (2018) enzyme price."
+    source: "$2.68/kg protein, 100%-protein-equivalent basis for soy protein isolate ($2.52/kg as-is at ~95% protein); Green Circle Capital, 'GC Protein Pricing Review Year End 2023' (Mar 2024), average of Alibaba wholesale prices for 1-MT shipments."
   lime:
     baseline: 0.262
     note: "CalciumDihydroxide (Ca(OH)2), dosed in HPFermentation (sabre/units/_3hp.py) for in-situ neutralization; same value biorefineries.HP.process_settings uses for its own 'Lime' price."

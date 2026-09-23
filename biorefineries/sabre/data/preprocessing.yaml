@@ -36,11 +36,11 @@ enzymatic_press:
   # sabre/units/_preprocessing.py::EnzymaticPress.
   hydrolysis_conversion: 0.50
 
-  # Same basis biorefineries.HP/lactic use for their own enzymatic
-  # hydrolysis step (20 mg enzyme/g glucan + 10% excess), applied here to
-  # Glucan + Alginate combined since the same cocktail (cellulase +
-  # alginate lyase) doses both.
-  enzyme_loading_mg_per_g_substrate: 20.0
+  # Base loading reduced from the biorefineries.HP/lactic basis (20 mg
+  # enzyme/g glucan) to 0.5 mg enzyme/g substrate; 10% excess still applied
+  # on top. Applied here to Glucan + Alginate combined since the same
+  # cocktail (cellulase + alginate lyase) doses both.
+  enzyme_loading_mg_per_g_substrate: 0.5
   enzyme_excess_frac: 0.10
 
   sources:
@@ -48,14 +48,14 @@ enzymatic_press:
       key: user_specified
       note: "Preliminary assumption; not derived from literature for this feedstock/enzyme combination."
     enzyme_loading:
-      citation: "Table 18 of Humbird et al. (2011), NREL/TP-5100-47764."
-      note: "20 mg enzyme/g glucan base loading, same value reused across biorefineries.HP and biorefineries.lactic's EnzymeHydrolysateMixer."
+      key: user_specified
+      note: "0.5 mg enzyme/g substrate base loading; lowered from the 20 mg enzyme/g glucan basis (Table 18 of Humbird et al. (2011), NREL/TP-5100-47764) reused across biorefineries.HP and biorefineries.lactic's EnzymeHydrolysateMixer."
     enzyme_excess:
       citation: "Davis et al. (2018), NREL/TP-5100-71949, page 23."
       note: "10% excess enzyme allowance on top of the base loading -- same citation biorefineries.lactic uses for this factor."
     enzyme_price:
-      citation: "Davis et al. (2018), NREL/TP-5100-71949, page 25 (P25)."
-      note: "$6.16/kg protein in 2016$, same value biorefineries.HP uses for its own 'Enzyme' price -- see data/tea.yaml price.Enzyme. Applied here to the whole blended cocktail dose (cellulase + alginate lyase together), since no separate published industrial-scale price exists for alginate lyase."
+      citation: "Green Circle Capital, 'GC Protein Pricing Review Year End 2023' (Mar 2024)."
+      note: "$2.68/kg protein, 100%-protein-equivalent basis for soy protein isolate (average of Alibaba wholesale prices for 1-MT shipments), replacing the prior Davis et al. (2018) $6.16/kg protein enzyme price -- see data/tea.yaml price.enzyme. Applied here to the whole blended cocktail dose (cellulase + alginate lyase together), since no separate published industrial-scale price exists for alginate lyase."
 
 
 mill:
