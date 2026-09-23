@@ -33,7 +33,8 @@ def _structural_solid(ID: str, formula: str, Hf_cal: float,
     return chemical
 
 
-def create_chemicals(set_thermo: bool = True, include_hp3: bool = False):
+def create_chemicals(set_thermo: bool = True, include_hp3: bool = False,
+                     include_dilute_acid: bool = False):
     """
     Parameters
     ----------
@@ -41,7 +42,18 @@ def create_chemicals(set_thermo: bool = True, include_hp3: bool = False):
         If True, also construct and include the chemicals used only by
         the EnzymaticPress/3-HP-from-Sargassum pathway (Glucose,
         AlginateMonomer, Enzyme, ...).
+    include_dilute_acid : bool
+        If True (requires `include_hp3`), also include the chemicals used
+        only by the 3-HP cake-saccharification configurations' dilute-acid
+        pretreatment (H2SO4, AmmoniumSulfate), and lock Glucose to the
+        liquid phase (needed by the pretreatment flash). Kept behind its own flag,
+        separate from `include_hp3`, so the `enzymatic_press` 3-HP
+        configuration's chemical set (and hence its simulated results)
+        stays exactly as it was.
     """
+    if include_dilute_acid and not include_hp3:
+        raise ValueError("include_dilute_acid=True requires include_hp3=True.")
+
     Water = bst.Chemical("Water")
 
     # Sargassum components
@@ -173,6 +185,32 @@ def create_chemicals(set_thermo: bool = True, include_hp3: bool = False):
             SO2, P4O10, CaSO4,
         ]
 
+    # Dilute-acid pretreatment chemicals (3-HP cake configurations only).
+    # Same choices biorefineries.cellulosic makes for its own corn stover
+    # dilute-acid pretreatment: H2SO4 as a liquid, and ammonium sulfate as a
+    # single-phase chemical locked to its database phase (solid) that
+    # nonetheless behaves as a dissolved salt downstream.
+    acid_chemicals = []
+    if include_dilute_acid:
+        # Glucose is formed upstream of the pretreatment flash here (it never
+        # enters a flash in the enzymatic_press configuration), and its
+        # database entry has no vapor-phase enthalpy data (missing Hvap at
+        # Tb), so the flash's VLE fails on it. Lock it to the liquid phase,
+        # as biorefineries.cellulosic does for its own Glucose. Only in this
+        # set, so the baseline's Glucose is untouched.
+        Glucose.at_state("l")
+
+        H2SO4 = bst.Chemical("H2SO4")
+        H2SO4.at_state("l")
+
+        AmmoniumSulfate = bst.Chemical("AmmoniumSulfate")
+        AmmoniumSulfate.at_state("s")
+        # Its database liquid-viscosity correlation ('NEGLECT_P') is invalid
+        # at process T/P, same issue and fix as the nutrient salts below.
+        AmmoniumSulfate.copy_models_from(Water, ["mu"])
+
+        acid_chemicals = [H2SO4, AmmoniumSulfate]
+
     # Gases
     CH4 = bst.Chemical("Methane", phase="g")
     CO2 = bst.Chemical("CarbonDioxide", phase="g")
@@ -238,6 +276,7 @@ def create_chemicals(set_thermo: bool = True, include_hp3: bool = False):
         MicrobialOil, CellMass,
         Ammonia, KH2PO4, NaOH, MagnesiumSulfate,
         *hp3_chemicals,
+        *acid_chemicals,
     ])
     chems.compile()
 

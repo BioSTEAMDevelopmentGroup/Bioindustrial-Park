@@ -30,6 +30,7 @@
 .. autoclass:: biorefineries.sabre.units.HPFermentation
 .. autoclass:: biorefineries.sabre.units.CaHPCrystallizer
 .. autoclass:: biorefineries.sabre.units.CrystalCentrifuge
+.. autoclass:: biorefineries.sabre.units.DiluteAcidReactor
 """
 from . import _ad
 from . import _preprocessing
@@ -37,6 +38,7 @@ from . import _biostimulant
 from . import _vfa
 from . import _microbial_oil
 from . import _3hp
+from . import _dilute_acid
 
 from ._ad import *
 from ._preprocessing import *
@@ -44,8 +46,10 @@ from ._biostimulant import *
 from ._vfa import *
 from ._microbial_oil import *
 from ._3hp import *
+from ._dilute_acid import *
 
 __all__ = (
     *_ad.__all__, *_preprocessing.__all__, *_biostimulant.__all__,
     *_vfa.__all__, *_microbial_oil.__all__, *_3hp.__all__,
+    *_dilute_acid.__all__,
 )

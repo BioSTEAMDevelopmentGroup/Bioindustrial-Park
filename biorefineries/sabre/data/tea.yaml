@@ -63,6 +63,10 @@ price:
     baseline: 0.262
     note: "CalciumDihydroxide (Ca(OH)2), dosed in HPFermentation (sabre/units/_3hp.py) for in-situ neutralization; same value biorefineries.HP.process_settings uses for its own 'Lime' price."
     source: "biorefineries.HP.process_settings.py, lime_price = 0.1189 * _lb_per_kg (hydrated-lime $/ton at plant, Mineral Commodity Summaries 2020, 2015-2019 average; see the comment block above that line)."
+  sulfuric_acid:
+    baseline: 0.0897171175961359
+    note: "$/kg of ~93.3 wt% H2SO4 SOLUTION (1800 kg H2SO4 : 130 kg water), dosed in the dilute-acid pretreatment of the 3-HP cake configurations (systems/_3hp_system.py)."
+    source: "biorefineries.cellulosic.streams.sulfuric_acid price (corn stover dilute-acid pretreatment)."
 
   # Waste streams, negative price to indicate as a cost
   disposal_solid:

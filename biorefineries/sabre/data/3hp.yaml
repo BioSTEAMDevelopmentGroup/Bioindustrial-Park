@@ -208,3 +208,91 @@ dryer:
     target_moisture:
       key: user_specified_patent
       note: "Patent's oven-drying step (Examples 1/2) reports final moisture in the ~200-5000 ppm range; 500 ppm selected as a representative mid-range target."
+
+
+# ---------------------------------------------------------------------------
+# Cake-saccharification configurations ("biostimulant_cake", "juice_cake";
+# systems/_3hp_system.py). The plain Press cake is dilute-acid pretreated,
+# saccharified, and filtered, mirroring biorefineries.cellulosic's corn stover
+# train (systems/pretreatment/dilute_acid.py) with sabre-local units.
+# ---------------------------------------------------------------------------
+cake_dilute_acid_pretreatment:
+  # Sulfuric acid dosing. The acid stream is a ~93.3 wt% H2SO4 solution
+  # (1800 kg H2SO4 : 130 kg water, biorefineries.cellulosic.streams), and the
+  # loading is on a SOLUTION-mass basis per kg of dry feed, as in
+  # cellulosic's SulfuricAcidTank specification.
+  acid_solution_H2SO4_kg: 1800.0
+  acid_solution_water_kg: 130.0
+  acid_solution_loading_kg_per_kg_dry: 0.02316
+  warm_water_kg_per_kg_dry: 0.282  # dilution water mixed with the acid before the steam mixer
+
+  # Steam mixer + pressure reactor.
+  reactor_T_K: 431.15  # 158 degC
+  reactor_P_atm: 5.5
+  solids_loading: 0.30  # SteamMixer target solids wt frac (process water added only if the cake is above this)
+  reactor_tau_hr: 0.166
+  reactor_V_wf: 0.8
+  reactor_length_to_diameter: 2.0
+  reactor_vessel_material: "Stainless steel 316"
+  reactor_vessel_type: "Horizontal"
+  warm_water_T_K: 368.15
+  warm_water_P_atm: 4.7
+
+  # Conversions applied in the reactor. Glucan value is corn stover's own
+  # (PretreatmentReactorSystem's Glucan + H2O -> Glucose, X=0.099).
+  glucan_to_glucose_conversion: 0.099
+  alginate_to_alginate_monomer_conversion: 0.099  # PLACEHOLDER: reuses the Glucan value
+
+  flash_P_Pa: 101325.0
+  ammonia_mol_per_mol_H2SO4: 2.0  # 2 NH3 + H2SO4 -> (NH4)2SO4, full neutralization
+
+  sources:
+    acid_and_reactor:
+      key: cellulosic_corn_stover_precedent
+      note: "acid_solution_*, loading, warm_water_kg_per_kg_dry, reactor_T_K/P_atm/tau/V_wf, solids_loading and the Glucan conversion are the corn stover values in biorefineries/cellulosic/systems/pretreatment/dilute_acid.py and cellulosic/units.py (PretreatmentReactorSystem)."
+    ash_buffering_caveat:
+      key: known_model_limitation
+      note: "Sargassum is ~35 wt% dry ash (modeled as inert CaO), which in reality buffers the acid, and alginate gels at low pH. The corn stover acid loading is used unchanged and does NOT account for either, so acid and neutralizer costs are likely understated. Placeholder pending Sargassum-specific dilute-acid data."
+    alginate_conversion:
+      key: placeholder
+      note: "No source for alginate conversion under dilute acid; set equal to the Glucan value. No degradation products (HMF, furfural) are modeled since they are not in sabre's chemical set."
+    ammonia_dilution_water:
+      key: simplification
+      note: "Corn stover also adds 2435.6 kg process water per kmol NH4OH; omitted here (the hydrolysate is diluted or concentrated to spec downstream anyway)."
+
+
+cake_saccharification:
+  # Enzyme dose and excess reuse data/preprocessing.yaml `enzymatic_press`
+  # (20 mg/g + 10%), read there rather than duplicated here.
+  hydrolysis_conversion: 0.80  # PLACEHOLDER (Glucan and Alginate -> Glucose / AlginateMonomer), applied to what survives pretreatment
+  solids_loading: 0.20  # insoluble-solids wt frac; water is added only if the slurry is more concentrated than this
+  T_K: 321.15  # 48 degC, same as cellulosic's HydrolysateHeatExchanger
+  tau_hr: 48.0  # PLACEHOLDER
+
+  sources:
+    hydrolysis_conversion:
+      key: user_specified
+      note: "User-chosen placeholder (higher than the 0.50 used in EnzymaticPress, on the basis that dilute-acid pretreatment improves enzyme accessibility); not derived from literature for this feedstock. Sensitivity-test."
+    solids_loading:
+      key: HP_precedent
+      note: "biorefineries.HP.units.EnzymeHydrolysateMixer's own solid_loading (0.20)."
+    T:
+      key: cellulosic_precedent
+      note: "48 degC, biorefineries.cellulosic saccharification_system's HydrolysateHeatExchanger."
+    tau:
+      key: scoping_placeholder
+      note: "No source for this feedstock/enzyme combination; sensitivity-test."
+
+
+hydrolysate_separator:
+  # bst.PressureFilter after saccharification, as cellulosic's cornstover
+  # train does. Residual solids go to the boiler; the filtrate is the
+  # hydrolysate.
+  moisture_content: 0.35  # BioSTEAM PressureFilter default (Humbird et al. 2011)
+  solids_split_to_cake: 0.98  # Humbird's insoluble-solids retention (PressureFilter defaults)
+  solutes_split_to_cake: 0.03714  # Humbird's dissolved-species carryover in the cake moisture
+
+  sources:
+    filter:
+      key: cellulosic_precedent
+      note: "Values are biosteam.PressureFilter's own defaults, taken from Humbird et al. (2011) NREL/TP-5100-47764."
