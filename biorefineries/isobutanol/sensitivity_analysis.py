@@ -24,7 +24,8 @@ import warnings
 
 import numpy as np
 
-__all__ = ('campaign_engine_kwargs', 'design_record', 'unit_to_values',
+__all__ = ('campaign_engine_kwargs', 'screening_search_space',
+           'custom_search_space', 'search_space_tag', 'design_record', 'unit_to_values',
            'feasible_sobol_stream', 'VectorizedFeasibility',
            'sample_feasible', 'conditional_partners', 'closed_index',
            'all_closed_indices', 'first_order', 'total_order',
@@ -108,6 +109,46 @@ def screening_search_space(search_space, kinetic_baselines):
     if missing:
         raise KeyError(f'screening measure: axes {missing} are not in the search space')
     return out
+
+def custom_search_space(search_space, bands):
+    """A NEW search-space dict (same insertion order) carrying a CUSTOM
+    measure: every axis of `search_space` must appear in `bands` (and no
+    other), each as {'low', 'high', 'log'} in ABSOLUTE decision-variable
+    units (a group axis = its multiplier / its referenced absolute value, as
+    in the search space). An integer axis keeps 'int': True and needs
+    integer bounds; a log axis needs low > 0; low < high always. The
+    measure is carried by the existing branches of unit_to_values /
+    ko.unit_to_external, so nothing downstream changes. `search_space` is
+    not mutated."""
+    extra = sorted(set(bands) - set(search_space))
+    missing = [n for n in search_space if n not in bands]
+    if extra or missing:
+        raise KeyError(f'custom measure: bands must cover exactly the search-space axes; '
+                       f'missing {missing}, unknown {extra}')
+    out = {}
+    for name, sp in search_space.items():
+        b = bands[name]
+        lo, hi, log = float(b['low']), float(b['high']), bool(b['log'])
+        if not lo < hi:
+            raise ValueError(f'{name!r}: low {lo!r} must be < high {hi!r}')
+        if log and not lo > 0.0:
+            raise ValueError(f'{name!r}: a log band needs low > 0; got {lo!r}')
+        if sp.get('int'):
+            if log or lo != int(lo) or hi != int(hi):
+                raise ValueError(f'{name!r} is an integer axis: linear, integer bounds only')
+            out[name] = {'low': int(lo), 'high': int(hi), 'log': False, 'int': True}
+        else:
+            out[name] = {'low': lo, 'high': hi, 'log': log}
+    return out
+
+def search_space_tag(search_space, n_hex=8):
+    """Short content hash of a search space (sha1 of its canonical JSON) for
+    study names: a custom band set is too long to spell out under the
+    260-character path limit; the design record carries the full bands."""
+    import hashlib
+    import json
+    blob = json.dumps(search_space, sort_keys=True, separators=(',', ':'))
+    return hashlib.sha1(blob.encode()).hexdigest()[:n_hex]
 
 def design_record(*, search_space, parameter_groups, group_references,
                   kinetic_baselines, burden_model, eb, baseline_model_kwargs,

@@ -304,5 +304,69 @@ PASS('screening_search_space: six axes re-specified (linear [0, ceiling] pathway
      '0.1x-4x native band), order + other entries unchanged, both unit maps agree and '
      'invert, the feasible co-production corner mass rises from ~0 to > 3 %, three error paths')
 
+#%% 13. custom measure: every axis from a bands dict (absolute units), tagged by content hash
+bands13 = {n: {'low': 0.0, 'high': 4.0*(kb[n] if n in ('k_3', 'k_6') else 1.0), 'log': False}
+           for n in ('k_3', 'k_6', 'glycolysis')}
+bands13.update({n: {'low': 0.0, 'high': space[n]['high'], 'log': False}
+                for n in ('k_13', 'k_17', 'ehrlich_downstream')})
+bands13.update({n: {'low': 0.75, 'high': 1.5, 'log': False}
+                for n in ('inhib_ethanol', 'inhib_isobutanol', 'inhib_acetate')})
+bands13.update({n: {'low': space[n]['low'], 'high': space[n]['high'], 'log': space[n]['log']}
+                for n in ('threshold_conc', 'target_delta', 'max_n_spikes')})
+bands13 = {n: bands13[n] for n in reversed(list(space))}     # order must not matter
+cus = sa.custom_search_space(space, bands13)
+assert list(cus) == list(space), 'insertion order changed'
+assert cus['max_n_spikes'] == {'low': 0, 'high': 50, 'log': False, 'int': True}, cus['max_n_spikes']
+assert cus['k_3'] == {'low': 0.0, 'high': 4.0*kb['k_3'], 'log': False}, cus['k_3']
+assert space['k_3']['log'] is True, 'the campaign space was mutated'
+# The shipped bands file is this same set (to the file's 4 significant figures).
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sobol_bands',
+                       'linear_0-4x_2026-09-22.json')) as fh:
+    shipped = {k: v for k, v in json.load(fh).items() if not k.startswith('_')}
+shipped_space = sa.custom_search_space(space, shipped)
+for n in space:
+    for key in ('low', 'high'):
+        assert np.isclose(shipped_space[n][key], cus[n][key], rtol=1e-3, atol=0), (n, key)
+    assert shipped_space[n]['log'] == cus[n]['log'], n
+# Hash: order-free, 8 hex, changes with any band.
+tag = sa.search_space_tag(bands13)
+assert len(tag) == 8 and tag == sa.search_space_tag(dict(reversed(list(bands13.items()))))
+assert tag != sa.search_space_tag({**bands13, 'k_3': {**bands13['k_3'], 'high': 20.0}})
+# Both unit maps agree on the all-linear space and u = 0 lands on 0.
+U13 = np.random.default_rng(14).random((50, len(cus)))
+U13[0] = 0.0
+vals13 = sa.unit_to_values(U13, cus)
+assert all(vals13[n][0] == 0.0 for n in ('k_3', 'k_6', 'glycolysis', 'k_13', 'k_17'))
+for i in (0, 3, 9):
+    ext = ko.unit_to_external(U13[i], cus)
+    for n in cus:
+        assert np.isclose(float(ext[n]), float(vals13[n][i]), rtol=1e-12, atol=1e-12), (n, ext[n], vals13[n][i])
+design_cus = json.loads(json.dumps(sa.design_record(
+    search_space=shipped_space, parameter_groups=engine_kwargs['parameter_groups'],
+    group_references=engine_kwargs['group_references'], kinetic_baselines=kb,
+    burden_model=bm, eb=eb, baseline_model_kwargs=BASE_FEED,
+    baseline_max_n_spikes=16, volume_cap=20.0,
+    target_conc_max=ko.TARGET_CONC_MAX, meta={'seed': 7})))
+vf_cus = sa.VectorizedFeasibility.from_design(design_cus)
+U13b = np.random.default_rng(15).random((20000, vf.d))
+feas13 = float(vf_cus(U13b).mean())
+print(f'   shipped custom bands: burden + volume feasible fraction {feas13:.1%}')
+assert 0.01 < feas13 < 1.0, feas13
+# error paths: a missing axis, an unknown axis, low >= high, a log band from 0, a log / fractional int axis
+for bad, exc in (({k: v for k, v in bands13.items() if k != 'k_17'}, KeyError),
+                 ({**bands13, 'k_99': {'low': 0, 'high': 1, 'log': False}}, KeyError),
+                 ({**bands13, 'k_3': {'low': 2.0, 'high': 2.0, 'log': False}}, ValueError),
+                 ({**bands13, 'k_3': {'low': 0.0, 'high': 2.0, 'log': True}}, ValueError),
+                 ({**bands13, 'max_n_spikes': {'low': 1, 'high': 50, 'log': True}}, ValueError),
+                 ({**bands13, 'max_n_spikes': {'low': 0, 'high': 49.5, 'log': False}}, ValueError)):
+    try:
+        sa.custom_search_space(space, bad)
+    except exc:
+        pass
+    else:
+        raise AssertionError(f'expected {exc.__name__}')
+PASS('custom_search_space: every axis from a bands dict (order-free, int axis kept), the '
+     'shipped bands file matches, content-hash tag, both unit maps agree, six error paths')
+
 #%% Done
 print(f'ALL {n_pass} CHECKS PASSED')

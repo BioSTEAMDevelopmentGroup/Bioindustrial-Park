@@ -317,7 +317,7 @@ def plot_heatmap(table, names, path, include_unreliable=False):
 
 def write_summary(path, *, study_name, counts, n_rows, irr_finite, skipped, names,
                   surrogates, S, fallback, y_headline, gp_metrics=None, measure='campaign',
-                  target=None):
+                  target=None, search_space=None):
     """`target` (None = no threshold): dict(threshold, source, n_zone, fraction,
     target_skip (str or None), conditional (dict(q2, reliable, mass, fallback)
     or None), conditional_skip (str or None)) -- the TARGET / CONDITIONAL
@@ -388,6 +388,12 @@ def write_summary(path, *, study_name, counts, n_rows, irr_finite, skipped, name
         '  * Domain: the FEASIBLE part of the campaign box (enzyme burden + volume bound) under '
         + ("the campaign's log-uniform measure -- variability across the designs the optimizer "
            'was allowed to propose, not around any one design.' if measure == 'campaign' else
+           'a CUSTOM measure (user-specified bands, an engineering prior, not data: '
+           + '; '.join(f"{n} {sp['low']:g}-{sp['high']:g} "
+                       f"{'int' if sp.get('int') else 'log' if sp['log'] else 'linear'}"
+                       for n, sp in (search_space or {}).items())
+           + ') -- variability across the designs that prior considers, not around any one '
+           'design.' if measure == 'custom' else
            'the SCREENING measure (an engineering prior, not data: k_13 / k_17 / '
            'ehrlich_downstream linear-uniform from zero, k_3 / k_6 / glycolysis log-uniform on '
            '0.1x-4x of scenario A) -- variability across the designs a pre-optimization screen '
@@ -502,7 +508,8 @@ def run(args):
                   n_rows=len(ok), irr_finite=float(np.isfinite(irr).mean()), skipped=skipped,
                   names=names, surrogates=surrogates, S=S, fallback=fallback,
                   y_headline=Y[HEADLINE], gp_metrics=gp_metrics,
-                  measure=meta.get('measure', 'campaign'), target=target)
+                  measure=meta.get('measure', 'campaign'), target=target,
+                  search_space=design['search_space'])
     print(f'Outputs: {out}*')
 
 def self_test():

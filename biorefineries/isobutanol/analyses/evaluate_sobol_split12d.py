@@ -29,7 +29,11 @@ docs/superpowers/specs/2026-09-21-sobol-screening-measure-design.md):
 sa.screening_search_space -- k_13 / k_17 / ehrlich_downstream linear-uniform
 on [0, ceiling], k_3 / k_6 / glycolysis on 0.1x-4x -- the pre-optimization
 measure that gives the co-production corner real mass. A screening study
-carries '_screening_rb0.1-4_lin0_' in place of the campaign rate-band tag,
+carries '_screening_rb0.1-4_lin0_' in place of the campaign rate-band tag.
+'custom' (2026-09-22) = sa.custom_search_space with every axis's band read
+from the JSON file IBO_SOBOL_BANDS ({axis: {low, high, log}}, absolute
+units; keys starting with '_' are comments); the study carries
+'_custom<sha1-8 of the bands>_' in place of the rate- and group-band tags,
 and every design record stores meta.measure and meta.baseline_PI (the
 scenario-A PI at the 15 % hurdle, stage 2's default target threshold).
 
@@ -49,8 +53,19 @@ ANCHOR = 'A'
 STUDY_TARGET_PRODUCTS = 'ethanol_isobutanol'
 STUDY_TYPE = 'metabolic_split_12d'
 MEASURE = os.environ.get('IBO_SOBOL_MEASURE', 'campaign')
-if MEASURE not in ('campaign', 'screening'):
-    raise ValueError(f"IBO_SOBOL_MEASURE must be 'campaign' or 'screening'; got {MEASURE!r}")
+if MEASURE not in ('campaign', 'screening', 'custom'):
+    raise ValueError("IBO_SOBOL_MEASURE must be 'campaign', 'screening' or 'custom'; "
+                     f'got {MEASURE!r}')
+BANDS = None
+if MEASURE == 'custom':
+    # {axis: {'low', 'high', 'log'}} in absolute decision-variable units, one
+    # entry per axis (sa.custom_search_space); read BEFORE the ~20 s load so a
+    # bad file fails fast.
+    bands_path = os.environ.get('IBO_SOBOL_BANDS')
+    if not bands_path:
+        raise ValueError("IBO_SOBOL_MEASURE='custom' needs IBO_SOBOL_BANDS=<bands JSON path>")
+    with open(bands_path) as fh:
+        BANDS = {k: v for k, v in json.load(fh).items() if not k.startswith('_')}
 
 #%% Load (fresh kernel; one load per process)
 from biorefineries import isobutanol
@@ -87,6 +102,13 @@ if MEASURE == 'screening':
     assert old_tag in STUDY_NAME, f'campaign rate-band tag {old_tag!r} not in {STUDY_NAME!r}'
     m_lo, m_hi = sa.SCREENING_NATIVE_BAND
     STUDY_NAME = STUDY_NAME.replace(old_tag, f'_screening_rb{m_lo:g}-{m_hi:g}_lin0_', 1)
+elif MEASURE == 'custom':
+    # Neither campaign band tag describes the space: swap both for a content
+    # hash of the bands (the design record carries them in full).
+    old_tag = f"_rb0.001-4_ib{engine_kwargs['group_multiplier_bounds'][0]:g}-" \
+              f"{engine_kwargs['group_multiplier_bounds'][1]:g}_"
+    assert old_tag in STUDY_NAME, f'campaign band tags {old_tag!r} not in {STUDY_NAME!r}'
+    STUDY_NAME = STUDY_NAME.replace(old_tag, f'_custom{sa.search_space_tag(BANDS)}_', 1)
 print(f'STUDY_NAME={STUDY_NAME}', flush=True)
 
 #%% Scenario + evaluation context (the engines' own set-up)
@@ -107,6 +129,11 @@ if MEASURE == 'screening':
     # The evaluation site never reads the space; the stream, the design record
     # and the resume verification all read ctx.search_space.
     ctx.search_space = sa.screening_search_space(ctx.search_space, ctx.kinetic_baselines)
+elif MEASURE == 'custom':
+    ctx.search_space = sa.custom_search_space(ctx.search_space, BANDS)
+for name, sp in ctx.search_space.items():
+    print(f"  {name:>20s}: {sp['low']:g} - {sp['high']:g} "
+          f"{'int' if sp.get('int') else 'log' if sp['log'] else 'linear'}", flush=True)
 is_feasible = ko.feasibility_predicate(
     burden_on=True, volume_on=True, burden_model=ctx.burden_model,
     parameter_groups=ctx.parameter_groups, kinetic_baselines=ctx.kinetic_baselines,
@@ -133,6 +160,7 @@ design = sa.design_record(
     target_conc_max=ko.TARGET_CONC_MAX,
     meta=dict(study_name=STUDY_NAME, seed=SEED, anchor=ANCHOR, measure=MEASURE,
               baseline_PI=BASELINE_PI,
+              **({'bands_file': os.path.abspath(bands_path)} if MEASURE == 'custom' else {}),
               study_target_products=STUDY_TARGET_PRODUCTS, study_type=STUDY_TYPE,
               git_commit=_git_commit(), python=sys.version.split()[0],
               numpy=np.__version__, created=datetime.now().isoformat(timespec='seconds')))
