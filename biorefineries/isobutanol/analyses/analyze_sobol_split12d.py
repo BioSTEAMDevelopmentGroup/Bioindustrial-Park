@@ -37,6 +37,7 @@ import argparse
 import importlib.util
 import json
 import os
+import re
 import time
 
 import matplotlib
@@ -285,7 +286,9 @@ def plot_heatmap(table, names, path):
     ax.set_xticklabels([LABELS.get(n, n) for n in names], rotation=40, ha='right')
     unreliable = set(table[~table.reliable].metric)
     ax.set_yticks(range(len(metrics)))
-    ax.set_yticklabels([m + (' *' if m in unreliable else '') for m in metrics])
+    # spell out PI in the row labels ('PI', 'PI (log-tail)', 'PI > baseline', ...)
+    ax.set_yticklabels([re.sub(r'\bPI\b', 'Profitability Index', m)
+                        + (' *' if m in unreliable else '') for m in metrics])
     for i in range(len(metrics)):
         for j in range(len(names)):
             v = grid.iat[i, j]
@@ -294,7 +297,7 @@ def plot_heatmap(table, names, path):
                         color='w' if v > 0.3 else 'k')
     cb = fig.colorbar(im, ax=ax, pad=0.02)
     cb.set_label('Shapley effect (share of variance)', fontsize=12)
-    ax.set_title('Shapley effects across the feasible campaign space'
+    ax.set_title('Shapley effects'
                  + ('  (* surrogate Q$^2$ < 0.8)' if unreliable else ''), fontweight='bold')
     fig.savefig(path + '.png', dpi=600, bbox_inches='tight')
     fig.savefig(path + '.pdf', bbox_inches='tight')
