@@ -264,7 +264,7 @@ def plot_bars(table, names, q2_text, path):
     ax.set_xticks(x)
     ax.set_xticklabels([LABELS.get(n, n) for n in order], rotation=40, ha='right')
     ax.set_ylim(-4.0, 60.0)
-    ax.set_ylabel('Share of PI variance (%)')
+    ax.set_ylabel('Share of Profitability Index variance (%)')
     ax.set_title(f'Sensitivity of the profitability index ({q2_text})', fontweight='bold')
     _ticks(ax)
     # inside the panel: bars are sorted by Shapley effect, so the upper right is empty
