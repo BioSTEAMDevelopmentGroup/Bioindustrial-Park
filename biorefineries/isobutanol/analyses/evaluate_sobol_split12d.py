@@ -105,10 +105,10 @@ if MEASURE == 'screening':
 elif MEASURE == 'custom':
     # Neither campaign band tag describes the space: swap both for a content
     # hash of the bands (the design record carries them in full).
-    old_tag = f"_rb0.001-4_ib{engine_kwargs['group_multiplier_bounds'][0]:g}-" \
-              f"{engine_kwargs['group_multiplier_bounds'][1]:g}_"
-    assert old_tag in STUDY_NAME, f'campaign band tags {old_tag!r} not in {STUDY_NAME!r}'
-    STUDY_NAME = STUDY_NAME.replace(old_tag, f'_custom{sa.search_space_tag(BANDS)}_', 1)
+    import re
+    STUDY_NAME, n_sub = re.subn(r'_rb[^_]+_ib[^_]+_',
+                                f'_custom{sa.search_space_tag(BANDS)}_', STUDY_NAME, count=1)
+    assert n_sub == 1, f'campaign band tags _rb..._ib..._ not in {STUDY_NAME!r}'
 print(f'STUDY_NAME={STUDY_NAME}', flush=True)
 
 #%% Scenario + evaluation context (the engines' own set-up)
