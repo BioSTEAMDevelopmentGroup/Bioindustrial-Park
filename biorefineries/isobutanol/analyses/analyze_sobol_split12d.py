@@ -274,17 +274,26 @@ def plot_bars(table, names, q2_text, path):
     fig.savefig(path + '.pdf', bbox_inches='tight')
     plt.close(fig)
 
-def plot_heatmap(table, names, path):
+def plot_heatmap(table, names, path, include_unreliable=False):
+    """Shapley heatmap, one row per metric. By default only metrics whose
+    surrogate is reliable (CV Q2 >= RELIABLE_Q2) are drawn; include_unreliable
+    adds the rest, starred. Returns the metrics drawn (empty: no figure)."""
     _style()
     t = table[table['index'] == 'Shapley']
+    unreliable = set(table[~table.reliable].metric)
     metrics = [HEADLINE] + [m for m in t.metric.unique() if m != HEADLINE]
+    if not include_unreliable:
+        metrics = [m for m in metrics if m not in unreliable]
+        unreliable = set()
+    if not metrics:
+        print('Shapley heatmap skipped: no metric has a reliable surrogate.', flush=True)
+        return metrics
     grid = t.pivot(index='metric', columns='parameter', values='mean').loc[metrics, names]
     fig, ax = plt.subplots(figsize=(8.5, 0.42*len(metrics) + 2.4))
     im = ax.imshow(grid.to_numpy(), cmap='Blues', vmin=0.0,
                    vmax=max(0.5, float(np.nanmax(grid.to_numpy()))), aspect='auto')
     ax.set_xticks(range(len(names)))
     ax.set_xticklabels([LABELS.get(n, n) for n in names], rotation=40, ha='right')
-    unreliable = set(table[~table.reliable].metric)
     ax.set_yticks(range(len(metrics)))
     # spell out PI in the row labels ('PI', 'PI (log-tail)', 'PI > baseline', ...)
     ax.set_yticklabels([re.sub(r'\bPI\b', 'Profitability Index', m)
@@ -302,6 +311,7 @@ def plot_heatmap(table, names, path):
     fig.savefig(path + '.png', dpi=600, bbox_inches='tight')
     fig.savefig(path + '.pdf', bbox_inches='tight')
     plt.close(fig)
+    return metrics
 
 #%% Summary text
 
@@ -486,7 +496,8 @@ def run(args):
     pd.DataFrame(conv).to_csv(out + 'PI_convergence.csv', index=False)
     s = surrogates[HEADLINE]
     plot_bars(table, names, f'{s.name.upper()} surrogate, Q$^2$ = {s.q2[s.name]:.2f}', out + 'PI_bars')
-    plot_heatmap(table, names, out + 'shapley_heatmap')
+    plot_heatmap(table, names, out + 'shapley_heatmap',
+                 include_unreliable=args.heatmap_include_unreliable)
     write_summary(out + 'summary.txt', study_name=args.study_name, counts=counts,
                   n_rows=len(ok), irr_finite=float(np.isfinite(irr).mean()), skipped=skipped,
                   names=names, surrogates=surrogates, S=S, fallback=fallback,
@@ -541,7 +552,11 @@ def self_test():
     import tempfile
     with tempfile.TemporaryDirectory() as tmp:
         plot_bars(table, Box.names, 'self-test', os.path.join(tmp, 'bars'))
-        plot_heatmap(table, Box.names, os.path.join(tmp, 'heat'))
+        drawn = plot_heatmap(table, Box.names, os.path.join(tmp, 'heat'))
+        assert set(drawn) == set(table[table.reliable].metric), drawn
+        every = plot_heatmap(table, Box.names, os.path.join(tmp, 'heat'),
+                             include_unreliable=True)
+        assert set(every) == set(table.metric), every
         write_summary(os.path.join(tmp, 'summary.txt'), study_name='self-test',
                       counts={'COMPLETE': 400}, n_rows=400, irr_finite=0.06, skipped=[],
                       names=Box.names, surrogates=surrogates, S=S, fallback=fallback,
@@ -583,6 +598,9 @@ if __name__ == '__main__':
     parser.add_argument('--min-zone-rows', type=int, default=200,
                         help='simulated rows above the threshold needed for the conditional '
                              'indices (default 200)')
+    parser.add_argument('--heatmap-include-unreliable', action='store_true',
+                        help='also draw (starred) the metrics whose surrogate CV Q2 is '
+                             'below 0.8 in the Shapley heatmap (default: omit them)')
     parser.add_argument('--self-test', action='store_true')
     args = parser.parse_args()
     if args.self_test:
