@@ -1318,15 +1318,12 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9):
         sx, sy, cc = s['scatter_x'], _yv(s['scatter'][col]), colors[id(s)]
         # a relay's preloaded donor rows (x < N) are not search progress --
         # their order is the relay's selection order (keep set sorted by value,
-        # then a space-filling fill) -- so they are drawn HOLLOW and fainter
-        # than the simulated trials
+        # then a space-filling fill) -- so they are NOT drawn; the preload zone
+        # keeps only its x extent and the divider rule at N
         pre = sx < (s.get('n_preloaded') or 0) if s.get('is_relay') \
             else np.zeros(len(sx), dtype=bool)
         ax.scatter(sx[~pre], sy[~pre], s=point_size, color=cc, alpha=0.35,
                    linewidths=0, zorder=1)
-        if pre.any():
-            ax.scatter(sx[pre], sy[pre], s=point_size, facecolors='none',
-                       edgecolors=cc, alpha=0.15, linewidths=0.4, zorder=1)
     for s in sets:
         if s.get('traj') is None:
             continue
