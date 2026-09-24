@@ -1316,17 +1316,32 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9):
         if s.get('scatter') is None or not _owns_outcome(s.get('objective'), col):
             continue
         sx, sy, cc = s['scatter_x'], _yv(s['scatter'][col]), colors[id(s)]
-        ax.scatter(sx, sy, s=point_size, color=cc, alpha=0.35, linewidths=0,
-                   zorder=1)
+        # a relay's preloaded donor rows (x < N) are not search progress --
+        # their order is the relay's selection order (keep set sorted by value,
+        # then a space-filling fill) -- so they are drawn HOLLOW and fainter
+        # than the simulated trials
+        pre = sx < (s.get('n_preloaded') or 0) if s.get('is_relay') \
+            else np.zeros(len(sx), dtype=bool)
+        ax.scatter(sx[~pre], sy[~pre], s=point_size, color=cc, alpha=0.35,
+                   linewidths=0, zorder=1)
+        if pre.any():
+            ax.scatter(sx[pre], sy[pre], s=point_size, facecolors='none',
+                       edgecolors=cc, alpha=0.15, linewidths=0.4, zorder=1)
     for s in sets:
         if s.get('traj') is None:
             continue
+        tx, ty = s['traj_x'], s['traj'][col]
+        if s.get('is_relay') and s.get('n_preloaded'):
+            # no incumbent line over the preloaded rows: it starts at the first
+            # simulated trial, from the incumbent carried over from the preload
+            keep = tx >= s['n_preloaded']
+            tx, ty = tx[keep], ty[keep]
         # the campaign that optimized THIS metric gets a ~2.25x-thick SOLID line
         # so its own trajectory stands out among the cross-plotted campaigns; the
         # thinner lines are drawn on top of it so none is hidden underneath, and
         # DASHED to mark that those campaigns were not optimizing this metric
         own = _owns_outcome(s.get('objective'), col)
-        ax.step(s['traj_x'], _yv(s['traj'][col]), where='post',
+        ax.step(tx, _yv(ty), where='post',
                 color=colors[id(s)], lw=3.15 if own else 1.4,
                 ls='-' if own else (0, (1.5, 1.2)),
                 zorder=2 if own else 3)
