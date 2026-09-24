@@ -65,9 +65,9 @@ metabolic_split_12d campaign with >= 2000 trials and the most recent relay
   C  (only with a relay) panel A's grid for the relay campaign alone, on
      panel A's value axes. Its IRR cell's preload zone (trials 0..N-1) shows
      the preloaded donor rows in their donor campaign's colour, in shuffled
-     order, and the seed (the best preloaded row,
-     the relay's incumbent when its first simulated trial starts) joined to
-     the incumbent line, which starts at N. The relay's legend line says
+     order, and the seed (the best preloaded row, the relay's incumbent when
+     its first simulated trial starts) as an open circle; the incumbent line
+     starts at N. The relay's legend line says
      what it was seeded with.
 Writes <stem>_<stamp>.png and .pdf to --out-dir.
 """
@@ -1424,8 +1424,7 @@ def _draw_relay_preload(ax, s, colors, donor_sets, sy_pre, point_size):
     preloaded donor rows as a trial cloud in their donor's colour (shuffled,
     relay_preload_layout), and the seed -- the best preloaded row, which is
     the relay's incumbent when its first simulated trial starts -- as an open
-    circle joined by a thin line to where the incumbent line begins (x = N)."""
-    n_pre = s['n_preloaded']
+    circle."""
     px, pcols = relay_preload_layout(s, donor_sets, colors)
     ax.scatter(px, sy_pre, s=point_size, c=pcols, alpha=0.35, linewidths=0,
                zorder=1)
@@ -1433,7 +1432,6 @@ def _draw_relay_preload(ax, s, colors, donor_sets, sy_pre, point_size):
     if i is None:
         return
     xs, ys = float(px[i]), float(sy_pre[i])
-    ax.plot([xs, n_pre], [ys, ys], color=colors[id(s)], lw=1.4, zorder=2)
     ax.scatter([xs], [ys], s=BEST_MARK_SIZE, facecolors='white',
                edgecolors=pcols[i], linewidths=BEST_MARK_LW, zorder=5)
 
