@@ -57,9 +57,9 @@ default_split_12d_specs). The most recent PI (log-tail) RELAY campaign (a
 fresh GP study preloaded with donor rows; `_rl<sha1-8>` name tag; see
 default_relay_spec) is overlaid as one extra set (--no-relay drops it): it adds
 lines / a trial cloud inside the existing panel-a cells (no new cell) and one
-more row in the lower panels. Its panel-a trials are the preloaded donor rows
-(from <study>_relay_manifest.csv, at their store trial numbers 0..N-1) followed
-by its simulated trials (N..), one continuous incumbent over both. Writes
+more row in the lower panels. Only its SIMULATED trials are drawn (the
+preloaded donor rows are not), at their simulated-trial index trial_number - N
+(N preloaded), so they line up with a fresh campaign's trials. Writes
 <stem>_<stamp>.png and .pdf to --out-dir.
 """
 import os
@@ -583,56 +583,35 @@ def incumbent_trajectory(df, sel_col, direction):
     return x, traj
 
 
-# manifest columns that are not trajectory columns (dropped on the merge)
-_RELAY_MANIFEST_ONLY = ('relay_trial_number', 'donor', 'donor_objective')
-
-
 def is_relay_campaign(campaign):
     """True if a study name (or trajectory-CSV path) carries the relay tag
     '_rl<sha1-8>' (ko.relay_study_tag)."""
     return bool(_RELAY_TAG_RE.search(os.path.basename(campaign)))
 
 
-def relay_trajectory(campaign):
-    """(df, n_preloaded) for a relay study: its preloaded donor rows from
-    <study>_relay_manifest.csv, renumbered to their store trial numbers
-    (relay_trial_number, 0..N-1) with 'objective' = the donor's recorded value
-    of the relay objective, followed by its simulated trajectory rows (numbered
-    from N). The manifest carries the full trajectory column set, so the two
-    concatenate column-for-column."""
-    import pandas as pd
+def relay_n_preloaded(campaign, df):
+    """Number of donor rows preloaded into a relay study: the row count of its
+    <study>_relay_manifest.csv (one row per preloaded trial), else the first
+    trial_number of its trajectory CSV (which holds only simulated rows,
+    numbered from n_preloaded)."""
     csv_path = resolve_campaign_csv(campaign)
-    sim = ko.load_trajectory(csv_path)
-    manifest = csv_path[:-len('_trajectory.csv')] + '_relay_manifest.csv'
-    if not os.path.isfile(manifest):
-        raise FileNotFoundError(f'relay campaign {campaign}: no relay manifest '
-                                f'{manifest}')
-    pre = pd.read_csv(manifest)
-    missing = [c for c in sim.columns if c not in pre.columns]
-    if missing:
-        raise ValueError(f'relay manifest {manifest}: missing trajectory '
-                         f'columns {missing}')
-    pre = pre.copy()
-    pre['trial_number'] = pre['relay_trial_number']
-    pre = pre[list(sim.columns)]
-    n_pre = len(pre)
-    if n_pre and int(sim['trial_number'].min()) < n_pre:
-        raise ValueError(f'relay campaign {campaign}: simulated trial numbers '
-                         f'start below the {n_pre} preloaded rows')
-    df = pd.concat([pre, sim], ignore_index=True)
-    return df.sort_values('trial_number', kind='stable').reset_index(drop=True), n_pre
+    if csv_path.endswith('_trajectory.csv'):
+        manifest = csv_path[:-len('_trajectory.csv')] + '_relay_manifest.csv'
+        if os.path.isfile(manifest):
+            with open(manifest, 'r', newline='') as f:
+                return max(sum(1 for _ in f) - 1, 0)
+    return int(df['trial_number'].min())
 
 
 def load_set(label, campaign, trial):
     """A campaign trial as a flat record (CSV row + metadata + the panel-a
-    incumbent trajectory). A relay study's preloaded donor rows are prepended
-    to its simulated rows (relay_trajectory), so its representative "best"
-    trial, incumbent and trial cloud all run over both."""
+    incumbent trajectory). A relay study's trajectory CSV holds only its
+    SIMULATED rows (numbered from n_preloaded); they are drawn at the
+    simulated-trial index trial_number - n_preloaded, and the preloaded donor
+    rows are not drawn."""
+    df = ko.load_trajectory(resolve_campaign_csv(campaign))
     is_relay = is_relay_campaign(campaign)
-    if is_relay:
-        df, n_preloaded = relay_trajectory(campaign)
-    else:
-        df, n_preloaded = ko.load_trajectory(resolve_campaign_csv(campaign)), 0
+    n_preloaded = relay_n_preloaded(campaign, df) if is_relay else 0
     missing = [c for c in DECISION_VARS if c not in df.columns]
     if missing:
         raise ValueError(
@@ -676,19 +655,18 @@ def load_set(label, campaign, trial):
     known |= set(eb.BURDEN_COLUMNS)
     known |= set(ko.TRACKED_METRICS)
     known |= {c for c in df.columns if c.startswith('applied_')}
-    known |= set(_RELAY_MANIFEST_ONLY)
     rec['extra_sampled'] = [c for c in df.columns if c not in known]
     sel_col, sel_dir = selection_spec(df, trial, campaign)
     tx, traj = incumbent_trajectory(df, sel_col, sel_dir)
     rec['sel_col'] = sel_col
     rec['sel_dir'] = sel_dir
-    rec['traj_x'] = tx
+    rec['traj_x'] = tx - n_preloaded
     rec['traj'] = traj
     # full per-trial cloud for panel a, drawn only on the cell whose metric
     # this campaign optimized: every trial's number, its completion flag and
     # each outcome value (non-COMPLETE / unsolved -> NaN via the CSV).
     rec['objective'] = campaign_objective(campaign)
-    rec['scatter_x'] = df['trial_number'].to_numpy(dtype=float)
+    rec['scatter_x'] = df['trial_number'].to_numpy(dtype=float) - n_preloaded
     rec['scatter_complete'] = (df['state'] == 'COMPLETE').to_numpy()
     rec['scatter'] = {c: df[c].to_numpy(dtype=float) for c, _, _ in OUTCOMES}
     return rec
@@ -1291,23 +1269,6 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9):
     ax.set_xlim(0, xmax * 1.02)
     if base is not None and np.isfinite(base):
         ax.axhline(base, color=BASELINE_COLOR, lw=1.4, ls=(0, (1.5, 1.2)), zorder=1)
-    # a relay campaign's preloaded donor rows (trials 0..N-1) are followed by
-    # its simulated trials: a thin vertical rule in the relay colour at N marks
-    # the hand-over, labelled once in the big financial cell
-    for s in sets:
-        n_pre = s.get('n_preloaded') if s.get('is_relay') else 0
-        if not n_pre:
-            continue
-        ax.axvline(n_pre, color=colors[id(s)], lw=0.9, ls=(0, (4, 2)),
-                   alpha=0.8, zorder=1)
-        if col == 'IRR':
-            y_txt = lo + 0.985 * (cap - lo)
-            ax.text(n_pre - 0.008 * xmax, y_txt, 'relay: preloaded',
-                    ha='right', va='top', fontsize=FONTS['callout'],
-                    color=colors[id(s)])
-            ax.text(n_pre + 0.008 * xmax, y_txt, 'simulated',
-                    ha='left', va='top', fontsize=FONTS['callout'],
-                    color=colors[id(s)])
     # individual trial cloud from the ONE campaign that optimized THIS metric:
     # every trial as a translucent dot in the campaign's own color, behind the
     # incumbent lines (zorder 1). Failed / unsolved trials (no finite value)
@@ -2004,8 +1965,8 @@ def console_report(sets, band_campaign):
             else (f'{s["campaign"]} trial {int(s["trial_number"])}; '
                   f'panel-a incumbent by {s["sel_col"]} ({s["sel_dir"]})')
         if s.get('is_relay'):
-            tag += (f'; relay: trials 0-{s["n_preloaded"] - 1} preloaded, '
-                    f'{s["n_preloaded"]}+ simulated')
+            tag += (f'; relay, {s["n_preloaded"]} preloaded rows not drawn, '
+                    'x = simulated-trial index')
         print(f'[{s["label"]}] {tag}')
         print(f'    IRR {s.get("IRR")!s:>8}  EtOH {s.get("EtOH titer")!s:>7}'
               f'  IBO {s.get("IBO titer")!s:>7}  tau {s.get("tau")!s:>6}')
