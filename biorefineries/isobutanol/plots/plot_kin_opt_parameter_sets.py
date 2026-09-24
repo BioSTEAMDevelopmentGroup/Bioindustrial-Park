@@ -72,8 +72,9 @@ variants (--variants selects a subset):
                  0..N-1, shaded light grey) shows the preloaded donor rows in
                  their donor campaign's colour, in shuffled order; the IRR
                  cell also marks the seed (the best preloaded row, the
-                 relay's incumbent when its first simulated trial starts) as
-                 an open circle; the incumbent line starts at N;
+                 relay's incumbent when its first simulated trial starts) and
+                 the relay's own highest-IRR simulated trial as open
+                 circles; the incumbent line starts at N;
               B  the overview's proteome allocation plus the relay row (last).
               The relay's legend line says what it was seeded with.
 Writes <stem>_<variant>_<stamp>.png and .pdf to --out-dir.
@@ -1346,19 +1347,24 @@ def bar_cell(ax, sets, colors, var, kind, ylabel, subtitle=None, ylim=None,
 
 def best_irr_points(sets):
     """[(set, trial_number, IRR)] of the highest finite-IRR trial of every
-    regular campaign, the financial one (which owns the IRR cell) included.
-    Baseline and relay sets are skipped."""
+    regular campaign, the financial one (which owns the IRR cell) included,
+    and of every relay campaign among its SIMULATED trials only (its
+    preloaded rows are donor trials, marked in the preload zone by
+    _draw_relay_preload). Baseline sets are skipped."""
     pts = []
     for s in sets:
-        if (s.get('is_baseline') or s.get('is_relay')
-                or s.get('scatter') is None):
+        if s.get('is_baseline') or s.get('scatter') is None:
             continue
+        x = np.asarray(s['scatter_x'], dtype=float)
         y = np.asarray(s['scatter']['IRR'], dtype=float)
-        fin = np.flatnonzero(np.isfinite(y))
+        ok = np.isfinite(y)
+        if s.get('is_relay'):
+            ok &= x >= (s.get('n_preloaded') or 0)
+        fin = np.flatnonzero(ok)
         if not len(fin):
             continue
         i = int(fin[np.argmax(y[fin])])
-        pts.append((s, float(s['scatter_x'][i]), float(y[i])))
+        pts.append((s, float(x[i]), float(y[i])))
     return pts
 
 
@@ -2069,9 +2075,11 @@ def plot(sets, band, out_stem, dpi=300, params_only=False, relay_view=False):
         # its preloaded rows are drawn in every cell's preload zone in
         # their donor campaign's colour. Same value axes as the overview's
         # panel a, so each cell reads directly against its counterpart.
+        # mark_best: the IRR cell also circles the relay's own highest-IRR
+        # simulated trial, like each campaign's in the overview
         base_sets = [s for s in sets if s.get('is_baseline')]
         a_axes = draw_outcomes(fig, a_gs[0], base_sets + relay_sets,
-                               colors, donor_sets=a_sets)
+                               colors, donor_sets=a_sets, mark_best=True)
         for ra, (ylim, ticks) in zip(a_axes,
                                      _panel_a_value_axes(a_sets, colors)):
             ra.set_ylim(ylim)
@@ -2220,8 +2228,9 @@ def plot_relay_trajectories(sets, out_stem, dpi=300):
     allocation of every set, the relay campaign last. Every panel-a cell's
     preload zone (trials 0..N-1, shaded light grey) shows the preloaded donor
     rows in their donor campaign's colour, shuffled; the IRR cell also marks
-    the seed and every campaign's highest-IRR trial that was preloaded (open
-    circles); the incumbent line starts at N. Returns None (and writes
+    the seed, every campaign's highest-IRR trial that was preloaded and the
+    relay's own highest-IRR simulated trial (open circles); the incumbent line
+    starts at N. Returns None (and writes
     nothing) when there is no relay set."""
     if not any(s.get('is_relay') for s in sets):
         return None
