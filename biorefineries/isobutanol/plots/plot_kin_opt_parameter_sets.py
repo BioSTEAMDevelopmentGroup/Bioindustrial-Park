@@ -1891,7 +1891,10 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
         colors = set_colors(sets)
         k = H0 / H                     # H0-canvas fraction -> this canvas
         a_axes = draw_outcomes(fig, a_gs[0], a_sets, colors)
-        axc = draw_burden(fig, c_gs[0], sets, colors, offset_scale=k)
+        # proteome rows: the regular sets in order, the relay campaign(s) last
+        # (bottom row), next to its own panel c
+        axc = draw_burden(fig, c_gs[0], a_sets + relay_sets, colors,
+                          offset_scale=k)
         panels = [(a_axes[0].get_position().y1 + 0.012 * k, 'A',
                    'Optimization trajectories'),
                   (axc.get_position().y1 + 0.005 * k, 'B',
