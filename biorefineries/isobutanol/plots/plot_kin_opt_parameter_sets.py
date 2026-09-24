@@ -368,6 +368,12 @@ RELAY_COLOR = '#0B6E7A'
 # two-panel layout: figure-fraction height of one campaign-legend row (at the
 # legend's font / labelspacing on the 9.856-in canvas)
 LEGEND_ROW_H = 0.0245
+# two-panel layout with a relay campaign: the relay's own outcome panel (panel
+# c, a copy of panel a's grid) is added below the proteome panel. The canvas
+# grows by RELAY_PANEL_IN inches; panel c's top sits RELAY_GAP_IN below the
+# proteome panel's bottom spine (room for its x-axis title and c's title).
+RELAY_PANEL_IN = 3.55
+RELAY_GAP_IN = 1.05
 
 FONTS = {'band': 12, 'cell': 10, 'tick': 9, 'callout': 9,
          'legend': 10, 'axis': 11, 'panel': 14}
@@ -1481,7 +1487,10 @@ if len(_METABOLIC_HATCHES) != len(BURDEN_CATEGORIES):
     raise AssertionError('one hatch per BURDEN_CATEGORIES entry required')
 
 
-def draw_burden(fig, gs_cell, sets, colors):
+def draw_burden(fig, gs_cell, sets, colors, offset_scale=1.0):
+    # offset_scale rescales the fixed figure-fraction x-title offset for a
+    # canvas taller than the one it was tuned on (the two-panel layout with a
+    # relay panel passes H0/H so the title keeps its inch distance)
     # full proteome allocation: each bar sums to the proteome cap PC (0.49).
     # Sectors left to right -- four metabolic categories | the unallocated
     # flexible slack | the growth-derated translation sector | housekeeping,
@@ -1684,7 +1693,7 @@ def draw_burden(fig, gs_cell, sets, colors):
     # (broken) panel rather than either sub-panel
     box_l = axL.get_position(); box_r = axR.get_position()
     mid = 0.5 * (box_l.x0 + box_r.x1)
-    fig.text(mid, box_l.y0 - 0.030,
+    fig.text(mid, box_l.y0 - 0.030 * offset_scale,
              _bold_axis_title('Proteome allocation [g protein·(g DCW)$^{-1}$]'),
              ha='center', va='top', fontsize=FONTS['axis'])
 
@@ -1847,11 +1856,26 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
         # that one extra row-height (8.8 -> 9.856 in) and panel c keeps its
         # absolute inch height, position and the a -> b gap (fractions rescaled
         # by 8.8/9.856; panel a's bottom edge is unchanged in inches).
-        fig = plt.figure(figsize=(9.5, 9.856))
+        # A relay campaign (is_relay) is NOT drawn in panel a: it gets its own
+        # panel c below the proteome panel, a copy of panel a's 3x4 outcome grid
+        # holding only the relay's trials / incumbents (plus the baseline
+        # reference line). The canvas grows by RELAY_PANEL_IN inches at the
+        # bottom; every layout fraction below is written for the 9.856-in
+        # canvas (H0) and mapped by fy(), which keeps each position's distance
+        # from the TOP edge in inches, so panels a / b are unchanged.
+        relay_sets = [s for s in sets if s.get('is_relay')]
+        a_sets = [s for s in sets if not s.get('is_relay')]
+        H0 = 9.856
+        H = H0 + (RELAY_PANEL_IN if relay_sets else 0.0)
+
+        def fy(y):
+            return 1.0 - (1.0 - y) * H0 / H
+
+        fig = plt.figure(figsize=(9.5, H))
         # panel a's bottom is lifted to widen the a -> b gap enough for the one
         # framed box that now holds both the campaign key and the mark key
         a_gs = fig.add_gridspec(1, 1, left=LEFT, right=RIGHT,
-                                top=0.9330, bottom=0.6500)
+                                top=fy(0.9330), bottom=fy(0.6500))
         # panel b (proteome) is pushed down ~0.027 vs panel a's bottom to widen
         # the a -> b gap enough for the legend box to clear both panel a's x-axis
         # titles above and panel b below with ~equal margins (see the anchors)
@@ -1862,14 +1886,35 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
         n_leg_rows = -(-len(sets) // min(len(sets), 4))
         extra = LEGEND_ROW_H * max(0, n_leg_rows - 2)
         c_gs = fig.add_gridspec(1, 1, left=0.32, right=RIGHT,
-                                top=0.4204 - extra, bottom=0.1475 - extra)
+                                top=fy(0.4204 - extra),
+                                bottom=fy(0.1475 - extra))
         colors = set_colors(sets)
-        a_axes = draw_outcomes(fig, a_gs[0], sets, colors)
-        axc = draw_burden(fig, c_gs[0], sets, colors)
-        panels = ((a_axes[0].get_position().y1 + 0.012, 'A',
+        k = H0 / H                     # H0-canvas fraction -> this canvas
+        a_axes = draw_outcomes(fig, a_gs[0], a_sets, colors)
+        axc = draw_burden(fig, c_gs[0], sets, colors, offset_scale=k)
+        panels = [(a_axes[0].get_position().y1 + 0.012 * k, 'A',
                    'Optimization trajectories'),
-                  (axc.get_position().y1 + 0.005, 'B',
-                   'Final proteome allocation'))
+                  (axc.get_position().y1 + 0.005 * k, 'B',
+                   'Final proteome allocation')]
+        if relay_sets:
+            # panel c: same width / height / grid as panel a, its top
+            # RELAY_GAP_IN below panel b's bottom (clearing b's x-axis title
+            # and c's own letter/title)
+            a_h = fy(0.9330) - fy(0.6500)
+            r_top = axc.get_position().y0 - RELAY_GAP_IN / H
+            r_gs = fig.add_gridspec(1, 1, left=LEFT, right=RIGHT,
+                                    top=r_top, bottom=r_top - a_h)
+            r_sets = [s for s in sets if s.get('is_baseline')] + relay_sets
+            r_axes = draw_outcomes(fig, r_gs[0], r_sets, colors)
+            # same value axes as panel a (ranges and major ticks), so each
+            # relay cell reads directly against its panel-a counterpart
+            for ra, aa in zip(r_axes, a_axes):
+                ra.set_ylim(aa.get_ylim())
+                ra.yaxis.set_major_locator(FixedLocator(
+                    [t for t in aa.get_yticks()
+                     if aa.get_ylim()[0] - 1e-12 <= t <= aa.get_ylim()[1] + 1e-12]))
+            panels.append((r_axes[0].get_position().y1 + 0.012 * k, 'C',
+                           'Optimization trajectories of the relay campaign'))
         # the campaign legend sits in the a -> b gap, doubling as the row key for
         # the proteome panel below. A single vertical column is too tall and
         # clips panel a's lower cells; a single horizontal row of all campaign
@@ -1887,8 +1932,8 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
         legend_sets = _legend_order(sets)
         # the campaign swatches sit a little high in the panel-a -> b gap so the
         # mark key can share the same framed box just below them
-        legend_anchor = (0.527, 0.5394 - extra / 2)   # centred: top fixed
-        style_anchor = (0.527, 0.4904 - extra)
+        legend_anchor = (0.527, fy(0.5394 - extra / 2))   # centred: top fixed
+        style_anchor = (0.527, fy(0.4904 - extra))
     for y, letter, title in panels:
         fig.text(0.03, y, letter, fontsize=FONTS['panel'], fontweight='bold',
                  va='baseline')
