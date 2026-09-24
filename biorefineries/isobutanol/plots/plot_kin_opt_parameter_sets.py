@@ -101,12 +101,12 @@ RESULTS_DIR = os.path.join(PKG_DIR, 'analyses', 'results')
 # campaigns). Each is the MOST RECENT metabolic_split_12d campaign for that
 # objective with at least DEFAULT_MIN_TRIALS logged trials (see
 # default_split_12d_specs). The financial set optimizes PI (log-tail) but is
-# drawn on the IRR axis (OUTCOME_OWN_OBJECTIVES), hence the "Financial
-# attractiveness" label.
+# drawn on the IRR axis (OUTCOME_OWN_OBJECTIVES), hence the
+# "Profitability" label.
 DEFAULT_STUDY_TYPE = 'metabolic_split_12d'
 DEFAULT_MIN_TRIALS = 2000
 DEFAULT_OBJECTIVES = [
-    ('Financial attractiveness', 'PI (log-tail)'),
+    ('Profitability', 'PI (log-tail)'),
     ('Isobutanol yield', 'IBO yield'),
     ('Isobutanol titer', 'IBO titer'),
     ('Isobutanol productivity', 'IBO productivity'),
@@ -140,7 +140,7 @@ DEFAULT_RELAY_CAMPAIGN = ('kin_opt_ethanol_isobutanol_metabolic_split_12d'
 # carries the '_rl<sha1-8>' tag (ko.relay_study_tag); relay studies are never
 # picked as one of the seven DEFAULT_OBJECTIVES campaigns.
 DEFAULT_RELAY_OBJECTIVE = 'PI (log-tail)'
-DEFAULT_RELAY_LABEL = 'Financial attractiveness (relay)'
+DEFAULT_RELAY_LABEL = 'Profitability (relay)'
 DEFAULT_RELAY_MIN_TRIALS = 1000
 _RELAY_TAG_RE = re.compile(r'_rl[0-9a-f]{8}(?=_|$)')
 
@@ -346,7 +346,7 @@ for _s in STEP_ENZYME:
 # y-label stays shorter than the short cell height -- a single-line
 # "Isobutanol productivity" overruns its box and collides with the titer cell's
 # label above it.
-OUTCOMES = (('IRR', 'Financial attractiveness\nas IRR [%]', (0, 0.3)),
+OUTCOMES = (('IRR', 'Profitability\nas IRR [%]', (0, 0.3)),
             ('IBO yield', 'Isobutanol\nyield\n[g·g$^{-1}$]', (0, 0.4)),
             ('IBO titer', 'Isobutanol\ntiter\n[g·L$^{-1}$]', (0, 60)),
             ('IBO productivity',
@@ -969,7 +969,7 @@ def set_colors(sets):
 # restricted from DEFAULT_OBJECTIVES: financial optimum (PI, drawn on the IRR
 # axis), isobutanol-titer max, ethanol-titer max.
 PATHWAY_OBJECTIVES = [
-    ('Financial attractiveness', 'PI (log-tail)'),
+    ('Profitability', 'PI (log-tail)'),
     ('Isobutanol titer', 'IBO titer'),
     ('Ethanol titer', 'EtOH titer'),
 ]
@@ -1988,7 +1988,7 @@ def _legend_order(sets):
     # (plus, optionally, the relay label) are exactly present.
     row1 = ('Baseline (no optimization)', 'Isobutanol yield',
             'Isobutanol titer', 'Isobutanol productivity')
-    row2 = ('Financial attractiveness', 'Ethanol yield',
+    row2 = ('Profitability', 'Ethanol yield',
             'Ethanol titer', 'Ethanol productivity')
     by_label = {s['label']: s for s in sets}
     has_relay = DEFAULT_RELAY_LABEL in by_label
