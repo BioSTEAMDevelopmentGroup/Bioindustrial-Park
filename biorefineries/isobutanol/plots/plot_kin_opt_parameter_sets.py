@@ -53,7 +53,14 @@ With no --set arguments it plots the "best" trial of the most recent
 metabolic_split_12d campaign (>= 2000 trials) for each of seven objectives --
 PI (log-tail, drawn on the IRR axis) / isobutanol yield / titer / productivity
 / ethanol yield / titer / productivity -- against the baseline (see
-default_split_12d_specs). Writes <stem>_<stamp>.png and .pdf to --out-dir.
+default_split_12d_specs). The most recent PI (log-tail) RELAY campaign (a
+fresh GP study preloaded with donor rows; `_rl<sha1-8>` name tag; see
+default_relay_spec) is overlaid as one extra set (--no-relay drops it): it adds
+lines / a trial cloud inside the existing panel-a cells (no new cell) and one
+more row in the lower panels. Its panel-a trials are the preloaded donor rows
+(from <study>_relay_manifest.csv, at their store trial numbers 0..N-1) followed
+by its simulated trials (N..), one continuous incumbent over both. Writes
+<stem>_<stamp>.png and .pdf to --out-dir.
 """
 import os
 import re
@@ -92,6 +99,15 @@ DEFAULT_OBJECTIVES = [
     ('Ethanol titer', 'EtOH titer'),
     ('Ethanol productivity', 'EtOH productivity'),
 ]
+# the relay overlay (default path): the most recent metabolic_split_12d relay
+# campaign on this objective with at least DEFAULT_RELAY_MIN_TRIALS simulated
+# trials, drawn right after the financial set under this label. A relay study
+# carries the '_rl<sha1-8>' tag (ko.relay_study_tag); relay studies are never
+# picked as one of the seven DEFAULT_OBJECTIVES campaigns.
+DEFAULT_RELAY_OBJECTIVE = 'PI (log-tail)'
+DEFAULT_RELAY_LABEL = 'Financial attractiveness (relay)'
+DEFAULT_RELAY_MIN_TRIALS = 1000
+_RELAY_TAG_RE = re.compile(r'_rl[0-9a-f]{8}(?=_|$)')
 
 
 def _load(name, filename):
@@ -344,7 +360,14 @@ def _owns_outcome(objective, col):
 BASELINE_COLOR = '#90918e'
 HUE_COLORS = ['#18C4DC', '#f98f60', '#79bf82', '#ED586F',
               '#a280b9', '#f3c354', '#5a6bcc']
-MAX_SETS = 1 + len(HUE_COLORS)   # 8
+MAX_SETS = 1 + len(HUE_COLORS)   # 8, not counting a relay overlay
+# a relay campaign (is_relay) is an overlay on top of the hue palette: a deep
+# teal, the darker sibling of the financial campaign's cyan, so it reads as the
+# same (PI) family without consuming one of the seven objective hues
+RELAY_COLOR = '#0B6E7A'
+# two-panel layout: figure-fraction height of one campaign-legend row (at the
+# legend's font / labelspacing on the 9.856-in canvas)
+LEGEND_ROW_H = 0.0245
 
 FONTS = {'band': 12, 'cell': 10, 'tick': 9, 'callout': 9,
          'legend': 10, 'axis': 11, 'panel': 14}
@@ -560,10 +583,56 @@ def incumbent_trajectory(df, sel_col, direction):
     return x, traj
 
 
+# manifest columns that are not trajectory columns (dropped on the merge)
+_RELAY_MANIFEST_ONLY = ('relay_trial_number', 'donor', 'donor_objective')
+
+
+def is_relay_campaign(campaign):
+    """True if a study name (or trajectory-CSV path) carries the relay tag
+    '_rl<sha1-8>' (ko.relay_study_tag)."""
+    return bool(_RELAY_TAG_RE.search(os.path.basename(campaign)))
+
+
+def relay_trajectory(campaign):
+    """(df, n_preloaded) for a relay study: its preloaded donor rows from
+    <study>_relay_manifest.csv, renumbered to their store trial numbers
+    (relay_trial_number, 0..N-1) with 'objective' = the donor's recorded value
+    of the relay objective, followed by its simulated trajectory rows (numbered
+    from N). The manifest carries the full trajectory column set, so the two
+    concatenate column-for-column."""
+    import pandas as pd
+    csv_path = resolve_campaign_csv(campaign)
+    sim = ko.load_trajectory(csv_path)
+    manifest = csv_path[:-len('_trajectory.csv')] + '_relay_manifest.csv'
+    if not os.path.isfile(manifest):
+        raise FileNotFoundError(f'relay campaign {campaign}: no relay manifest '
+                                f'{manifest}')
+    pre = pd.read_csv(manifest)
+    missing = [c for c in sim.columns if c not in pre.columns]
+    if missing:
+        raise ValueError(f'relay manifest {manifest}: missing trajectory '
+                         f'columns {missing}')
+    pre = pre.copy()
+    pre['trial_number'] = pre['relay_trial_number']
+    pre = pre[list(sim.columns)]
+    n_pre = len(pre)
+    if n_pre and int(sim['trial_number'].min()) < n_pre:
+        raise ValueError(f'relay campaign {campaign}: simulated trial numbers '
+                         f'start below the {n_pre} preloaded rows')
+    df = pd.concat([pre, sim], ignore_index=True)
+    return df.sort_values('trial_number', kind='stable').reset_index(drop=True), n_pre
+
+
 def load_set(label, campaign, trial):
     """A campaign trial as a flat record (CSV row + metadata + the panel-a
-    incumbent trajectory)."""
-    df = ko.load_trajectory(resolve_campaign_csv(campaign))
+    incumbent trajectory). A relay study's preloaded donor rows are prepended
+    to its simulated rows (relay_trajectory), so its representative "best"
+    trial, incumbent and trial cloud all run over both."""
+    is_relay = is_relay_campaign(campaign)
+    if is_relay:
+        df, n_preloaded = relay_trajectory(campaign)
+    else:
+        df, n_preloaded = ko.load_trajectory(resolve_campaign_csv(campaign)), 0
     missing = [c for c in DECISION_VARS if c not in df.columns]
     if missing:
         raise ValueError(
@@ -579,6 +648,8 @@ def load_set(label, campaign, trial):
     rec = row.to_dict()
     rec['label'] = label
     rec['campaign'] = campaign
+    rec['is_relay'] = is_relay
+    rec['n_preloaded'] = n_preloaded
     rec['trial_number'] = int(row['trial_number'])
     rec['is_baseline'] = False
     # applied target sugar concentration (clip at TARGET_CONC_MAX), drawn
@@ -605,6 +676,7 @@ def load_set(label, campaign, trial):
     known |= set(eb.BURDEN_COLUMNS)
     known |= set(ko.TRACKED_METRICS)
     known |= {c for c in df.columns if c.startswith('applied_')}
+    known |= set(_RELAY_MANIFEST_ONLY)
     rec['extra_sampled'] = [c for c in df.columns if c not in known]
     sel_col, sel_dir = selection_spec(df, trial, campaign)
     tx, traj = incumbent_trajectory(df, sel_col, sel_dir)
@@ -786,9 +858,12 @@ def set_colors(sets):
     for s in sets:
         if s.get('is_baseline'):
             colors[id(s)] = BASELINE_COLOR
+        elif s.get('is_relay'):
+            colors[id(s)] = RELAY_COLOR
         else:
             if hue >= len(HUE_COLORS):
-                n_campaign = len([x for x in sets if not x.get('is_baseline')])
+                n_campaign = len([x for x in sets if not x.get('is_baseline')
+                                  and not x.get('is_relay')])
                 raise ValueError(
                     f'too many campaign sets ({n_campaign}); at most '
                     f'{len(HUE_COLORS)} plus the baseline '
@@ -832,6 +907,9 @@ def pathway_colors(sets):
     for s in sets:
         if s.get('is_baseline'):
             colors[id(s)] = BASELINE_COLOR
+            continue
+        if s.get('is_relay'):
+            colors[id(s)] = RELAY_COLOR
             continue
         obj = s.get('objective') or campaign_objective(s.get('campaign'))
         i = obj_index.get(obj)
@@ -1213,6 +1291,23 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9):
     ax.set_xlim(0, xmax * 1.02)
     if base is not None and np.isfinite(base):
         ax.axhline(base, color=BASELINE_COLOR, lw=1.4, ls=(0, (1.5, 1.2)), zorder=1)
+    # a relay campaign's preloaded donor rows (trials 0..N-1) are followed by
+    # its simulated trials: a thin vertical rule in the relay colour at N marks
+    # the hand-over, labelled once in the big financial cell
+    for s in sets:
+        n_pre = s.get('n_preloaded') if s.get('is_relay') else 0
+        if not n_pre:
+            continue
+        ax.axvline(n_pre, color=colors[id(s)], lw=0.9, ls=(0, (4, 2)),
+                   alpha=0.8, zorder=1)
+        if col == 'IRR':
+            y_txt = lo + 0.985 * (cap - lo)
+            ax.text(n_pre - 0.008 * xmax, y_txt, 'relay: preloaded',
+                    ha='right', va='top', fontsize=FONTS['callout'],
+                    color=colors[id(s)])
+            ax.text(n_pre + 0.008 * xmax, y_txt, 'simulated',
+                    ha='left', va='top', fontsize=FONTS['callout'],
+                    color=colors[id(s)])
     # individual trial cloud from the ONE campaign that optimized THIS metric:
     # every trial as a translucent dot in the campaign's own color, behind the
     # incumbent lines (zorder 1). Failed / unsolved trials (no finite value)
@@ -1656,17 +1751,24 @@ def _legend_order(sets):
     # a -- row 1 the isobutanol metrics, row 2 the ethanol metrics, columns
     # yield -> titer -> productivity, baseline + financial leading column 1.
     # fig.legend fills column-major, so the two rows are interleaved into the
-    # returned handle order. Returns the natural set order unchanged unless the
-    # eight expected labels are exactly present.
+    # returned handle order. A relay overlay set (DEFAULT_RELAY_LABEL) takes a
+    # third row in column 1, under the financial campaign (with ncol=4 and nine
+    # handles matplotlib gives column 1 three entries and the others two).
+    # Returns the natural set order unchanged unless the eight expected labels
+    # (plus, optionally, the relay label) are exactly present.
     row1 = ('Baseline (no optimization)', 'Isobutanol yield',
             'Isobutanol titer', 'Isobutanol productivity')
     row2 = ('Financial attractiveness', 'Ethanol yield',
             'Ethanol titer', 'Ethanol productivity')
     by_label = {s['label']: s for s in sets}
-    if len(by_label) == len(sets) and set(by_label) == set(row1 + row2):
+    has_relay = DEFAULT_RELAY_LABEL in by_label
+    expected = set(row1 + row2) | ({DEFAULT_RELAY_LABEL} if has_relay else set())
+    if len(by_label) == len(sets) and set(by_label) == expected:
         ordered = []
-        for top, bot in zip(row1, row2):
+        for i, (top, bot) in enumerate(zip(row1, row2)):
             ordered += [by_label[top], by_label[bot]]
+            if i == 0 and has_relay:
+                ordered.append(by_label[DEFAULT_RELAY_LABEL])
         return ordered
     return sets
 
@@ -1758,8 +1860,14 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
         # panel b (proteome) is pushed down ~0.027 vs panel a's bottom to widen
         # the a -> b gap enough for the legend box to clear both panel a's x-axis
         # titles above and panel b below with ~equal margins (see the anchors)
+        # each campaign-legend row beyond two (e.g. the relay overlay's third
+        # row in column 1) grows the framed key downward by one row height:
+        # the legend top stays put, the mark key and panel b move down by
+        # `extra`, into the spare canvas below panel b's x-axis title
+        n_leg_rows = -(-len(sets) // min(len(sets), 4))
+        extra = LEGEND_ROW_H * max(0, n_leg_rows - 2)
         c_gs = fig.add_gridspec(1, 1, left=0.32, right=RIGHT,
-                                top=0.4204, bottom=0.1475)
+                                top=0.4204 - extra, bottom=0.1475 - extra)
         colors = set_colors(sets)
         a_axes = draw_outcomes(fig, a_gs[0], sets, colors)
         axc = draw_burden(fig, c_gs[0], sets, colors)
@@ -1784,8 +1892,8 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
         legend_sets = _legend_order(sets)
         # the campaign swatches sit a little high in the panel-a -> b gap so the
         # mark key can share the same framed box just below them
-        legend_anchor = (0.527, 0.5394)
-        style_anchor = (0.527, 0.4904)
+        legend_anchor = (0.527, 0.5394 - extra / 2)   # centred: top fixed
+        style_anchor = (0.527, 0.4904 - extra)
     for y, letter, title in panels:
         fig.text(0.03, y, letter, fontsize=FONTS['panel'], fontweight='bold',
                  va='baseline')
@@ -1895,6 +2003,9 @@ def console_report(sets, band_campaign):
         tag = 'baseline' if s.get('is_baseline') \
             else (f'{s["campaign"]} trial {int(s["trial_number"])}; '
                   f'panel-a incumbent by {s["sel_col"]} ({s["sel_dir"]})')
+        if s.get('is_relay'):
+            tag += (f'; relay: trials 0-{s["n_preloaded"] - 1} preloaded, '
+                    f'{s["n_preloaded"]}+ simulated')
         print(f'[{s["label"]}] {tag}')
         print(f'    IRR {s.get("IRR")!s:>8}  EtOH {s.get("EtOH titer")!s:>7}'
               f'  IBO {s.get("IBO titer")!s:>7}  tau {s.get("tau")!s:>6}')
@@ -1972,7 +2083,7 @@ def default_split_12d_specs(objectives=DEFAULT_OBJECTIVES,
         cands = []
         for fn in files:
             stem = fn[:-len('_trajectory.csv')]
-            if not _name_has_objective(stem, slug):
+            if not _name_has_objective(stem, slug) or is_relay_campaign(stem):
                 continue
             path = os.path.join(results_dir, fn)
             n = _campaign_trial_count(path)
@@ -1986,6 +2097,40 @@ def default_split_12d_specs(objectives=DEFAULT_OBJECTIVES,
         cands.sort()                       # by mtime, then trial count
         specs.append((label, cands[-1][2], 'best'))
     return specs
+
+
+def default_relay_spec(objective=DEFAULT_RELAY_OBJECTIVE,
+                       label=DEFAULT_RELAY_LABEL,
+                       min_trials=DEFAULT_RELAY_MIN_TRIALS,
+                       results_dir=RESULTS_DIR):
+    """(label, study_name, 'best') for the MOST RECENT metabolic_split_12d
+    relay campaign (name tag '_rl<sha1-8>') on `objective` with at least
+    `min_trials` simulated trials, or None if there is none."""
+    slug = ko.objective_slug(objective)
+    cands = []
+    for fn in os.listdir(results_dir):
+        if not (fn.endswith('_trajectory.csv') and DEFAULT_STUDY_TYPE in fn):
+            continue
+        stem = fn[:-len('_trajectory.csv')]
+        if not (_name_has_objective(stem, slug) and is_relay_campaign(stem)):
+            continue
+        path = os.path.join(results_dir, fn)
+        n = _campaign_trial_count(path)
+        if n >= min_trials:
+            cands.append((os.path.getmtime(path), n, stem))
+    if not cands:
+        return None
+    cands.sort()
+    return (label, cands[-1][2], 'best')
+
+
+def _insert_relay(specs, relay):
+    """Place the relay spec right after the financial campaign (the set whose
+    objective owns the IRR cell), else at the end."""
+    for i, (_lab, camp, _tr) in enumerate(specs):
+        if _owns_outcome(campaign_objective(camp), 'IRR'):
+            return specs[:i + 1] + [relay] + specs[i + 1:]
+    return specs + [relay]
 
 
 def main(argv=None):
@@ -2011,6 +2156,12 @@ def main(argv=None):
     ap.add_argument('--pathway', action='store_true',
                     help='render the enzyme lever-map figure (metabolic_split_12d '
                          'campaigns only); overrides --panel-b / --params-only')
+    ap.add_argument('--relay', action=argparse.BooleanOptionalAction,
+                    default=True,
+                    help='default (no --set) path only: overlay the most '
+                         'recent PI (log-tail) relay campaign as one extra set '
+                         '(on by default; --no-relay drops it). With --set, a '
+                         'relay campaign is recognised by its _rl tag.')
     ap.add_argument('--out-dir', default=RESULTS_DIR)
     ap.add_argument('--stem', default=None)
     ap.add_argument('--dpi', type=int, default=300)
@@ -2030,8 +2181,17 @@ def main(argv=None):
         # (financial / IBO yield / titer / productivity / EtOH yield / titer /
         # productivity), each drawn as its own "best" trial
         specs = default_split_12d_specs()
+        if args.relay:
+            relay = default_relay_spec()
+            if relay is None:
+                print('  NOTE no metabolic_split_12d PI (log-tail) relay '
+                      f'campaign with >= {DEFAULT_RELAY_MIN_TRIALS} trials; '
+                      'plotting without the relay overlay')
+            else:
+                specs = _insert_relay(specs, relay)
 
-    if len(specs) + (0 if args.no_baseline else 1) > MAX_SETS:
+    n_regular = sum(1 for _, c, _ in specs if not is_relay_campaign(c))
+    if n_regular + (0 if args.no_baseline else 1) > MAX_SETS:
         raise ValueError(f'at most {MAX_SETS} sets (baseline + '
                          f'{len(HUE_COLORS)} campaign sets)')
 
