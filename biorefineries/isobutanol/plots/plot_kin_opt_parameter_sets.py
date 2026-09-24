@@ -420,6 +420,7 @@ PRELOAD_FALLBACK_COLOR = '0.55'
 PRELOAD_SHUFFLE_SEED = 0
 # ... over a light-gray backdrop spanning the preload zone (trials 0..N)
 PRELOAD_ZONE_COLOR = '0.96'
+PRELOAD_ZONE_ALPHA = 0.5
 # figure variants written by one run (main --variants; default all three):
 # the panel-A + proteome overview, the standalone final-parameters figure and
 # the standalone relay-trajectory figure (file stems <stem>_<variant>_<stamp>)
@@ -1546,8 +1547,8 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9,
     for s, sy_pre in preload_cells:
         # light-gray backdrop over the preload zone (trials 0..N): these rows
         # were preloaded from the donors, not searched by the relay itself
-        ax.axvspan(0, s['n_preloaded'], color=PRELOAD_ZONE_COLOR, lw=0,
-                   zorder=0)
+        ax.axvspan(0, s['n_preloaded'], color=PRELOAD_ZONE_COLOR,
+                   alpha=PRELOAD_ZONE_ALPHA, lw=0, zorder=0)
         _draw_relay_preload(ax, s, colors, donor_sets, sy_pre, point_size,
                             mark=(col == 'IRR'))
     if mark_best and col == 'IRR':
@@ -2229,9 +2230,9 @@ def _frame_keys(fig, keys, zorder, padx=0.014, pady=0.011):
         linewidth=1.0, zorder=zorder))
 
 
-def _style_handles(has_best_marks, preload_zone=False):
-    """The colour-free mark key: what the points, open circles, solid vs
-    dashed lines (and, for the relay figure, the grey preload zone) mean."""
+def _style_handles(has_best_marks):
+    """The colour-free mark key: what the points, open circles and solid vs
+    dashed lines mean."""
     style_c = '0.30'
     handles = [
         Line2D([], [], linestyle='none', marker='o', markersize=5,
@@ -2248,10 +2249,6 @@ def _style_handles(has_best_marks, preload_zone=False):
                label='Incumbent (campaign optimizing the shown metric)'),
         Line2D([], [], color=style_c, lw=1.4, linestyle=(0, (2, 1.5)),
                label='Incumbent (other campaign)')]
-    if preload_zone:
-        handles.append(plt.Rectangle((0, 0), 1, 1, fc=PRELOAD_ZONE_COLOR,
-                                     ec='0.6', lw=0.6,
-                                     label='Preloaded trials'))
     return handles
 
 
@@ -2338,9 +2335,9 @@ def plot_relay_trajectories(sets, out_stem, dpi=300):
     rb = relay_leg.get_window_extent(fig.canvas.get_renderer()).transformed(inv)
     has_marks = any(s.get('preload_seed') is not None for s in relay_sets) \
         or bool(best_irr_points(a_sets))
-    style_leg = fig.legend(handles=_style_handles(has_marks, preload_zone=True),
+    style_leg = fig.legend(handles=_style_handles(has_marks),
                            loc='upper center', bbox_to_anchor=(0.527, rb.y0),
-                           ncol=3 if has_marks else 2, frameon=False,
+                           ncol=2 if has_marks else 3, frameon=False,
                            fontsize=FONTS['legend'], handlelength=2.2,
                            handletextpad=0.5, columnspacing=1.4)
     _frame_keys(fig, [leg, relay_leg, style_leg], zorder=leg.get_zorder() - 1)
