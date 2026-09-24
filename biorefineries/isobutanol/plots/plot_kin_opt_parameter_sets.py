@@ -58,18 +58,24 @@ yield / titer / productivity) against the baseline, plus the pinned PI
 study preloaded with rows of the six process-level rs350 campaigns;
 --no-relay drops it). --latest instead picks, per objective, the most recent
 metabolic_split_12d campaign with >= 2000 trials and the most recent relay
-(default_split_12d_specs / default_relay_spec). Layout (two-panel default):
-  A  outcome trajectories of the seven regular campaigns; the IRR cell also
-     marks each campaign's highest-IRR trial (open circle);
-  B  proteome allocation, one row per set, the relay campaign last;
-  C  (only with a relay) panel A's grid for the relay campaign alone, on
-     panel A's value axes. Every cell's preload zone (trials 0..N-1) shows
-     the preloaded donor rows in their donor campaign's colour, in shuffled
-     order; the IRR cell also marks the seed (the best preloaded row, the relay's incumbent when
-     its first simulated trial starts) as an open circle; the incumbent line
-     starts at N. The relay's legend line says
-     what it was seeded with.
-Writes <stem>_<stamp>.png and .pdf to --out-dir.
+(default_split_12d_specs / default_relay_spec). Each run writes three figure
+variants (--variants selects a subset):
+  overview    A  outcome trajectories of the seven regular campaigns; the
+                 IRR cell also marks each campaign's highest-IRR trial (open
+                 circle);
+              B  proteome allocation, one row per set, the relay campaign
+                 last;
+  parameters  the final kinetic and process parameters of every set, the
+              relay campaign included;
+  relay       (only with a relay) the overview's panel-A grid for the relay
+              campaign alone, on panel A's value axes. Every cell's preload
+              zone (trials 0..N-1, shaded light grey) shows the preloaded donor
+              rows in their donor campaign's colour, in shuffled order; the
+              IRR cell also marks the seed (the best preloaded row, the
+              relay's incumbent when its first simulated trial starts) as an
+              open circle; the incumbent line starts at N. The relay's legend
+              line says what it was seeded with.
+Writes <stem>_<variant>_<stamp>.png and .pdf to --out-dir.
 """
 import os
 import re
@@ -397,27 +403,27 @@ RELAY_COLOR = '#0B6E7A'
 # two-panel layout: figure-fraction height of one campaign-legend row (at the
 # legend's font / labelspacing on the 9.856-in canvas)
 LEGEND_ROW_H = 0.0245
-# two-panel layout with a relay campaign: the relay's own outcome panel (panel
-# c, a copy of panel a's grid) is added below the proteome panel. The canvas
-# grows by RELAY_PANEL_IN inches; panel c's top sits RELAY_GAP_IN below the
-# proteome panel's bottom spine (room for its x-axis title and c's title).
-RELAY_PANEL_IN = 3.55
-RELAY_GAP_IN = 1.05
 # panel a's financial cell marks every campaign's highest-IRR trial with an
 # open circle in that campaign's colour: only the financial campaign's trial
 # cloud is drawn there, and a process-level campaign's incumbent line follows
 # its own metric, so those trials would otherwise never reach the cell (the
-# financial campaign's is marked too, for comparison). The relay's seed (its best preloaded trial) is one of those donor trials; the
-# same open circle marks it in panel c, tying the two panels together.
+# financial campaign's is marked too, for comparison). The relay's seed (its
+# best preloaded trial) is one of those donor trials; the same open circle
+# marks it in the relay figure, tying the two figures together.
 BEST_MARK_SIZE = 42
 BEST_MARK_LW = 1.4
-# panel c draws the relay's preloaded donor rows in their DONOR campaign's
-# colour; a donor that is not one of the plotted campaigns falls back to grey
+# the relay figure draws the relay's preloaded donor rows in their DONOR
+# campaign's colour; a donor that is not one of the plotted campaigns falls
+# back to grey
 PRELOAD_FALLBACK_COLOR = '0.55'
 # ... in a fixed-seed shuffled order (relay_preload_layout)
 PRELOAD_SHUFFLE_SEED = 0
 # ... over a light-gray backdrop spanning the preload zone (trials 0..N)
 PRELOAD_ZONE_COLOR = '0.96'
+# figure variants written by one run (main --variants; default all three):
+# the panel-A + proteome overview, the standalone final-parameters figure and
+# the standalone relay-trajectory figure (file stems <stem>_<variant>_<stamp>)
+FIGURE_VARIANTS = ('overview', 'parameters', 'relay')
 
 FONTS = {'band': 12, 'cell': 10, 'tick': 9, 'callout': 9,
          'legend': 10, 'axis': 11, 'panel': 14}
@@ -2079,13 +2085,11 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
         # that one extra row-height (8.8 -> 9.856 in) and panel c keeps its
         # absolute inch height, position and the a -> b gap (fractions rescaled
         # by 8.8/9.856; panel a's bottom edge is unchanged in inches).
-        # A relay campaign (is_relay) is NOT drawn in panel a: it gets its own
-        # panel c below the proteome panel, a copy of panel a's 3x4 outcome grid
-        # holding only the relay's trials / incumbents (plus the baseline
-        # reference line). The canvas grows by RELAY_PANEL_IN inches at the
-        # bottom; every layout fraction below is written for the 9.856-in
-        # canvas (H0) and mapped by fy(), which keeps each position's distance
-        # from the TOP edge in inches, so panels a / b are unchanged.
+        # A relay campaign (is_relay) is NOT drawn in panel a: its trajectories
+        # are the separate relay figure (plot_relay_trajectories); here it only
+        # takes the last proteome row and a legend line. Every layout fraction
+        # below is written for the 9.856-in canvas (H0) and mapped by fy(),
+        # which keeps each position's distance from the TOP edge in inches.
         a_sets = [s for s in sets if not s.get('is_relay')]
         H0 = 9.856
         # the framed key in the a -> b gap = the campaign grid (<= 4 columns),
@@ -2101,7 +2105,7 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
         extra_leg = LEGEND_ROW_H * max(0, n_grid_rows + len(relay_sets) - 2)
         extra_style = LEGEND_ROW_H if has_best_marks else 0.0
         extra = extra_leg + extra_style
-        H = H0 + (RELAY_PANEL_IN if relay_sets else 0.0) + extra_style * H0
+        H = H0 + extra_style * H0
 
         def fy(y):
             return 1.0 - (1.0 - y) * H0 / H
@@ -2121,38 +2125,13 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
         k = H0 / H                     # H0-canvas fraction -> this canvas
         a_axes = draw_outcomes(fig, a_gs[0], a_sets, colors, mark_best=True)
         # proteome rows: the regular sets in order, the relay campaign(s) last
-        # (bottom row), next to its own panel c
+        # (bottom row)
         axc = draw_burden(fig, c_gs[0], a_sets + relay_sets, colors,
                           offset_scale=k)
         panels = [(a_axes[0].get_position().y1 + 0.012 * k, 'A',
                    'Optimization trajectories'),
                   (axc.get_position().y1 + 0.005 * k, 'B',
                    'Final proteome allocation')]
-        if relay_sets:
-            # panel c: same width / height / grid as panel a, its top
-            # RELAY_GAP_IN below panel b's bottom (clearing b's x-axis title
-            # and c's own letter/title)
-            a_h = fy(0.9330) - fy(0.6500)
-            r_top = axc.get_position().y0 - RELAY_GAP_IN / H
-            r_gs = fig.add_gridspec(1, 1, left=LEFT, right=RIGHT,
-                                    top=r_top, bottom=r_top - a_h)
-            r_sets = [s for s in sets if s.get('is_baseline')] + relay_sets
-            # donor_sets: the relay's preloaded rows are drawn in every
-            # cell's preload zone in their donor campaign's panel-a colour
-            r_axes = draw_outcomes(fig, r_gs[0], r_sets, colors,
-                                   donor_sets=a_sets)
-            # same value axes as panel a (ranges and major ticks), so each
-            # relay cell reads directly against its panel-a counterpart
-            for ra, aa in zip(r_axes, a_axes):
-                ra.set_ylim(aa.get_ylim())
-                ra.yaxis.set_major_locator(FixedLocator(
-                    [t for t in aa.get_yticks()
-                     if aa.get_ylim()[0] - 1e-12 <= t <= aa.get_ylim()[1] + 1e-12]))
-            seeded_from_a = relay_donor_summary(relay_sets[0], a_sets)[1]
-            panels.append((r_axes[0].get_position().y1 + 0.012 * k, 'C',
-                           'Optimization trajectories of the relay campaign'
-                           + (', seeded from panel A' if seeded_from_a
-                              else '')))
         # the campaign legend sits in the a -> b gap, doubling as the row key for
         # the proteome panel below. A single vertical column is too tall and
         # clips panel a's lower cells; a single horizontal row of all campaign
@@ -2180,25 +2159,10 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
                  fontweight='bold', va='baseline')
     # small colour-free key for the marks in panel a: what the points and the
     # solid vs dashed lines mean (the campaign legend gives the colours).
-    style_c = '0.30'
-    # with the highest-IRR circle the key is two rows x two columns (filled
+    # With the highest-IRR circle the key is two rows x two columns (filled
     # column-major): trials | own incumbent over best-IRR trial | other
     # incumbent; without it the original single row of three
-    style_handles = [
-        Line2D([], [], linestyle='none', marker='o', markersize=5,
-               markerfacecolor=style_c, markeredgecolor='none', alpha=0.5,
-               label='Individual trials')]
-    if has_best_marks:
-        style_handles.append(
-            Line2D([], [], linestyle='none', marker='o', markersize=6.5,
-                   markerfacecolor='white', markeredgecolor=style_c,
-                   markeredgewidth=BEST_MARK_LW,
-                   label='Highest-IRR trial'))
-    style_handles += [
-        Line2D([], [], color=style_c, lw=2.4, linestyle='-',
-               label='Incumbent (campaign optimizing the shown metric)'),
-        Line2D([], [], color=style_c, lw=1.4, linestyle=(0, (2, 1.5)),
-               label='Incumbent (other campaign)')]
+    style_handles = _style_handles(has_best_marks)
     handles = [plt.Rectangle((0, 0), 1, 1, fc=colors[id(s)], label=s['label'])
                for s in legend_sets]
     # three-panel: the mark key is a standalone strip under panel a and the
@@ -2243,16 +2207,143 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
                 handletextpad=0.6, borderpad=0.6)
             keys.append(relay_leg)
             fig.canvas.draw()
-        # draw one frame enclosing every frameless key (union of their drawn
-        # extents), so the mark key reads as part of the campaign legend
-        bbs = [a.get_window_extent(renderer).transformed(inv) for a in keys]
-        x0 = min(b.x0 for b in bbs); x1 = max(b.x1 for b in bbs)
-        y0 = min(b.y0 for b in bbs); y1 = max(b.y1 for b in bbs)
-        padx, pady = 0.014, 0.011
-        fig.add_artist(plt.Rectangle(
-            (x0 - padx, y0 - pady), (x1 - x0) + 2 * padx, (y1 - y0) + 2 * pady,
-            transform=fig.transFigure, facecolor='white', edgecolor='0.6',
-            linewidth=1.0, zorder=leg.get_zorder() - 1))
+        _frame_keys(fig, keys, zorder=leg.get_zorder() - 1)
+    for ext in ('png', 'pdf'):
+        fig.savefig(f'{out_stem}.{ext}', dpi=dpi)
+    plt.close(fig)
+    return out_stem
+
+
+def _frame_keys(fig, keys, zorder, padx=0.014, pady=0.011):
+    """Draw one white frame enclosing every frameless key (the union of their
+    drawn extents), so several legends read as one framed key."""
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    inv = fig.transFigure.inverted()
+    bbs = [a.get_window_extent(renderer).transformed(inv) for a in keys]
+    x0 = min(b.x0 for b in bbs); x1 = max(b.x1 for b in bbs)
+    y0 = min(b.y0 for b in bbs); y1 = max(b.y1 for b in bbs)
+    fig.add_artist(plt.Rectangle(
+        (x0 - padx, y0 - pady), (x1 - x0) + 2 * padx, (y1 - y0) + 2 * pady,
+        transform=fig.transFigure, facecolor='white', edgecolor='0.6',
+        linewidth=1.0, zorder=zorder))
+
+
+def _style_handles(has_best_marks, preload_zone=False):
+    """The colour-free mark key: what the points, open circles, solid vs
+    dashed lines (and, for the relay figure, the grey preload zone) mean."""
+    style_c = '0.30'
+    handles = [
+        Line2D([], [], linestyle='none', marker='o', markersize=5,
+               markerfacecolor=style_c, markeredgecolor='none', alpha=0.5,
+               label='Individual trials')]
+    if has_best_marks:
+        handles.append(
+            Line2D([], [], linestyle='none', marker='o', markersize=6.5,
+                   markerfacecolor='white', markeredgecolor=style_c,
+                   markeredgewidth=BEST_MARK_LW,
+                   label='Highest-IRR trial'))
+    handles += [
+        Line2D([], [], color=style_c, lw=2.4, linestyle='-',
+               label='Incumbent (campaign optimizing the shown metric)'),
+        Line2D([], [], color=style_c, lw=1.4, linestyle=(0, (2, 1.5)),
+               label='Incumbent (other campaign)')]
+    if preload_zone:
+        handles.append(plt.Rectangle((0, 0), 1, 1, fc=PRELOAD_ZONE_COLOR,
+                                     ec='0.6', lw=0.6,
+                                     label='Preloaded trials'))
+    return handles
+
+
+def _panel_a_value_axes(a_sets, colors):
+    """(ylim, major ticks) of each panel-a outcome cell, from a throwaway
+    render of panel a (the limits and tick steps depend only on the data), so
+    the relay figure's cells read directly against their panel-a
+    counterparts."""
+    tmp = plt.figure(figsize=(9.5, 3.0))
+    gs = tmp.add_gridspec(1, 1)
+    axes = draw_outcomes(tmp, gs[0], a_sets, colors, mark_best=True)
+    out = []
+    for aa in axes:
+        lo, hi = aa.get_ylim()
+        out.append(((lo, hi), [t for t in aa.get_yticks()
+                               if lo - 1e-12 <= t <= hi + 1e-12]))
+    plt.close(tmp)
+    return out
+
+
+def plot_relay_trajectories(sets, out_stem, dpi=300):
+    """Standalone figure: panel a's 3x4 outcome grid for the relay campaign(s)
+    alone (plus the baseline reference line), on panel a's value axes. Every
+    cell's preload zone (trials 0..N-1, shaded light grey) shows the preloaded
+    donor rows in their donor campaign's colour, shuffled; the IRR cell also
+    marks the seed and every campaign's highest-IRR trial that was preloaded
+    (open circles); the incumbent line starts at N. Returns None (and writes
+    nothing) when there is no relay set."""
+    relay_sets = [s for s in sets if s.get('is_relay')]
+    if not relay_sets:
+        return None
+    apply_fonts()
+    LEFT, RIGHT = 0.083, 0.97
+    a_sets = [s for s in sets if not s.get('is_relay')]
+    base_sets = [s for s in sets if s.get('is_baseline')]
+    colors = set_colors(sets)
+    # the donors that actually contributed preloaded rows, in panel-a order
+    donor_stems = {d for s in relay_sets for d in (s.get('preload_donor') or ())}
+    donors = [s for s in a_sets if not s.get('is_baseline')
+              and _campaign_stem(s['campaign']) in donor_stems]
+    # canvas in inches: title strip, the panel-a-height grid (2.789 in, as on
+    # the two-panel canvas), its x-axis titles, then the framed key
+    W, top_in, grid_in, gap_in = 9.5, 0.55, 2.789, 0.62
+    n_key_rows = -(-(len(base_sets) + len(donors)) // 4) + len(relay_sets) + 2
+    key_in = 0.30 * n_key_rows + 0.55
+    H = top_in + grid_in + gap_in + key_in
+    fig = plt.figure(figsize=(W, H))
+    r_top = 1.0 - top_in / H
+    r_gs = fig.add_gridspec(1, 1, left=LEFT, right=RIGHT, top=r_top,
+                            bottom=r_top - grid_in / H)
+    r_axes = draw_outcomes(fig, r_gs[0], base_sets + relay_sets, colors,
+                           donor_sets=a_sets)
+    for ra, (ylim, ticks) in zip(r_axes, _panel_a_value_axes(a_sets, colors)):
+        ra.set_ylim(ylim)
+        ra.yaxis.set_major_locator(FixedLocator(ticks))
+    fig.text(0.03, r_axes[0].get_position().y1 + 0.20 / H,
+             'Optimization trajectories of the relay campaign',
+             fontsize=FONTS['panel'] - 1, fontweight='bold', va='baseline')
+    # framed key under the grid: baseline + the donor campaigns (colours of
+    # the preloaded trials) on top, the relay line(s), the mark key below
+    key_top = (r_top - (grid_in + gap_in) / H)
+    handles = [plt.Rectangle((0, 0), 1, 1, fc=colors[id(s)], label=s['label'])
+               for s in base_sets + donors]
+    leg = fig.legend(handles=handles, loc='upper center',
+                     bbox_to_anchor=(0.527, key_top),
+                     ncol=min(len(handles), 4), frameon=False,
+                     fontsize=FONTS['legend'] + 1, title='Optimization campaign',
+                     labelspacing=0.6, columnspacing=1.6,
+                     handlelength=1.7, handleheight=1.1, handletextpad=0.6,
+                     borderpad=0.6)
+    leg.get_title().set_fontweight('bold')
+    leg.get_title().set_fontsize(FONTS['legend'] + 2)
+    fig.canvas.draw()
+    inv = fig.transFigure.inverted()
+    lb = leg.get_window_extent(fig.canvas.get_renderer()).transformed(inv)
+    relay_leg = fig.legend(
+        handles=[plt.Rectangle((0, 0), 1, 1, fc=colors[id(s)],
+                               label=relay_legend_label(s, a_sets))
+                 for s in relay_sets],
+        loc='upper left', bbox_to_anchor=(lb.x0, lb.y0), ncol=1,
+        frameon=False, fontsize=FONTS['legend'] + 1, labelspacing=0.6,
+        handlelength=1.7, handleheight=1.1, handletextpad=0.6, borderpad=0.3)
+    fig.canvas.draw()
+    rb = relay_leg.get_window_extent(fig.canvas.get_renderer()).transformed(inv)
+    has_marks = any(s.get('preload_seed') is not None for s in relay_sets) \
+        or bool(best_irr_points(a_sets))
+    style_leg = fig.legend(handles=_style_handles(has_marks, preload_zone=True),
+                           loc='upper center', bbox_to_anchor=(0.527, rb.y0),
+                           ncol=3 if has_marks else 2, frameon=False,
+                           fontsize=FONTS['legend'], handlelength=2.2,
+                           handletextpad=0.5, columnspacing=1.4)
+    _frame_keys(fig, [leg, relay_leg, style_leg], zorder=leg.get_zorder() - 1)
     for ext in ('png', 'pdf'):
         fig.savefig(f'{out_stem}.{ext}', dpi=dpi)
     plt.close(fig)
@@ -2485,17 +2576,25 @@ def main(argv=None):
                          'baseline. TRIAL is an int, "best", or "best:COL".')
     ap.add_argument('--no-baseline', action='store_true',
                     help='drop the scenario-A baseline row')
-    # the two-panel layout (panel A + proteome allocation) is the default;
-    # --panel-b adds the kinetic/process-parameter panel B, --no-panel-b is
-    # the explicit form of the default (kept so existing commands still work)
+    ap.add_argument('--variants', nargs='+', choices=FIGURE_VARIANTS,
+                    default=list(FIGURE_VARIANTS),
+                    help='figure variants to write (default: all three): '
+                         'overview = panel A trajectories + panel B proteome '
+                         'allocation; parameters = the final kinetic and '
+                         'process parameters of every set, relay included; '
+                         'relay = the relay campaign\'s trajectories (skipped '
+                         'without a relay set)')
+    # the overview is the two-panel layout (panel A + proteome allocation);
+    # --panel-b renders it as the legacy three-panel layout instead (kinetic/
+    # process-parameter panel B inserted), --no-panel-b is the explicit form
+    # of the default (kept so existing commands still work)
     ap.add_argument('--panel-b', action=argparse.BooleanOptionalAction,
                     default=False,
-                    help='include panel B (final kinetic and process '
-                         'parameters); omitted by default, in which case the '
-                         'proteome-allocation panel is panel B')
+                    help='overview variant: include panel B (final kinetic '
+                         'and process parameters); omitted by default, in '
+                         'which case the proteome-allocation panel is panel B')
     ap.add_argument('--params-only', action='store_true',
-                    help='render ONLY the final-parameters panel (panel B of '
-                         'the three-panel variant) as a standalone figure')
+                    help='shorthand for --variants parameters')
     ap.add_argument('--pathway', action='store_true',
                     help='render the enzyme lever-map figure (metabolic_split_12d '
                          'campaigns only); overrides --panel-b / --params-only')
@@ -2503,7 +2602,8 @@ def main(argv=None):
                     default=True,
                     help='default (no --set) path only: add the PI (log-tail) '
                          'relay campaign (pinned, or the most recent with '
-                         '--latest) as its own panel C (on by default; '
+                         '--latest): the last proteome and parameter row '
+                         'plus the relay figure (on by default; '
                          '--no-relay drops it). With --set, a relay campaign '
                          'is recognised by its _rl tag.')
     ap.add_argument('--latest', action='store_true',
@@ -2578,12 +2678,26 @@ def main(argv=None):
         return out_stem
     stem = args.stem or f'{os.path.basename(specs[0][1]).replace(".csv", "")}' \
                         '_parameter_sets'
-    out_stem = os.path.join(args.out_dir, f'{stem}_{stamp}')
-    plot(sets, band, out_stem, dpi=args.dpi,
-         include_parameters=args.panel_b, params_only=args.params_only)
+    variants = ('parameters',) if args.params_only else tuple(args.variants)
+    written = []
+    for variant in FIGURE_VARIANTS:
+        if variant not in variants:
+            continue
+        out_stem = os.path.join(args.out_dir, f'{stem}_{variant}_{stamp}')
+        if variant == 'overview':
+            plot(sets, band, out_stem, dpi=args.dpi,
+                 include_parameters=args.panel_b)
+        elif variant == 'parameters':
+            plot(sets, band, out_stem, dpi=args.dpi, params_only=True)
+        elif plot_relay_trajectories(sets, out_stem, dpi=args.dpi) is None:
+            print('  NOTE no relay campaign among the sets; relay figure '
+                  'skipped')
+            continue
+        written.append(out_stem)
     console_report(sets, band_campaign)
-    print(f'wrote {out_stem}.png / .pdf')
-    return out_stem
+    for out_stem in written:
+        print(f'wrote {out_stem}.png / .pdf')
+    return written
 
 
 if __name__ == '__main__':
