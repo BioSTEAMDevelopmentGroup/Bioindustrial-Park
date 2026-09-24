@@ -1485,7 +1485,10 @@ def plot_kinetic_results(xlim=None, ylim=None,
                          save_fig=False, filename=None, figwidth=3.9):
     # if variables is None:
     #     variables = ['[x]', 'curr_a', '[s_glu]', '[s_EtOH]', '[s_acetate]', '[s_IBO]']
-    plt.rcParams['font.sans-serif'] = "Arial Unicode"
+    plt.rcParams['font.sans-serif'] = "Arial"
+    plt.rcParams['mathtext.fontset'] = 'custom'
+    plt.rcParams['mathtext.rm'] = 'Arial'
+    plt.rcParams['mathtext.bf'] = 'Arial:bold'
     plt.rcParams['font.size'] = str(12)
     n_minor_ticks = 4
     
@@ -1501,8 +1504,8 @@ def plot_kinetic_results(xlim=None, ylim=None,
     ax.plot(V406.nsk_results_dict['time'], V406.nsk_results_dict['[s_acetate]'], label='acetate')
     ax.plot(V406.nsk_results_dict['time'], V406.nsk_results_dict['[s_IBO]'], label='isobutanol')
     ax.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left', edgecolor='white')
-    ax.set_xlabel(r"$\bfTime$" + ' [h]')
-    ax.set_ylabel(r"$\bfConcentration$" + ' [' + r"$\mathrm{g} \cdot \mathrm{L}^{-1}$" + ']')
+    ax.set_xlabel(r"$\mathbf{Time}$" + ' [h]')
+    ax.set_ylabel(r"$\mathbf{Concentration}$" + ' [' + r"$\mathrm{g·L}^{-1}$" + ']')
     
     
     ax.xaxis.set_minor_locator(AutoMinorLocator(n_minor_ticks+1))
