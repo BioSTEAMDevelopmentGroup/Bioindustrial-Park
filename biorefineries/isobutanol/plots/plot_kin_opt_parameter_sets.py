@@ -63,9 +63,9 @@ metabolic_split_12d campaign with >= 2000 trials and the most recent relay
      marks each campaign's highest-IRR trial (open circle);
   B  proteome allocation, one row per set, the relay campaign last;
   C  (only with a relay) panel A's grid for the relay campaign alone, on
-     panel A's value axes. Its IRR cell's preload zone (trials 0..N-1) shows
+     panel A's value axes. Every cell's preload zone (trials 0..N-1) shows
      the preloaded donor rows in their donor campaign's colour, in shuffled
-     order, and the seed (the best preloaded row, the relay's incumbent when
+     order; the IRR cell also marks the seed (the best preloaded row, the relay's incumbent when
      its first simulated trial starts) as an open circle; the incumbent line
      starts at N. The relay's legend line says
      what it was seeded with.
@@ -1418,16 +1418,20 @@ def relay_preload_layout(s, donor_sets, colors):
     return x, row_colors
 
 
-def _draw_relay_preload(ax, s, colors, donor_sets, sy_pre, point_size):
-    """Panel c's preload zone (x 0..N-1) of a relay's owned cell: the
-    preloaded donor rows as a trial cloud in their donor's colour (shuffled,
-    relay_preload_layout), and as open circles (panel a's highest-IRR mark)
-    the seed -- the best preloaded row, which is the relay's incumbent when
-    its first simulated trial starts -- plus every plotted process-level
-    campaign's highest-IRR trial that was preloaded (best_irr_points)."""
+def _draw_relay_preload(ax, s, colors, donor_sets, sy_pre, point_size,
+                        mark=True):
+    """Panel c's preload zone (x 0..N-1) of a relay cell: the preloaded donor
+    rows as a trial cloud in their donor's colour (shuffled,
+    relay_preload_layout), and, with mark (the IRR cell only), as open circles
+    (panel a's highest-IRR mark) the seed -- the best preloaded row, which is
+    the relay's incumbent when its first simulated trial starts -- plus every
+    plotted process-level campaign's highest-IRR trial that was preloaded
+    (best_irr_points)."""
     px, pcols = relay_preload_layout(s, donor_sets, colors)
     ax.scatter(px, sy_pre, s=point_size, c=pcols, alpha=0.35, linewidths=0,
                zorder=1)
+    if not mark:
+        return
     row_of = {(d, int(t)): k for k, (d, t) in enumerate(
         zip(s['preload_donor'], s['preload_donor_trial']))}
     marked = set()
@@ -1497,17 +1501,20 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9,
     # are drawn at the axis floor rather than omitted.
     preload_cells = []
     for s in sets:
-        if s.get('scatter') is None or not _owns_outcome(s.get('objective'), col):
+        if s.get('scatter') is None:
             continue
+        own = _owns_outcome(s.get('objective'), col)
         sx, sy, cc = s['scatter_x'], _yv(s['scatter'][col]), colors[id(s)]
         # a relay's preloaded donor rows (x < N) are not its own search
         # progress: never drawn in the relay colour. In panel c (donor_sets
         # given) they are drawn in their DONOR's colour, shuffled
-        # (_draw_relay_preload, after the incumbent lines); elsewhere hidden.
+        # (_draw_relay_preload, after the incumbent lines) -- in EVERY cell,
+        # since each donor row carries all the outcomes; elsewhere hidden.
         n_pre = (s.get('n_preloaded') or 0) if s.get('is_relay') else 0
         pre = sx < n_pre
-        ax.scatter(sx[~pre], sy[~pre], s=point_size, color=cc, alpha=0.35,
-                   linewidths=0, zorder=1)
+        if own:
+            ax.scatter(sx[~pre], sy[~pre], s=point_size, color=cc, alpha=0.35,
+                       linewidths=0, zorder=1)
         if n_pre and donor_sets is not None and s.get('preload_donor'):
             preload_cells.append((s, sy[pre]))
     for s in sets:
@@ -1529,7 +1536,8 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9,
                 ls='-' if own else (0, (1.5, 1.2)),
                 zorder=2 if own else 3)
     for s, sy_pre in preload_cells:
-        _draw_relay_preload(ax, s, colors, donor_sets, sy_pre, point_size)
+        _draw_relay_preload(ax, s, colors, donor_sets, sy_pre, point_size,
+                            mark=(col == 'IRR'))
     if mark_best and col == 'IRR':
         _draw_best_irr_marks(ax, sets, colors)
     # metric name next to the value axis itself (not a title above the cell)
@@ -1562,7 +1570,8 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9,
 
 def draw_outcomes(fig, gs_cell, sets, colors, donor_sets=None,
                   mark_best=False):
-    # donor_sets / mark_best reach only the IRR cell (outcome_cell)
+    # mark_best reaches only the IRR cell; donor_sets (panel c) reaches every
+    # cell, which then draws the relay's preloaded rows (outcome_cell)
     xmax = 1.0
     for s in sets:
         tx = s.get('traj_x')
@@ -1590,7 +1599,7 @@ def draw_outcomes(fig, gs_cell, sets, colors, donor_sets=None,
         # linear ratio, from the actual rendered widths (robust to layout tweaks)
         ratio = ax.get_position().width / big_w
         outcome_cell(ax, sets, colors, col, label, yl, xmax,
-                     point_size=9 * ratio ** 2)
+                     point_size=9 * ratio ** 2, donor_sets=donor_sets)
         axes.append(ax)
     return axes
 
@@ -2122,7 +2131,7 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
             r_gs = fig.add_gridspec(1, 1, left=LEFT, right=RIGHT,
                                     top=r_top, bottom=r_top - a_h)
             r_sets = [s for s in sets if s.get('is_baseline')] + relay_sets
-            # donor_sets: the relay's preloaded rows are drawn in its IRR
+            # donor_sets: the relay's preloaded rows are drawn in every
             # cell's preload zone in their donor campaign's panel-a colour
             r_axes = draw_outcomes(fig, r_gs[0], r_sets, colors,
                                    donor_sets=a_sets)
