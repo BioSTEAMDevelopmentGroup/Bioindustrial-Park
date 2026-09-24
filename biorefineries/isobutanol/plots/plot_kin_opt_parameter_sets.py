@@ -60,8 +60,7 @@ study preloaded with rows of the six process-level rs350 campaigns;
 metabolic_split_12d campaign with >= 2000 trials and the most recent relay
 (default_split_12d_specs / default_relay_spec). Layout (two-panel default):
   A  outcome trajectories of the seven regular campaigns; the IRR cell also
-     marks each process-level campaign's highest-IRR trial (open circle) and
-     calls out the one that seeds the relay;
+     marks each process-level campaign's highest-IRR trial (open circle);
   B  proteome allocation, one row per set, the relay campaign last;
   C  (only with a relay) panel A's grid for the relay campaign alone, on
      panel A's value axes. Its IRR cell's preload zone (trials 0..N-1) shows
@@ -1420,8 +1419,7 @@ def relay_preload_layout(s, donor_sets, colors):
     return x, row_colors
 
 
-def _draw_relay_preload(ax, s, colors, donor_sets, sy_pre, lo, cap,
-                        point_size):
+def _draw_relay_preload(ax, s, colors, donor_sets, sy_pre, point_size):
     """Panel c's preload zone (x 0..N-1) of a relay's owned cell: the
     preloaded donor rows as a trial cloud in their donor's colour (shuffled,
     relay_preload_layout), and the seed -- the best preloaded row, which is
@@ -1438,53 +1436,18 @@ def _draw_relay_preload(ax, s, colors, donor_sets, sy_pre, lo, cap,
     ax.plot([xs, n_pre], [ys, ys], color=colors[id(s)], lw=1.4, zorder=2)
     ax.scatter([xs], [ys], s=BEST_MARK_SIZE, facecolors='white',
                edgecolors=pcols[i], linewidths=BEST_MARK_LW, zorder=5)
-    # the shuffle can put the seed anywhere in the zone: label it from above,
-    # centred on the seed but clamped so the ~0.7 N-wide label stays inside
-    # the preload zone (clear of the incumbent line rising at N), with a short
-    # arrow down to the circle
-    ax.annotate('Seed (best preloaded)', xy=(xs, ys),
-                xytext=(float(np.clip(xs, 0.37 * n_pre, 0.63 * n_pre)),
-                        ys + 0.09 * (cap - lo)),
-                ha='center', va='bottom', fontsize=FONTS['callout'],
-                color='0.25', zorder=4,
-                arrowprops=dict(arrowstyle='-|>', color='0.25', lw=0.8,
-                                shrinkA=1, shrinkB=5, mutation_scale=8))
 
 
-def _draw_best_irr_marks(ax, sets, colors, xmax, lo, cap, seed_ref):
+def _draw_best_irr_marks(ax, sets, colors):
     """Panel a's financial cell: an open circle at each other campaign's
-    highest-IRR trial (best_irr_points) and, when a relay is plotted, a callout
-    on its seed trial (drawn as an extra circle if it is not already one)."""
-    marks = best_irr_points(sets)
-    for s, x, y in marks:
+    highest-IRR trial (best_irr_points)."""
+    for s, x, y in best_irr_points(sets):
         ax.scatter([x], [y], s=BEST_MARK_SIZE, facecolors='white',
                    edgecolors=colors[id(s)], linewidths=BEST_MARK_LW, zorder=5)
-    if seed_ref is None:
-        return
-    stem, trial = seed_ref
-    donor = _donor_set_map(sets).get(stem)
-    if donor is None or donor.get('scatter') is None:
-        return
-    hit = np.flatnonzero(donor['scatter_x'] == trial)
-    if not len(hit):
-        return
-    y = float(donor['scatter']['IRR'][hit[0]])
-    if not np.isfinite(y) or y < lo:
-        return
-    if not any(m[0] is donor and m[1] == trial for m in marks):
-        ax.scatter([trial], [y], s=BEST_MARK_SIZE, facecolors='white',
-                   edgecolors=colors[id(donor)], linewidths=BEST_MARK_LW,
-                   zorder=5)
-    ax.annotate('Seeds the relay campaign (C)', xy=(trial, y),
-                xytext=(trial + 0.08 * xmax, y + 0.12 * (cap - lo)),
-                fontsize=FONTS['callout'], color='0.25', ha='left',
-                va='center', zorder=6,
-                arrowprops=dict(arrowstyle='-|>', color='0.25', lw=0.8,
-                                shrinkA=2, shrinkB=5, mutation_scale=8))
 
 
 def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9,
-                 donor_sets=None, mark_best=False, seed_ref=None):
+                 donor_sets=None, mark_best=False):
     """One outcome metric as incumbent trajectories over trial_number: one
     step line per campaign set (the metric at that set's running incumbent,
     in its panel-b/c color), the scenario-A baseline as a dashed reference.
@@ -1492,8 +1455,7 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9,
     donor_sets (panel c): the plotted campaigns, so a relay's preloaded rows
     are drawn in its owned cell in their donor's colour (_draw_relay_preload);
     None keeps them hidden. mark_best (panel a): on the IRR cell, mark every
-    other campaign's highest-IRR trial and call out the relay seed `seed_ref`
-    ((donor study name, donor trial) or None).
+    other campaign's highest-IRR trial.
     """
     lo, hi = ylim
 
@@ -1562,10 +1524,9 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9,
                 ls='-' if own else (0, (1.5, 1.2)),
                 zorder=2 if own else 3)
     for s, sy_pre in preload_cells:
-        _draw_relay_preload(ax, s, colors, donor_sets, sy_pre, lo, cap,
-                            point_size)
+        _draw_relay_preload(ax, s, colors, donor_sets, sy_pre, point_size)
     if mark_best and col == 'IRR':
-        _draw_best_irr_marks(ax, sets, colors, xmax, lo, cap, seed_ref)
+        _draw_best_irr_marks(ax, sets, colors)
     # metric name next to the value axis itself (not a title above the cell)
     ax.set_ylabel(_bold_axis_title(title), fontsize=FONTS['cell'], labelpad=3)
     ax.set_xlabel(_bold_axis_title('Trial'), fontsize=FONTS['tick'], labelpad=2)
@@ -1595,8 +1556,8 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9,
 
 
 def draw_outcomes(fig, gs_cell, sets, colors, donor_sets=None,
-                  mark_best=False, seed_ref=None):
-    # donor_sets / mark_best / seed_ref reach only the IRR cell (outcome_cell)
+                  mark_best=False):
+    # donor_sets / mark_best reach only the IRR cell (outcome_cell)
     xmax = 1.0
     for s in sets:
         tx = s.get('traj_x')
@@ -1611,8 +1572,7 @@ def draw_outcomes(fig, gs_cell, sets, colors, donor_sets=None,
     big, rest = OUTCOMES[0], OUTCOMES[1:]
     ax_big = fig.add_subplot(sub_gs[0:3, 0:2])
     outcome_cell(ax_big, sets, colors, big[0], big[1], big[2], xmax,
-                 donor_sets=donor_sets, mark_best=mark_best,
-                 seed_ref=seed_ref)
+                 donor_sets=donor_sets, mark_best=mark_best)
     axes.append(ax_big)
     big_w = ax_big.get_position().width
     for (col, label, yl), (r, c) in zip(rest,
@@ -2023,8 +1983,7 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
     if params_only:
         return _plot_parameters_only(sets, band, out_stem, dpi)
     # panel a's IRR cell marks the other campaigns' highest-IRR trials (a
-    # fourth mark-key entry when any exist) and, in the two-panel layout, calls
-    # out the relay's seed
+    # fourth mark-key entry when any exist)
     relay_sets = [s for s in sets if s.get('is_relay')]
     has_best_marks = bool(best_irr_points(sets))
     if include_parameters:
@@ -2054,9 +2013,6 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
         c_gs = fig.add_gridspec(1, 1, left=0.32, right=RIGHT,
                                 top=0.3309, bottom=0.1235)
         colors = set_colors(sets)
-        # no seed callout here: this layout has no relay panel (a relay is
-        # drawn in panel a itself, its cloud over the callout's spot, and
-        # panel c is the proteome panel)
         a_axes = draw_outcomes(fig, a_gs[0], sets, colors, mark_best=True)
         b_axes = draw_parameters(fig, [band_gs[0], band_gs[1], band_gs[2],
                                        band_gs[3]], sets, colors, band)
@@ -2143,9 +2099,7 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
                                 bottom=fy(0.1475 - extra))
         colors = set_colors(sets)
         k = H0 / H                     # H0-canvas fraction -> this canvas
-        a_axes = draw_outcomes(
-            fig, a_gs[0], a_sets, colors, mark_best=True,
-            seed_ref=relay_seed(relay_sets[0]) if relay_sets else None)
+        a_axes = draw_outcomes(fig, a_gs[0], a_sets, colors, mark_best=True)
         # proteome rows: the regular sets in order, the relay campaign(s) last
         # (bottom row), next to its own panel c
         axc = draw_burden(fig, c_gs[0], a_sets + relay_sets, colors,
