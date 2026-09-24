@@ -1422,18 +1422,26 @@ def relay_preload_layout(s, donor_sets, colors):
 def _draw_relay_preload(ax, s, colors, donor_sets, sy_pre, point_size):
     """Panel c's preload zone (x 0..N-1) of a relay's owned cell: the
     preloaded donor rows as a trial cloud in their donor's colour (shuffled,
-    relay_preload_layout), and the seed -- the best preloaded row, which is
-    the relay's incumbent when its first simulated trial starts -- as an open
-    circle."""
+    relay_preload_layout), and as open circles (panel a's highest-IRR mark)
+    the seed -- the best preloaded row, which is the relay's incumbent when
+    its first simulated trial starts -- plus every plotted process-level
+    campaign's highest-IRR trial that was preloaded (best_irr_points)."""
     px, pcols = relay_preload_layout(s, donor_sets, colors)
     ax.scatter(px, sy_pre, s=point_size, c=pcols, alpha=0.35, linewidths=0,
                zorder=1)
-    i = s.get('preload_seed')
-    if i is None:
-        return
-    xs, ys = float(px[i]), float(sy_pre[i])
-    ax.scatter([xs], [ys], s=BEST_MARK_SIZE, facecolors='white',
-               edgecolors=pcols[i], linewidths=BEST_MARK_LW, zorder=5)
+    row_of = {(d, int(t)): k for k, (d, t) in enumerate(
+        zip(s['preload_donor'], s['preload_donor_trial']))}
+    marked = set()
+    for d, x, _y in best_irr_points(donor_sets):
+        k = row_of.get((_campaign_stem(d['campaign']), int(x)))
+        if k is not None:
+            marked.add(k)
+    if s.get('preload_seed') is not None:
+        marked.add(s['preload_seed'])
+    for k in sorted(marked):
+        ax.scatter([float(px[k])], [float(sy_pre[k])], s=BEST_MARK_SIZE,
+                   facecolors='white', edgecolors=pcols[k],
+                   linewidths=BEST_MARK_LW, zorder=5)
 
 
 def _draw_best_irr_marks(ax, sets, colors):
