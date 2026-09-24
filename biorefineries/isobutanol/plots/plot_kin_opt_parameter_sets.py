@@ -417,7 +417,7 @@ PRELOAD_FALLBACK_COLOR = '0.55'
 # ... in a fixed-seed shuffled order (relay_preload_layout)
 PRELOAD_SHUFFLE_SEED = 0
 # ... over a light-gray backdrop spanning the preload zone (trials 0..N)
-PRELOAD_ZONE_COLOR = '0.93'
+PRELOAD_ZONE_COLOR = '0.96'
 
 FONTS = {'band': 12, 'cell': 10, 'tick': 9, 'callout': 9,
          'legend': 10, 'axis': 11, 'panel': 14}
