@@ -1291,23 +1291,6 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9):
     ax.set_xlim(0, xmax * 1.02)
     if base is not None and np.isfinite(base):
         ax.axhline(base, color=BASELINE_COLOR, lw=1.4, ls=(0, (1.5, 1.2)), zorder=1)
-    # a relay campaign's preloaded donor rows (trials 0..N-1) are followed by
-    # its simulated trials: a thin vertical rule in the relay colour at N marks
-    # the hand-over, labelled once in the big financial cell
-    for s in sets:
-        n_pre = s.get('n_preloaded') if s.get('is_relay') else 0
-        if not n_pre:
-            continue
-        ax.axvline(n_pre, color=colors[id(s)], lw=0.9, ls=(0, (4, 2)),
-                   alpha=0.8, zorder=1)
-        if col == 'IRR':
-            y_txt = lo + 0.985 * (cap - lo)
-            ax.text(n_pre - 0.008 * xmax, y_txt, 'relay: preloaded',
-                    ha='right', va='top', fontsize=FONTS['callout'],
-                    color=colors[id(s)])
-            ax.text(n_pre + 0.008 * xmax, y_txt, 'simulated',
-                    ha='left', va='top', fontsize=FONTS['callout'],
-                    color=colors[id(s)])
     # individual trial cloud from the ONE campaign that optimized THIS metric:
     # every trial as a translucent dot in the campaign's own color, behind the
     # incumbent lines (zorder 1). Failed / unsolved trials (no finite value)
@@ -1319,7 +1302,7 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9):
         # a relay's preloaded donor rows (x < N) are not search progress --
         # their order is the relay's selection order (keep set sorted by value,
         # then a space-filling fill) -- so they are NOT drawn; the preload zone
-        # keeps only its x extent and the divider rule at N
+        # keeps only its x extent (empty for the relay)
         pre = sx < (s.get('n_preloaded') or 0) if s.get('is_relay') \
             else np.zeros(len(sx), dtype=bool)
         ax.scatter(sx[~pre], sy[~pre], s=point_size, color=cc, alpha=0.35,
