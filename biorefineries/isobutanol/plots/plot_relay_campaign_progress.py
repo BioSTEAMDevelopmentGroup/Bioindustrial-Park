@@ -39,11 +39,12 @@ Outputs (in --out-dir, default analyses/results):
   <study>_relay_summary.txt
       thresholds table (first simulated trial whose best-so-far PI reaches
       0.3 / 0.5 / 0.65 / 0.7 / 0.75 / 0.8 / reference best / reference best +
-      0.01, for relay vs reference vs IBO-yield donor), the final best PI /
-      IRR / trial and its decision vector with [low, high] bounds, its
-      unit-cube distance to the nearest preloaded (manifest) row and to the
-      nearest reference-campaign row, the donor panel (sunk cost), state
-      counts and the check-in tables (top 5 by PI / IBO titer / EtOH titer).
+      reproducibility margin (0.01), for relay vs reference vs IBO-yield
+      donor), the final best PI / IRR / trial and its decision vector with
+      [low, high] bounds, its unit-cube distance to the nearest preloaded
+      (manifest) row and to the nearest reference-campaign row, the donor
+      panel (sunk cost), state counts and the check-in tables (top 5 by PI /
+      IBO titer / EtOH titer).
 
 Sim-safe: plain CSV reads (pandas) + a sqlite3 read of a temporary COPY of the
 optuna store for the decision-variable bounds (the live store is never
@@ -122,16 +123,18 @@ MANIFEST_SUFFIX = '_relay_manifest.csv'
 MANIFEST_LEAD_COLUMNS = ('relay_trial_number', 'donor', 'donor_objective')
 
 # Fixed best-so-far PI thresholds (spec section 3.5); the reference campaign's
-# best (read from its CSV) and best + REF_BEST_MARGIN are appended. "Reaches"
-# = best-so-far >= t, so the reference's own best row reports the trial that
-# set it (a strict ">" would never fire there).
+# best (read from its CSV) and best + REF_BEST_MARGIN (the reproducibility
+# margin, rounded) are appended. "Reaches" = best-so-far >= t, so the
+# reference's own best row reports the trial that set it (a strict ">" would
+# never fire there).
 PI_THRESHOLDS = (0.3, 0.5, 0.65, 0.7, 0.75, 0.8)
 REF_BEST_MARGIN = 0.01
 # used only when the reference CSV is missing (2026-09-16 campaign, #1602)
 REFERENCE_BEST_PI_FALLBACK = 0.808761
-# cross-process |dPI| at the same decision vector (load-path noise, spec
-# section 1: up to 0.0105) -- the ceiling verdict must exceed it
-SAME_X_NOISE_PI = 0.0105
+# reproducibility margin: cross-process |dPI| at the same decision vector
+# (load-path drift, spec section 1: up to 0.0105; the objective itself is
+# deterministic) -- the ceiling verdict must exceed it
+REPRODUCIBILITY_MARGIN_PI = 0.0105
 # scenario-A PI at the 15 % hurdle (the Sobol' design records' baseline_PI)
 PI_A = -0.1383
 # a relay best within this max-norm unit-cube distance of a preloaded row is
@@ -707,10 +710,11 @@ def build_summary(*, study, relay, relay_path, manifest, manifest_path,
     # --- thresholds
     L.append('-- thresholds: first simulated trial whose best-so-far PI '
              'reaches t, as "index (#trial_number)"')
-    L.append(f'   {"t":>24s} {"relay":>14s} {"reference":>14s} '
+    w = max([24] + [len(tag) for _, tag in thresholds])
+    L.append(f'   {"t":>{w}s} {"relay":>14s} {"reference":>14s} '
              f'{short_label(study_stem(donor_cmp_path)) + " donor":>18s}')
     for t, tag in thresholds:
-        L.append(f'   {tag:>24s} {_fmt_hit(first_reaching(relay, t)):>14s} '
+        L.append(f'   {tag:>{w}s} {_fmt_hit(first_reaching(relay, t)):>14s} '
                  f'{_fmt_hit(first_reaching(reference, t)):>14s} '
                  f'{_fmt_hit(first_reaching(donor_cmp, t)):>18s}')
     if len(relay):
@@ -746,16 +750,16 @@ def build_summary(*, study, relay, relay_path, manifest, manifest_path,
                  f'{b["IBO yield"]:.4g}, EtOH yield {b["EtOH yield"]:.4g}, '
                  f'tau {b.tau:.4g} h, spikes {b.n_glu_spikes:.0f}')
         d_ref = b.PI - ref_best
-        verdict = ('ABOVE the reference beyond the same-x noise'
-                   if d_ref > SAME_X_NOISE_PI else
-                   'BELOW the reference beyond the same-x noise'
-                   if d_ref < -SAME_X_NOISE_PI else
-                   'WITHIN the same-x noise of the reference')
+        verdict = ('ABOVE the reference beyond the reproducibility margin'
+                   if d_ref > REPRODUCIBILITY_MARGIN_PI else
+                   'BELOW the reference beyond the reproducibility margin'
+                   if d_ref < -REPRODUCIBILITY_MARGIN_PI else
+                   'WITHIN the reproducibility margin of the reference')
         ref_tag = (f' (#{int(ref_best_row.trial_number)})'
                    if ref_best_row is not None else '')
         L.append(f'   vs reference best {ref_best:.4f}{ref_tag}: dPI '
-                 f'{d_ref:+.4f} -> {verdict} (|dPI| noise up to '
-                 f'{SAME_X_NOISE_PI})')
+                 f'{d_ref:+.4f} -> {verdict} (reproducibility margin '
+                 f'{REPRODUCIBILITY_MARGIN_PI})')
         if pre_best is not None:
             L.append(f'   vs preloaded best {pre_best:.4f}: dPI '
                      f'{b.PI - pre_best:+.4f}')
@@ -939,7 +943,8 @@ def main(argv=None):
     thresholds = [(t, f'{t:g}') for t in PI_THRESHOLDS]
     thresholds.append((ref_best, f'{ref_best:.4f} (ref best)'))
     thresholds.append((ref_best + REF_BEST_MARGIN,
-                       f'{ref_best + REF_BEST_MARGIN:.4f} (ref best+0.01)'))
+                       f'{ref_best + REF_BEST_MARGIN:.4f} '
+                       '(ref best + reproducibility margin)'))
 
     lines, pre_best = build_summary(
         study=study, relay=relay, relay_path=relay_path, manifest=manifest,
