@@ -1977,14 +1977,26 @@ def draw_burden(fig, gs_cell, sets, colors, offset_scale=1.0):
     return axR
 
 
+# the six titer / yield / productivity objectives, grouped in the campaign
+# legends under PROCESS_LEVEL_HEADER (the financial objective and the baseline
+# stay outside the group)
+PROCESS_LEVEL_LABELS = ('Isobutanol yield', 'Isobutanol titer',
+                        'Isobutanol productivity', 'Ethanol yield',
+                        'Ethanol titer', 'Ethanol productivity')
+PROCESS_LEVEL_HEADER = 'Process-level objectives'
+
+
 def _legend_order(sets):
-    # reorder the campaign swatches into a 2-row x 4-col grid that mirrors panel
-    # a -- row 1 the isobutanol metrics, row 2 the ethanol metrics, columns
-    # yield -> titer -> productivity, baseline + financial leading column 1.
-    # fig.legend fills column-major, so the two rows are interleaved into the
-    # returned handle order. A relay overlay set (DEFAULT_RELAY_LABEL) takes a
-    # third row in column 1, under the financial campaign (with ncol=4 and nine
-    # handles matplotlib gives column 1 three entries and the others two).
+    # reorder the campaign swatches into a grid that mirrors panel a -- a header
+    # row (PROCESS_LEVEL_HEADER over columns 2-4), then row 1 the isobutanol
+    # metrics, row 2 the ethanol metrics, columns yield -> titer ->
+    # productivity, baseline + financial leading column 1. fig.legend fills
+    # column-major, so the rows are interleaved into the returned handle order;
+    # None = an empty header-row slot (_campaign_legend_handles). Column 1's
+    # slot is its header-row cell, so baseline + financial line up with the
+    # two product rows; a relay overlay set (DEFAULT_RELAY_LABEL) takes it
+    # instead and column 1 reads baseline / financial / relay from the top
+    # (with ncol=4 every column then has three entries).
     # Returns the natural set order unchanged unless the eight expected labels
     # (plus, optionally, the relay label) are exactly present.
     row1 = ('Baseline (no optimization)', 'Isobutanol yield',
@@ -1995,13 +2007,58 @@ def _legend_order(sets):
     has_relay = DEFAULT_RELAY_LABEL in by_label
     expected = set(row1 + row2) | ({DEFAULT_RELAY_LABEL} if has_relay else set())
     if len(by_label) == len(sets) and set(by_label) == expected:
-        ordered = []
-        for i, (top, bot) in enumerate(zip(row1, row2)):
-            ordered += [by_label[top], by_label[bot]]
-            if i == 0 and has_relay:
-                ordered.append(by_label[DEFAULT_RELAY_LABEL])
+        first = [by_label[row1[0]], by_label[row2[0]]]
+        ordered = (first + [by_label[DEFAULT_RELAY_LABEL]] if has_relay
+                   else [None] + first)
+        for top, bot in zip(row1[1:], row2[1:]):
+            ordered += [None, by_label[top], by_label[bot]]
         return ordered
     return sets
+
+
+def _campaign_legend_handles(legend_sets, colors):
+    """Colour swatches for the campaign legend; a None entry (_legend_order's
+    header-row slot) becomes an invisible, unlabelled spacer."""
+    return [plt.Rectangle((0, 0), 1, 1, fc='none', ec='none', label=' ')
+            if s is None else
+            plt.Rectangle((0, 0), 1, 1, fc=colors[id(s)], label=s['label'])
+            for s in legend_sets]
+
+
+def _draw_process_level_header(fig, leg, legend_sets):
+    """Over a grid campaign legend (_legend_order with its header row), write
+    PROCESS_LEVEL_HEADER in the header row, centred over the process-level
+    columns, with a thin rule under it spanning them. No-op for a legend
+    without header slots."""
+    proc = [i for i, s in enumerate(legend_sets)
+            if isinstance(s, dict) and s['label'] in PROCESS_LEVEL_LABELS]
+    slots = [i for i, s in enumerate(legend_sets) if s is None]
+    if not proc or not slots:
+        return
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    inv = fig.transFigure.inverted()
+    def ext(artist):
+        return artist.get_window_extent(renderer).transformed(inv)
+
+    hs = leg.legend_handles
+    texts = leg.get_texts()
+    x0 = min(ext(hs[i]).x0 for i in proc)
+    x1 = max(ext(texts[i]).x1 for i in proc)
+    # the row pitch from the process-level labels' centres (the invisible
+    # header slots have no reliable extent); the header row sits one pitch
+    # above the first process-level row, the rule midway between the two
+    ys = sorted({round((ext(texts[i]).y0 + ext(texts[i]).y1) / 2, 6)
+                 for i in proc}, reverse=True)
+    pitch = ys[0] - ys[1] if len(ys) > 1 else 1.5 * ext(texts[proc[0]]).height
+    y_rule = ys[0] + 0.5 * pitch
+    fig.text((x0 + x1) / 2, ys[0] + pitch,
+             PROCESS_LEVEL_HEADER, ha='center', va='center',
+             fontsize=FONTS['legend'] + 1, fontstyle='italic',
+             zorder=leg.get_zorder() + 1)
+    fig.add_artist(plt.Line2D([x0, x1], [y_rule, y_rule],
+                              transform=fig.transFigure, color='0.35',
+                              lw=0.8, zorder=leg.get_zorder() + 1))
 
 
 def plot(sets, band, out_stem, dpi=300, include_parameters=False,
@@ -2101,6 +2158,15 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
         # each position's distance from the TOP edge in inches.
         a_sets = [s for s in sets if not s.get('is_relay')]
         key_relay = relay_sets if relay_view else []
+        # arrange the swatches into a product-grouped grid that mirrors panel a:
+        # a header row naming the process-level objectives, row 1 the
+        # isobutanol metrics, row 2 the ethanol metrics, columns reading yield
+        # -> titer -> productivity, with the baseline and the financial
+        # campaign leading column 1. fig.legend fills column-major, so the rows
+        # are interleaved into the handle order; falls back to the natural set
+        # order whenever the expected labels aren't all present.
+        # (the relay campaign(s) get their own full-width line below the grid)
+        legend_sets = _legend_order(a_sets)
         H0 = 9.856
         # the framed key in the a -> b gap = the campaign grid (<= 4 columns),
         # one full-width line per relay campaign (its long "seeded with ..."
@@ -2110,7 +2176,7 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
         # top stays put, the mark key and panel b move down by `extra`. The
         # campaign-legend rows spill into the spare canvas below panel b's
         # x-axis title (as before); the extra mark-key row grows the canvas.
-        n_grid_rows = -(-len(a_sets) // min(len(a_sets), 4))
+        n_grid_rows = -(-len(legend_sets) // min(len(a_sets), 4))
         extra_grid = LEGEND_ROW_H * max(0, n_grid_rows - 2)
         extra_leg = LEGEND_ROW_H * max(0, n_grid_rows + len(key_relay) - 2)
         extra_style = LEGEND_ROW_H if has_best_marks else 0.0
@@ -2165,14 +2231,6 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
         # columns -- two rows under the title.
         legend_loc = 'center'
         legend_ncol = min(len(a_sets), 4)
-        # arrange the swatches into a product-grouped grid that mirrors panel a:
-        # row 1 the isobutanol metrics, row 2 the ethanol metrics, columns reading
-        # yield -> titer -> productivity, with the baseline and the financial
-        # campaign leading column 1. fig.legend fills column-major, so the two
-        # rows are interleaved into the handle order; falls back to the natural
-        # set order whenever the expected labels aren't all present.
-        # (the relay campaign(s) get their own full-width line below the grid)
-        legend_sets = _legend_order(a_sets)
         # the campaign swatches sit a little high in the panel-a -> b gap so the
         # mark key can share the same framed box just below them
         legend_anchor = (0.527, fy(0.5394 - extra_grid / 2))   # top fixed
@@ -2188,8 +2246,7 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
     # column-major): trials | own incumbent over best-IRR trial | other
     # incumbent; without it the original single row of three
     style_handles = _style_handles(has_best_marks)
-    handles = [plt.Rectangle((0, 0), 1, 1, fc=colors[id(s)], label=s['label'])
-               for s in legend_sets]
+    handles = _campaign_legend_handles(legend_sets, colors)
     # three-panel: the mark key is a standalone strip under panel a and the
     # campaign legend is its own framed box in panel b's empty columns.
     # two-panel: both keys share ONE framed box in the panel-a -> b gap -- the
@@ -2210,6 +2267,7 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
                      borderpad=0.6, edgecolor='0.6', fancybox=False)
     leg.get_title().set_fontweight('bold')
     leg.get_title().set_fontsize(FONTS['legend'] + 2)
+    _draw_process_level_header(fig, leg, legend_sets)
     if not include_parameters:
         fig.canvas.draw()
         renderer = fig.canvas.get_renderer()
@@ -2336,8 +2394,8 @@ def _plot_parameters_only(sets, band, out_stem, dpi):
              fontsize=FONTS['panel'] - 1, fontweight='bold', va='baseline')
     # campaign colour legend below the bands (product-grouped like the two-panel
     # figure); no marks key, since the bands are bars
-    handles = [plt.Rectangle((0, 0), 1, 1, fc=colors[id(s)], label=s['label'])
-               for s in _legend_order(sets)]
+    legend_sets = _legend_order(sets)
+    handles = _campaign_legend_handles(legend_sets, colors)
     leg = fig.legend(handles=handles, loc='center', bbox_to_anchor=(0.5, 0.115),
                      ncol=min(len(sets), 4), frameon=True,
                      fontsize=FONTS['legend'] + 1, title='Optimization campaign',
@@ -2346,6 +2404,7 @@ def _plot_parameters_only(sets, band, out_stem, dpi):
                      borderpad=0.6, edgecolor='0.6', fancybox=False)
     leg.get_title().set_fontweight('bold')
     leg.get_title().set_fontsize(FONTS['legend'] + 2)
+    _draw_process_level_header(fig, leg, legend_sets)
     for ext in ('png', 'pdf'):
         fig.savefig(f'{out_stem}.{ext}', dpi=dpi)
     plt.close(fig)
