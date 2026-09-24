@@ -49,18 +49,23 @@ while a campaign is in flight. Run:
         --set "Best ethanol titer" <campaign> "best:EtOH titer" \
         --set "Best isobutanol titer" <campaign> "best:IBO titer"
 
-With no --set arguments it plots the "best" trial of the most recent
-metabolic_split_12d campaign (>= 2000 trials) for each of seven objectives --
-PI (log-tail, drawn on the IRR axis) / isobutanol yield / titer / productivity
-/ ethanol yield / titer / productivity -- against the baseline (see
-default_split_12d_specs). The most recent PI (log-tail) RELAY campaign (a
-fresh GP study preloaded with donor rows; `_rl<sha1-8>` name tag; see
-default_relay_spec) is overlaid as one extra set (--no-relay drops it): it adds
-lines / a trial cloud inside the existing panel-a cells (no new cell) and one
-more row in the lower panels. Its panel-a trials are the preloaded donor rows
-(from <study>_relay_manifest.csv, at their store trial numbers 0..N-1) followed
-by its simulated trials (N..), one continuous incumbent over both. Writes
-<stem>_<stamp>.png and .pdf to --out-dir.
+With no --set arguments it plots the "best" trial of each of the PINNED
+default campaigns (DEFAULT_CAMPAIGNS: the seven 2026-09-23 seed-350
+metabolic_split_12d campaigns, `_rs350`, one per objective -- PI (log-tail,
+drawn on the IRR axis) / isobutanol yield / titer / productivity / ethanol
+yield / titer / productivity) against the baseline, plus the pinned PI
+(log-tail) RELAY campaign DEFAULT_RELAY_CAMPAIGN (`_rl15c111dc`, a fresh GP
+study preloaded with rows of the six process-level rs350 campaigns;
+--no-relay drops it). --latest instead picks, per objective, the most recent
+metabolic_split_12d campaign with >= 2000 trials and the most recent relay
+(default_split_12d_specs / default_relay_spec). Layout (two-panel default):
+  A  outcome trajectories of the seven regular campaigns;
+  B  proteome allocation, one row per set, the relay campaign last;
+  C  (only with a relay) panel A's grid for the relay campaign alone, on
+     panel A's value axes. Its preloaded donor rows are not drawn: they hold
+     trial numbers 0..N-1, so its trials and incumbent start at N (from the
+     best preloaded value).
+Writes <stem>_<stamp>.png and .pdf to --out-dir.
 """
 import os
 import re
@@ -99,7 +104,27 @@ DEFAULT_OBJECTIVES = [
     ('Ethanol titer', 'EtOH titer'),
     ('Ethanol productivity', 'EtOH productivity'),
 ]
-# the relay overlay (default path): the most recent metabolic_split_12d relay
+# the pinned no-argument defaults (the 2026-09-24 publication figure): one
+# campaign per DEFAULT_OBJECTIVES entry -- the seven seed-350 split_12d GP
+# campaigns launched 2026-09-23 (2000 trials each) -- and the PI (log-tail)
+# relay campaign preloaded from the six process-level ones (1000 preloaded +
+# 1000 simulated). --latest restores the most-recent-per-objective pick.
+_RS350 = ('kin_opt_ethanol_isobutanol_metabolic_split_12d_{}_gp'
+          '_rb0.001-4_ib0.75-1.5_aA_rs350_burden')
+DEFAULT_CAMPAIGNS = {
+    'PI (log-tail)': _RS350.format('pi_log-tail'),
+    'IBO yield': _RS350.format('ibo_yield'),
+    'IBO titer': _RS350.format('ibo_titer'),
+    'IBO productivity': _RS350.format('ibo_productivity'),
+    'EtOH yield': _RS350.format('etoh_yield'),
+    'EtOH titer': _RS350.format('etoh_titer'),
+    'EtOH productivity': _RS350.format('etoh_productivity'),
+}
+DEFAULT_RELAY_CAMPAIGN = ('kin_opt_ethanol_isobutanol_metabolic_split_12d'
+                          '_pi_log-tail_gp_rb0.001-4_ib0.75-1.5_aA'
+                          '_rl15c111dc_burden')
+
+# the relay overlay (--latest path): the most recent metabolic_split_12d relay
 # campaign on this objective with at least DEFAULT_RELAY_MIN_TRIALS simulated
 # trials, drawn right after the financial set under this label. A relay study
 # carries the '_rl<sha1-8>' tag (ko.relay_study_tag); relay studies are never
@@ -2167,6 +2192,36 @@ def default_relay_spec(objective=DEFAULT_RELAY_OBJECTIVE,
     return (label, cands[-1][2], 'best')
 
 
+def pinned_split_12d_specs(objectives=DEFAULT_OBJECTIVES,
+                           results_dir=RESULTS_DIR):
+    """(label, study_name, 'best') per (label, objective) from the pinned
+    DEFAULT_CAMPAIGNS; raises if an objective has no pinned campaign or its
+    trajectory CSV is missing (use --latest or --set then)."""
+    specs = []
+    for label, objective in objectives:
+        if objective not in DEFAULT_CAMPAIGNS:
+            raise KeyError(f'no pinned default campaign for objective '
+                           f'{objective!r} (DEFAULT_CAMPAIGNS)')
+        study = DEFAULT_CAMPAIGNS[objective]
+        _require_trajectory(study, results_dir)
+        specs.append((label, study, 'best'))
+    return specs
+
+
+def pinned_relay_spec(label=DEFAULT_RELAY_LABEL, results_dir=RESULTS_DIR):
+    """(label, DEFAULT_RELAY_CAMPAIGN, 'best'); raises if its CSV is missing."""
+    _require_trajectory(DEFAULT_RELAY_CAMPAIGN, results_dir)
+    return (label, DEFAULT_RELAY_CAMPAIGN, 'best')
+
+
+def _require_trajectory(study, results_dir):
+    path = os.path.join(results_dir, f'{study}_trajectory.csv')
+    if not os.path.isfile(path):
+        raise FileNotFoundError(
+            f'pinned default campaign not found: {path} (pass --latest to pick '
+            'the most recent campaigns, or --set)')
+
+
 def _insert_relay(specs, relay):
     """Place the relay spec right after the financial campaign (the set whose
     objective owns the IRR cell), else at the end."""
@@ -2201,10 +2256,16 @@ def main(argv=None):
                          'campaigns only); overrides --panel-b / --params-only')
     ap.add_argument('--relay', action=argparse.BooleanOptionalAction,
                     default=True,
-                    help='default (no --set) path only: overlay the most '
-                         'recent PI (log-tail) relay campaign as one extra set '
-                         '(on by default; --no-relay drops it). With --set, a '
-                         'relay campaign is recognised by its _rl tag.')
+                    help='default (no --set) path only: add the PI (log-tail) '
+                         'relay campaign (pinned, or the most recent with '
+                         '--latest) as its own panel C (on by default; '
+                         '--no-relay drops it). With --set, a relay campaign '
+                         'is recognised by its _rl tag.')
+    ap.add_argument('--latest', action='store_true',
+                    help='no --set: instead of the pinned DEFAULT_CAMPAIGNS / '
+                         'DEFAULT_RELAY_CAMPAIGN, pick the most recent '
+                         'metabolic_split_12d campaign per objective (>= 2000 '
+                         'trials) and the most recent relay campaign')
     ap.add_argument('--out-dir', default=RESULTS_DIR)
     ap.add_argument('--stem', default=None)
     ap.add_argument('--dpi', type=int, default=300)
@@ -2218,14 +2279,17 @@ def main(argv=None):
     if args.sets:
         specs = [(lab, camp, norm_trial(tr)) for lab, camp, tr in args.sets]
     elif args.pathway:  # the lever map's three-objective story set
-        specs = default_split_12d_specs(objectives=PATHWAY_OBJECTIVES)
-    else:  # default: each optimum from the study that optimized it -- the most
-        # recent metabolic_split_12d campaign per objective with >= 2000 trials
-        # (financial / IBO yield / titer / productivity / EtOH yield / titer /
-        # productivity), each drawn as its own "best" trial
-        specs = default_split_12d_specs()
+        specs = (default_split_12d_specs if args.latest
+                 else pinned_split_12d_specs)(objectives=PATHWAY_OBJECTIVES)
+    else:  # default: each optimum from the study that optimized it -- the
+        # pinned DEFAULT_CAMPAIGNS (or, with --latest, the most recent
+        # metabolic_split_12d campaign per objective with >= 2000 trials),
+        # each drawn as its own "best" trial
+        specs = default_split_12d_specs() if args.latest \
+            else pinned_split_12d_specs()
         if args.relay:
-            relay = default_relay_spec()
+            relay = default_relay_spec() if args.latest \
+                else pinned_relay_spec()
             if relay is None:
                 print('  NOTE no metabolic_split_12d PI (log-tail) relay '
                       f'campaign with >= {DEFAULT_RELAY_MIN_TRIALS} trials; '
