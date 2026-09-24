@@ -416,6 +416,8 @@ BEST_MARK_LW = 1.4
 PRELOAD_FALLBACK_COLOR = '0.55'
 # ... in a fixed-seed shuffled order (relay_preload_layout)
 PRELOAD_SHUFFLE_SEED = 0
+# ... over a light-gray backdrop spanning the preload zone (trials 0..N)
+PRELOAD_ZONE_COLOR = '0.93'
 
 FONTS = {'band': 12, 'cell': 10, 'tick': 9, 'callout': 9,
          'legend': 10, 'axis': 11, 'panel': 14}
@@ -1536,6 +1538,10 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9,
                 ls='-' if own else (0, (1.5, 1.2)),
                 zorder=2 if own else 3)
     for s, sy_pre in preload_cells:
+        # light-gray backdrop over the preload zone (trials 0..N): these rows
+        # were preloaded from the donors, not searched by the relay itself
+        ax.axvspan(0, s['n_preloaded'], color=PRELOAD_ZONE_COLOR, lw=0,
+                   zorder=0)
         _draw_relay_preload(ax, s, colors, donor_sets, sy_pre, point_size,
                             mark=(col == 'IRR'))
     if mark_best and col == 'IRR':
