@@ -60,7 +60,7 @@ study preloaded with rows of the six process-level rs350 campaigns;
 metabolic_split_12d campaign with >= 2000 trials and the most recent relay
 (default_split_12d_specs / default_relay_spec). Layout (two-panel default):
   A  outcome trajectories of the seven regular campaigns; the IRR cell also
-     marks each process-level campaign's highest-IRR trial (open circle);
+     marks each campaign's highest-IRR trial (open circle);
   B  proteome allocation, one row per set, the relay campaign last;
   C  (only with a relay) panel A's grid for the relay campaign alone, on
      panel A's value axes. Its IRR cell's preload zone (trials 0..N-1) shows
@@ -403,11 +403,11 @@ LEGEND_ROW_H = 0.0245
 # proteome panel's bottom spine (room for its x-axis title and c's title).
 RELAY_PANEL_IN = 3.55
 RELAY_GAP_IN = 1.05
-# panel a's financial cell marks every OTHER campaign's highest-IRR trial with
-# an open circle in that campaign's colour: only the financial campaign's trial
+# panel a's financial cell marks every campaign's highest-IRR trial with an
+# open circle in that campaign's colour: only the financial campaign's trial
 # cloud is drawn there, and a process-level campaign's incumbent line follows
-# its own metric, so those trials would otherwise never reach the cell. The
-# relay's seed (its best preloaded trial) is one of those donor trials; the
+# its own metric, so those trials would otherwise never reach the cell (the
+# financial campaign's is marked too, for comparison). The relay's seed (its best preloaded trial) is one of those donor trials; the
 # same open circle marks it in panel c, tying the two panels together.
 BEST_MARK_SIZE = 42
 BEST_MARK_LW = 1.4
@@ -1341,13 +1341,12 @@ def bar_cell(ax, sets, colors, var, kind, ylabel, subtitle=None, ylim=None,
 
 def best_irr_points(sets):
     """[(set, trial_number, IRR)] of the highest finite-IRR trial of every
-    regular campaign that does NOT own the IRR cell (its trials are not in the
-    cell's cloud). Baseline and relay sets are skipped."""
+    regular campaign, the financial one (which owns the IRR cell) included.
+    Baseline and relay sets are skipped."""
     pts = []
     for s in sets:
         if (s.get('is_baseline') or s.get('is_relay')
-                or s.get('scatter') is None
-                or _owns_outcome(s.get('objective'), 'IRR')):
+                or s.get('scatter') is None):
             continue
         y = np.asarray(s['scatter']['IRR'], dtype=float)
         fin = np.flatnonzero(np.isfinite(y))
@@ -1445,7 +1444,7 @@ def _draw_relay_preload(ax, s, colors, donor_sets, sy_pre, point_size):
 
 
 def _draw_best_irr_marks(ax, sets, colors):
-    """Panel a's financial cell: an open circle at each other campaign's
+    """Panel a's financial cell: an open circle at each campaign's
     highest-IRR trial (best_irr_points)."""
     for s, x, y in best_irr_points(sets):
         ax.scatter([x], [y], s=BEST_MARK_SIZE, facecolors='white',
@@ -1461,7 +1460,7 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9,
     donor_sets (panel c): the plotted campaigns, so a relay's preloaded rows
     are drawn in its owned cell in their donor's colour (_draw_relay_preload);
     None keeps them hidden. mark_best (panel a): on the IRR cell, mark every
-    other campaign's highest-IRR trial.
+    campaign's highest-IRR trial.
     """
     lo, hi = ylim
 
@@ -2179,7 +2178,7 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
             Line2D([], [], linestyle='none', marker='o', markersize=6.5,
                    markerfacecolor='white', markeredgecolor=style_c,
                    markeredgewidth=BEST_MARK_LW,
-                   label='Highest-IRR trial (other campaign)'))
+                   label='Highest-IRR trial'))
     style_handles += [
         Line2D([], [], color=style_c, lw=2.4, linestyle='-',
                label='Incumbent (campaign optimizing the shown metric)'),
