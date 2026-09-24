@@ -59,12 +59,17 @@ study preloaded with rows of the six process-level rs350 campaigns;
 --no-relay drops it). --latest instead picks, per objective, the most recent
 metabolic_split_12d campaign with >= 2000 trials and the most recent relay
 (default_split_12d_specs / default_relay_spec). Layout (two-panel default):
-  A  outcome trajectories of the seven regular campaigns;
+  A  outcome trajectories of the seven regular campaigns; the IRR cell also
+     marks each process-level campaign's highest-IRR trial (open circle) and
+     calls out the one that seeds the relay;
   B  proteome allocation, one row per set, the relay campaign last;
   C  (only with a relay) panel A's grid for the relay campaign alone, on
-     panel A's value axes. Its preloaded donor rows are not drawn: they hold
-     trial numbers 0..N-1, so its trials and incumbent start at N (from the
-     best preloaded value).
+     panel A's value axes. Its IRR cell's preload zone (trials 0..N-1) shows
+     the preloaded donor rows in their donor campaign's colour, grouped by
+     donor under a composition strip, and the seed (the best preloaded row,
+     the relay's incumbent when its first simulated trial starts) joined to
+     the incumbent line, which starts at N. The relay's legend line says
+     what it was seeded with.
 Writes <stem>_<stamp>.png and .pdf to --out-dir.
 """
 import os
@@ -81,6 +86,7 @@ from matplotlib.lines import Line2D, TICKDOWN, TICKLEFT
 from matplotlib.ticker import (AutoMinorLocator, FixedLocator, FuncFormatter,
                                LogLocator, MultipleLocator, NullFormatter,
                                NullLocator, PercentFormatter)
+from matplotlib.transforms import blended_transform_factory
 
 # --- sim-safe module loads (by file path; never import the package) ----------
 PKG_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -399,6 +405,17 @@ LEGEND_ROW_H = 0.0245
 # proteome panel's bottom spine (room for its x-axis title and c's title).
 RELAY_PANEL_IN = 3.55
 RELAY_GAP_IN = 1.05
+# panel a's financial cell marks every OTHER campaign's highest-IRR trial with
+# an open circle in that campaign's colour: only the financial campaign's trial
+# cloud is drawn there, and a process-level campaign's incumbent line follows
+# its own metric, so those trials would otherwise never reach the cell. The
+# relay's seed (its best preloaded trial) is one of those donor trials; the
+# same open circle marks it in panel c, tying the two panels together.
+BEST_MARK_SIZE = 42
+BEST_MARK_LW = 1.4
+# panel c draws the relay's preloaded donor rows in their DONOR campaign's
+# colour; a donor that is not one of the plotted campaigns falls back to grey
+PRELOAD_FALLBACK_COLOR = '0.55'
 
 FONTS = {'band': 12, 'cell': 10, 'tick': 9, 'callout': 9,
          'legend': 10, 'axis': 11, 'panel': 14}
@@ -624,13 +641,24 @@ def is_relay_campaign(campaign):
     return bool(_RELAY_TAG_RE.search(os.path.basename(campaign)))
 
 
+def _campaign_stem(campaign):
+    """Study name of a campaign given as a study name or a CSV path."""
+    stem = os.path.basename(str(campaign))
+    for suffix in ('_trajectory.csv', '.csv'):
+        if stem.endswith(suffix):
+            return stem[:-len(suffix)]
+    return stem
+
+
 def relay_trajectory(campaign):
-    """(df, n_preloaded) for a relay study: its preloaded donor rows from
-    <study>_relay_manifest.csv, renumbered to their store trial numbers
+    """(df, n_preloaded, donors) for a relay study: its preloaded donor rows
+    from <study>_relay_manifest.csv, renumbered to their store trial numbers
     (relay_trial_number, 0..N-1) with 'objective' = the donor's recorded value
     of the relay objective, followed by its simulated trajectory rows (numbered
     from N). The manifest carries the full trajectory column set, so the two
-    concatenate column-for-column."""
+    concatenate column-for-column. `donors` = {'donor': [study name per
+    preloaded row], 'donor_trial': [its trial number in that donor]}, in
+    store-trial order (row i of the preload = df row i)."""
     import pandas as pd
     csv_path = resolve_campaign_csv(campaign)
     sim = ko.load_trajectory(csv_path)
@@ -643,15 +671,23 @@ def relay_trajectory(campaign):
     if missing:
         raise ValueError(f'relay manifest {manifest}: missing trajectory '
                          f'columns {missing}')
-    pre = pre.copy()
+    pre = pre.sort_values('relay_trial_number', kind='stable') \
+             .reset_index(drop=True)
+    n_pre = len(pre)
+    if not np.array_equal(pre['relay_trial_number'].to_numpy(), np.arange(n_pre)):
+        raise ValueError(f'relay manifest {manifest}: relay_trial_number is '
+                         f'not 0..{n_pre - 1}')
+    # the manifest's own trial_number is the row's trial number in its DONOR
+    donors = {'donor': [_campaign_stem(d) for d in pre['donor']],
+              'donor_trial': pre['trial_number'].to_numpy(dtype=int)}
     pre['trial_number'] = pre['relay_trial_number']
     pre = pre[list(sim.columns)]
-    n_pre = len(pre)
     if n_pre and int(sim['trial_number'].min()) < n_pre:
         raise ValueError(f'relay campaign {campaign}: simulated trial numbers '
                          f'start below the {n_pre} preloaded rows')
     df = pd.concat([pre, sim], ignore_index=True)
-    return df.sort_values('trial_number', kind='stable').reset_index(drop=True), n_pre
+    df = df.sort_values('trial_number', kind='stable').reset_index(drop=True)
+    return df, n_pre, donors
 
 
 def load_set(label, campaign, trial):
@@ -661,9 +697,10 @@ def load_set(label, campaign, trial):
     trial, incumbent and trial cloud all run over both."""
     is_relay = is_relay_campaign(campaign)
     if is_relay:
-        df, n_preloaded = relay_trajectory(campaign)
+        df, n_preloaded, donors = relay_trajectory(campaign)
     else:
         df, n_preloaded = ko.load_trajectory(resolve_campaign_csv(campaign)), 0
+        donors = None
     missing = [c for c in DECISION_VARS if c not in df.columns]
     if missing:
         raise ValueError(
@@ -715,6 +752,20 @@ def load_set(label, campaign, trial):
     rec['sel_dir'] = sel_dir
     rec['traj_x'] = tx
     rec['traj'] = traj
+    if donors is not None and n_preloaded:
+        # the relay's SEED: its incumbent when the first simulated trial
+        # starts, i.e. the arg-best preloaded row under the same rule as
+        # incumbent_trajectory (COMPLETE, finite, first occurrence wins)
+        pre = df.iloc[:n_preloaded]
+        ok = pre[(pre['state'] == 'COMPLETE')
+                 & np.isfinite(pre[sel_col].to_numpy(dtype=float))]
+        seed = None
+        if len(ok):
+            seed = int(ok[sel_col].idxmin() if sel_dir == 'minimize'
+                       else ok[sel_col].idxmax())
+        rec['preload_donor'] = donors['donor']
+        rec['preload_donor_trial'] = donors['donor_trial']
+        rec['preload_seed'] = seed     # preload row index (0..N-1) or None
     # full per-trial cloud for panel a, drawn only on the cell whose metric
     # this campaign optimized: every trial's number, its completion flag and
     # each outcome value (non-COMPLETE / unsolved -> NaN via the CSV).
@@ -1288,10 +1339,178 @@ def bar_cell(ax, sets, colors, var, kind, ylabel, subtitle=None, ylim=None,
     ax.set_xlim(-0.6, n - 0.4); style_cell_axes(ax)
 
 
-def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9):
+def best_irr_points(sets):
+    """[(set, trial_number, IRR)] of the highest finite-IRR trial of every
+    regular campaign that does NOT own the IRR cell (its trials are not in the
+    cell's cloud). Baseline and relay sets are skipped."""
+    pts = []
+    for s in sets:
+        if (s.get('is_baseline') or s.get('is_relay')
+                or s.get('scatter') is None
+                or _owns_outcome(s.get('objective'), 'IRR')):
+            continue
+        y = np.asarray(s['scatter']['IRR'], dtype=float)
+        fin = np.flatnonzero(np.isfinite(y))
+        if not len(fin):
+            continue
+        i = int(fin[np.argmax(y[fin])])
+        pts.append((s, float(s['scatter_x'][i]), float(y[i])))
+    return pts
+
+
+def relay_seed(s):
+    """(donor study name, donor trial number) of a relay set's seed, or None."""
+    i = s.get('preload_seed')
+    if i is None:
+        return None
+    return s['preload_donor'][i], int(s['preload_donor_trial'][i])
+
+
+def _donor_set_map(donor_sets):
+    """{study name: set} over the plotted campaigns (first occurrence)."""
+    out = {}
+    for d in donor_sets:
+        if d.get('campaign') is not None:
+            out.setdefault(_campaign_stem(d['campaign']), d)
+    return out
+
+
+def relay_donor_summary(s, donor_sets):
+    """(n_donors, all_process_level_in_panel_a) for a relay set: how many
+    campaigns it was preloaded from, and whether every one of them is a
+    plotted campaign that does not own the IRR cell (i.e. one of panel a's
+    process-level campaigns) -- which decides the legend / title wording."""
+    stems = set(s.get('preload_donor') or ())
+    by_stem = _donor_set_map(donor_sets)
+    ok = bool(stems) and all(
+        st in by_stem and not _owns_outcome(by_stem[st].get('objective'), 'IRR')
+        for st in stems)
+    return len(stems), ok
+
+
+def _count_word(k):
+    return ('no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven',
+            'eight', 'nine')[k] if 0 <= k < 10 else f'{k:,}'
+
+
+def relay_legend_label(s, donor_sets):
+    """The relay's descriptive legend label: what its GP was seeded with."""
+    n = s.get('n_preloaded') or 0
+    if not n or not s.get('preload_donor'):
+        return s['label']
+    k, process_level = relay_donor_summary(s, donor_sets)
+    src = (f'the {_count_word(k)} process-level campaigns' if process_level
+           else f'{_count_word(k)} donor campaign{"s" if k != 1 else ""}')
+    return f'{s["label"]}: seeded with {n:,} trials of {src}'
+
+
+def relay_preload_layout(s, donor_sets, colors):
+    """Panel-c layout of a relay's preloaded rows. Their store order is the
+    relay's selection order (keep set by value, then a space-filling fill),
+    which carries no meaning, so they are regrouped into one contiguous block
+    per donor campaign -- blocks in the plotted campaigns' set order (donors
+    that are not plotted last, by name), rows within a block by donor trial
+    number. Returns (x per preload row, colour per preload row, blocks), each
+    block (study name, first x, last x, colour)."""
+    donors = list(s['preload_donor'])
+    trials = np.asarray(s['preload_donor_trial'])
+    by_stem = _donor_set_map(donor_sets)
+    present = set(donors)
+    order = [st for st in by_stem if st in present]
+    order += sorted(present - set(order))
+    rank = {st: k for k, st in enumerate(order)}
+    perm = np.lexsort((trials, np.array([rank[d] for d in donors])))
+    x = np.empty(len(donors))
+    x[perm] = np.arange(len(donors))
+
+    def col_of(st):
+        return colors[id(by_stem[st])] if st in by_stem \
+            else PRELOAD_FALLBACK_COLOR
+    row_colors = [col_of(d) for d in donors]
+    donors_arr = np.array(donors)
+    blocks = [(st, float(x[donors_arr == st].min()),
+               float(x[donors_arr == st].max()), col_of(st)) for st in order]
+    return x, row_colors, blocks
+
+
+def _draw_relay_preload(ax, s, colors, donor_sets, sy_pre, lo, cap,
+                        point_size):
+    """Panel c's preload zone (x 0..N-1) of a relay's owned cell: the
+    preloaded donor rows as a trial cloud in their donor's colour (grouped by
+    donor, relay_preload_layout), a composition strip along the top edge, and
+    the seed -- the best preloaded row, which is the relay's incumbent when its
+    first simulated trial starts -- as an open circle joined by a thin line to
+    where the incumbent line begins (x = N)."""
+    n_pre = s['n_preloaded']
+    px, pcols, blocks = relay_preload_layout(s, donor_sets, colors)
+    ax.scatter(px, sy_pre, s=point_size, c=pcols, alpha=0.35, linewidths=0,
+               zorder=1)
+    # composition strip: one bar per donor block, x in data, y in axes units
+    trans = blended_transform_factory(ax.transData, ax.transAxes)
+    for _st, x0, x1, c in blocks:
+        ax.add_patch(plt.Rectangle((x0 - 0.5, 0.962), x1 - x0 + 1.0, 0.028,
+                                   transform=trans, facecolor=c,
+                                   edgecolor='none', zorder=3))
+    # one line, so it clears the seed label below it (the count is in the
+    # relay's legend line)
+    ax.text(n_pre / 2, 0.94, 'Preloaded trials, by source', transform=trans,
+            ha='center', va='top', fontsize=FONTS['callout'], color='0.25',
+            zorder=4)
+    i = s.get('preload_seed')
+    if i is None:
+        return
+    xs, ys = float(px[i]), float(sy_pre[i])
+    ax.plot([xs, n_pre], [ys, ys], color=colors[id(s)], lw=1.4, zorder=2)
+    ax.scatter([xs], [ys], s=BEST_MARK_SIZE, facecolors='white',
+               edgecolors=pcols[i], linewidths=BEST_MARK_LW, zorder=5)
+    ax.text(xs + 0.012 * n_pre, ys + 0.022 * (cap - lo),
+            'Seed (best preloaded)', ha='left', va='bottom',
+            fontsize=FONTS['callout'], color='0.25', zorder=4)
+
+
+def _draw_best_irr_marks(ax, sets, colors, xmax, lo, cap, seed_ref):
+    """Panel a's financial cell: an open circle at each other campaign's
+    highest-IRR trial (best_irr_points) and, when a relay is plotted, a callout
+    on its seed trial (drawn as an extra circle if it is not already one)."""
+    marks = best_irr_points(sets)
+    for s, x, y in marks:
+        ax.scatter([x], [y], s=BEST_MARK_SIZE, facecolors='white',
+                   edgecolors=colors[id(s)], linewidths=BEST_MARK_LW, zorder=5)
+    if seed_ref is None:
+        return
+    stem, trial = seed_ref
+    donor = _donor_set_map(sets).get(stem)
+    if donor is None or donor.get('scatter') is None:
+        return
+    hit = np.flatnonzero(donor['scatter_x'] == trial)
+    if not len(hit):
+        return
+    y = float(donor['scatter']['IRR'][hit[0]])
+    if not np.isfinite(y) or y < lo:
+        return
+    if not any(m[0] is donor and m[1] == trial for m in marks):
+        ax.scatter([trial], [y], s=BEST_MARK_SIZE, facecolors='white',
+                   edgecolors=colors[id(donor)], linewidths=BEST_MARK_LW,
+                   zorder=5)
+    ax.annotate('Seeds the relay campaign (C)', xy=(trial, y),
+                xytext=(trial + 0.08 * xmax, y + 0.12 * (cap - lo)),
+                fontsize=FONTS['callout'], color='0.25', ha='left',
+                va='center', zorder=6,
+                arrowprops=dict(arrowstyle='-|>', color='0.25', lw=0.8,
+                                shrinkA=2, shrinkB=5, mutation_scale=8))
+
+
+def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9,
+                 donor_sets=None, mark_best=False, seed_ref=None):
     """One outcome metric as incumbent trajectories over trial_number: one
     step line per campaign set (the metric at that set's running incumbent,
     in its panel-b/c color), the scenario-A baseline as a dashed reference.
+
+    donor_sets (panel c): the plotted campaigns, so a relay's preloaded rows
+    are drawn in its owned cell in their donor's colour (_draw_relay_preload);
+    None keeps them hidden. mark_best (panel a): on the IRR cell, mark every
+    other campaign's highest-IRR trial and call out the relay seed `seed_ref`
+    ((donor study name, donor trial) or None).
     """
     lo, hi = ylim
 
@@ -1326,18 +1545,21 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9):
     # every trial as a translucent dot in the campaign's own color, behind the
     # incumbent lines (zorder 1). Failed / unsolved trials (no finite value)
     # are drawn at the axis floor rather than omitted.
+    preload_cells = []
     for s in sets:
         if s.get('scatter') is None or not _owns_outcome(s.get('objective'), col):
             continue
         sx, sy, cc = s['scatter_x'], _yv(s['scatter'][col]), colors[id(s)]
-        # a relay's preloaded donor rows (x < N) are not search progress --
-        # their order is the relay's selection order (keep set sorted by value,
-        # then a space-filling fill) -- so they are NOT drawn; the preload zone
-        # keeps only its x extent (empty for the relay)
-        pre = sx < (s.get('n_preloaded') or 0) if s.get('is_relay') \
-            else np.zeros(len(sx), dtype=bool)
+        # a relay's preloaded donor rows (x < N) are not its own search
+        # progress: never drawn in the relay colour. In panel c (donor_sets
+        # given) they are drawn in their DONOR's colour, regrouped by donor
+        # (_draw_relay_preload, after the incumbent lines); elsewhere hidden.
+        n_pre = (s.get('n_preloaded') or 0) if s.get('is_relay') else 0
+        pre = sx < n_pre
         ax.scatter(sx[~pre], sy[~pre], s=point_size, color=cc, alpha=0.35,
                    linewidths=0, zorder=1)
+        if n_pre and donor_sets is not None and s.get('preload_donor'):
+            preload_cells.append((s, sy[pre]))
     for s in sets:
         if s.get('traj') is None:
             continue
@@ -1356,6 +1578,11 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9):
                 color=colors[id(s)], lw=3.15 if own else 1.4,
                 ls='-' if own else (0, (1.5, 1.2)),
                 zorder=2 if own else 3)
+    for s, sy_pre in preload_cells:
+        _draw_relay_preload(ax, s, colors, donor_sets, sy_pre, lo, cap,
+                            point_size)
+    if mark_best and col == 'IRR':
+        _draw_best_irr_marks(ax, sets, colors, xmax, lo, cap, seed_ref)
     # metric name next to the value axis itself (not a title above the cell)
     ax.set_ylabel(_bold_axis_title(title), fontsize=FONTS['cell'], labelpad=3)
     ax.set_xlabel(_bold_axis_title('Trial'), fontsize=FONTS['tick'], labelpad=2)
@@ -1384,7 +1611,9 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9):
     _inward_top_right_ticks(ax, do_x=True, do_y=True)
 
 
-def draw_outcomes(fig, gs_cell, sets, colors):
+def draw_outcomes(fig, gs_cell, sets, colors, donor_sets=None,
+                  mark_best=False, seed_ref=None):
+    # donor_sets / mark_best / seed_ref reach only the IRR cell (outcome_cell)
     xmax = 1.0
     for s in sets:
         tx = s.get('traj_x')
@@ -1398,7 +1627,9 @@ def draw_outcomes(fig, gs_cell, sets, colors):
     axes = []
     big, rest = OUTCOMES[0], OUTCOMES[1:]
     ax_big = fig.add_subplot(sub_gs[0:3, 0:2])
-    outcome_cell(ax_big, sets, colors, big[0], big[1], big[2], xmax)
+    outcome_cell(ax_big, sets, colors, big[0], big[1], big[2], xmax,
+                 donor_sets=donor_sets, mark_best=mark_best,
+                 seed_ref=seed_ref)
     axes.append(ax_big)
     big_w = ax_big.get_position().width
     for (col, label, yl), (r, c) in zip(rest,
@@ -1808,6 +2039,11 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
     LEFT, RIGHT = 0.083, 0.97
     if params_only:
         return _plot_parameters_only(sets, band, out_stem, dpi)
+    # panel a's IRR cell marks the other campaigns' highest-IRR trials (a
+    # fourth mark-key entry when any exist) and, in the two-panel layout, calls
+    # out the relay's seed
+    relay_sets = [s for s in sets if s.get('is_relay')]
+    has_best_marks = bool(best_irr_points(sets))
     if include_parameters:
         fig = plt.figure(figsize=(9.5, 13.454))
         # Top-anchored vertical layout, figure fractions. Panel a now holds a
@@ -1835,7 +2071,10 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
         c_gs = fig.add_gridspec(1, 1, left=0.32, right=RIGHT,
                                 top=0.3309, bottom=0.1235)
         colors = set_colors(sets)
-        a_axes = draw_outcomes(fig, a_gs[0], sets, colors)
+        # no seed callout here: this layout has no relay panel (a relay is
+        # drawn in panel a itself, its cloud over the callout's spot, and
+        # panel c is the proteome panel)
+        a_axes = draw_outcomes(fig, a_gs[0], sets, colors, mark_best=True)
         b_axes = draw_parameters(fig, [band_gs[0], band_gs[1], band_gs[2],
                                        band_gs[3]], sets, colors, band)
         # light-grey backing behind the whole of panel b (band cells, their
@@ -1888,10 +2127,22 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
         # bottom; every layout fraction below is written for the 9.856-in
         # canvas (H0) and mapped by fy(), which keeps each position's distance
         # from the TOP edge in inches, so panels a / b are unchanged.
-        relay_sets = [s for s in sets if s.get('is_relay')]
         a_sets = [s for s in sets if not s.get('is_relay')]
         H0 = 9.856
-        H = H0 + (RELAY_PANEL_IN if relay_sets else 0.0)
+        # the framed key in the a -> b gap = the campaign grid (<= 4 columns),
+        # one full-width line per relay campaign (its long "seeded with ..."
+        # label would blow up a grid column), and the mark key (two rows when
+        # the highest-IRR circle adds a fourth entry). Each row beyond the
+        # original 2 + 1 grows the key downward by one row height: the legend
+        # top stays put, the mark key and panel b move down by `extra`. The
+        # campaign-legend rows spill into the spare canvas below panel b's
+        # x-axis title (as before); the extra mark-key row grows the canvas.
+        n_grid_rows = -(-len(a_sets) // min(len(a_sets), 4))
+        extra_grid = LEGEND_ROW_H * max(0, n_grid_rows - 2)
+        extra_leg = LEGEND_ROW_H * max(0, n_grid_rows + len(relay_sets) - 2)
+        extra_style = LEGEND_ROW_H if has_best_marks else 0.0
+        extra = extra_leg + extra_style
+        H = H0 + (RELAY_PANEL_IN if relay_sets else 0.0) + extra_style * H0
 
         def fy(y):
             return 1.0 - (1.0 - y) * H0 / H
@@ -1904,18 +2155,14 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
         # panel b (proteome) is pushed down ~0.027 vs panel a's bottom to widen
         # the a -> b gap enough for the legend box to clear both panel a's x-axis
         # titles above and panel b below with ~equal margins (see the anchors)
-        # each campaign-legend row beyond two (e.g. the relay overlay's third
-        # row in column 1) grows the framed key downward by one row height:
-        # the legend top stays put, the mark key and panel b move down by
-        # `extra`, into the spare canvas below panel b's x-axis title
-        n_leg_rows = -(-len(sets) // min(len(sets), 4))
-        extra = LEGEND_ROW_H * max(0, n_leg_rows - 2)
         c_gs = fig.add_gridspec(1, 1, left=0.32, right=RIGHT,
                                 top=fy(0.4204 - extra),
                                 bottom=fy(0.1475 - extra))
         colors = set_colors(sets)
         k = H0 / H                     # H0-canvas fraction -> this canvas
-        a_axes = draw_outcomes(fig, a_gs[0], a_sets, colors)
+        a_axes = draw_outcomes(
+            fig, a_gs[0], a_sets, colors, mark_best=True,
+            seed_ref=relay_seed(relay_sets[0]) if relay_sets else None)
         # proteome rows: the regular sets in order, the relay campaign(s) last
         # (bottom row), next to its own panel c
         axc = draw_burden(fig, c_gs[0], a_sets + relay_sets, colors,
@@ -1933,7 +2180,10 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
             r_gs = fig.add_gridspec(1, 1, left=LEFT, right=RIGHT,
                                     top=r_top, bottom=r_top - a_h)
             r_sets = [s for s in sets if s.get('is_baseline')] + relay_sets
-            r_axes = draw_outcomes(fig, r_gs[0], r_sets, colors)
+            # donor_sets: the relay's preloaded rows are drawn in its IRR
+            # cell's preload zone in their donor campaign's panel-a colour
+            r_axes = draw_outcomes(fig, r_gs[0], r_sets, colors,
+                                   donor_sets=a_sets)
             # same value axes as panel a (ranges and major ticks), so each
             # relay cell reads directly against its panel-a counterpart
             for ra, aa in zip(r_axes, a_axes):
@@ -1941,8 +2191,11 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
                 ra.yaxis.set_major_locator(FixedLocator(
                     [t for t in aa.get_yticks()
                      if aa.get_ylim()[0] - 1e-12 <= t <= aa.get_ylim()[1] + 1e-12]))
+            seeded_from_a = relay_donor_summary(relay_sets[0], a_sets)[1]
             panels.append((r_axes[0].get_position().y1 + 0.012 * k, 'C',
-                           'Optimization trajectories of the relay campaign'))
+                           'Optimization trajectories of the relay campaign'
+                           + (', seeded from panel A' if seeded_from_a
+                              else '')))
         # the campaign legend sits in the a -> b gap, doubling as the row key for
         # the proteome panel below. A single vertical column is too tall and
         # clips panel a's lower cells; a single horizontal row of all campaign
@@ -1950,18 +2203,19 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
         # widest being "Baseline (no optimization)"), so it wraps to at most four
         # columns -- two rows under the title.
         legend_loc = 'center'
-        legend_ncol = min(len(sets), 4)
+        legend_ncol = min(len(a_sets), 4)
         # arrange the swatches into a product-grouped grid that mirrors panel a:
         # row 1 the isobutanol metrics, row 2 the ethanol metrics, columns reading
         # yield -> titer -> productivity, with the baseline and the financial
         # campaign leading column 1. fig.legend fills column-major, so the two
         # rows are interleaved into the handle order; falls back to the natural
         # set order whenever the expected labels aren't all present.
-        legend_sets = _legend_order(sets)
+        # (the relay campaign(s) get their own full-width line below the grid)
+        legend_sets = _legend_order(a_sets)
         # the campaign swatches sit a little high in the panel-a -> b gap so the
         # mark key can share the same framed box just below them
-        legend_anchor = (0.527, fy(0.5394 - extra / 2))   # centred: top fixed
-        style_anchor = (0.527, fy(0.4904 - extra))
+        legend_anchor = (0.527, fy(0.5394 - extra_grid / 2))   # top fixed
+        style_anchor = (0.527, fy(0.4904 - extra_leg - extra_style / 2))
     for y, letter, title in panels:
         fig.text(0.03, y, letter, fontsize=FONTS['panel'], fontweight='bold',
                  va='baseline')
@@ -1970,10 +2224,20 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
     # small colour-free key for the marks in panel a: what the points and the
     # solid vs dashed lines mean (the campaign legend gives the colours).
     style_c = '0.30'
+    # with the highest-IRR circle the key is two rows x two columns (filled
+    # column-major): trials | own incumbent over best-IRR trial | other
+    # incumbent; without it the original single row of three
     style_handles = [
         Line2D([], [], linestyle='none', marker='o', markersize=5,
                markerfacecolor=style_c, markeredgecolor='none', alpha=0.5,
-               label='Individual trials'),
+               label='Individual trials')]
+    if has_best_marks:
+        style_handles.append(
+            Line2D([], [], linestyle='none', marker='o', markersize=6.5,
+                   markerfacecolor='white', markeredgecolor=style_c,
+                   markeredgewidth=BEST_MARK_LW,
+                   label='Highest-IRR trial (other campaign)'))
+    style_handles += [
         Line2D([], [], color=style_c, lw=2.4, linestyle='-',
                label='Incumbent (campaign optimizing the shown metric)'),
         Line2D([], [], color=style_c, lw=1.4, linestyle=(0, (2, 1.5)),
@@ -1983,9 +2247,11 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
     # three-panel: the mark key is a standalone strip under panel a and the
     # campaign legend is its own framed box in panel b's empty columns.
     # two-panel: both keys share ONE framed box in the panel-a -> b gap -- the
-    # campaign swatches on top, the mark key row below, a single manual frame.
+    # campaign swatches on top, the relay line(s), the mark key rows below, a
+    # single manual frame.
     style_leg = fig.legend(handles=style_handles, loc='center',
-                           bbox_to_anchor=style_anchor, ncol=3, frameon=False,
+                           bbox_to_anchor=style_anchor,
+                           ncol=2 if has_best_marks else 3, frameon=False,
                            fontsize=FONTS['legend'], handlelength=2.2,
                            handletextpad=0.5, columnspacing=1.4)
     fig.add_artist(style_leg)
@@ -1999,13 +2265,30 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
     leg.get_title().set_fontweight('bold')
     leg.get_title().set_fontsize(FONTS['legend'] + 2)
     if not include_parameters:
-        # draw one frame enclosing both frameless keys (union of their drawn
-        # extents), so the mark key reads as part of the campaign legend
         fig.canvas.draw()
         renderer = fig.canvas.get_renderer()
         inv = fig.transFigure.inverted()
-        bbs = [a.get_window_extent(renderer).transformed(inv)
-               for a in (leg, style_leg)]
+        keys = [leg, style_leg]
+        if relay_sets:
+            # the relay line(s): full width, centred in the gap between the
+            # campaign grid and the mark key, swatch aligned with column 1
+            lb = leg.get_window_extent(renderer).transformed(inv)
+            sb = style_leg.get_window_extent(renderer).transformed(inv)
+            relay_handles = [
+                plt.Rectangle((0, 0), 1, 1, fc=colors[id(s)],
+                              label=relay_legend_label(s, a_sets))
+                for s in relay_sets]
+            relay_leg = fig.legend(
+                handles=relay_handles, loc='center left',
+                bbox_to_anchor=(lb.x0, (lb.y0 + sb.y1) / 2), ncol=1,
+                frameon=False, fontsize=FONTS['legend'] + 1,
+                labelspacing=0.6, handlelength=1.7, handleheight=1.1,
+                handletextpad=0.6, borderpad=0.6)
+            keys.append(relay_leg)
+            fig.canvas.draw()
+        # draw one frame enclosing every frameless key (union of their drawn
+        # extents), so the mark key reads as part of the campaign legend
+        bbs = [a.get_window_extent(renderer).transformed(inv) for a in keys]
         x0 = min(b.x0 for b in bbs); x1 = max(b.x1 for b in bbs)
         y0 = min(b.y0 for b in bbs); y1 = max(b.y1 for b in bbs)
         padx, pady = 0.014, 0.011
@@ -2074,6 +2357,11 @@ def console_report(sets, band_campaign):
         if s.get('is_relay'):
             tag += (f'; relay: trials 0-{s["n_preloaded"] - 1} preloaded, '
                     f'{s["n_preloaded"]}+ simulated')
+            seed = relay_seed(s)
+            if seed is not None:
+                i = s['preload_seed']
+                tag += (f'; seed = preloaded trial {i} ({seed[0]} trial '
+                        f'{seed[1]}, IRR {s["scatter"]["IRR"][i]:.4f})')
         print(f'[{s["label"]}] {tag}')
         print(f'    IRR {s.get("IRR")!s:>8}  EtOH {s.get("EtOH titer")!s:>7}'
               f'  IBO {s.get("IBO titer")!s:>7}  tau {s.get("tau")!s:>6}')
