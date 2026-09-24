@@ -429,11 +429,6 @@ FIGURE_VARIANTS = ('overview', 'parameters', 'relay')
 
 FONTS = {'band': 12, 'cell': 10, 'tick': 9, 'callout': 9,
          'legend': 10, 'axis': 11, 'panel': 14}
-
-# light-grey backing for panel b, so it reads as a distinct block from the
-# white panels a and c
-PANEL_B_BG = '0.93'
-
 # --- scenario-A baseline outcomes: HARD-CODED (spec decision b).
 # Re-simulated 2026-09-13 (smoke_test_1 protocol, IBO_2026: load(),
 # scenarios.load_scenario('A'), model_specification, solve_TEA; ethanol MPSP
@@ -1620,16 +1615,16 @@ def draw_outcomes(fig, gs_cell, sets, colors, donor_sets=None,
 
 def draw_parameters(fig, gs_rows, sets, colors, band, title_offset_scale=1.0):
     # title_offset_scale compensates the fixed figure-fraction band-title
-    # offsets for a canvas shorter than the three-panel one (the standalone
-    # params-only figure), so the titles keep the same ABSOLUTE clearance above
-    # their cells; 1.0 leaves the three-panel / two-panel figures untouched.
+    # offsets, which were tuned on a 13.454-in canvas (the retired three-panel
+    # figure), for the canvas actually drawn on (the standalone parameters
+    # figure passes 13.454 / H), so the titles keep the same ABSOLUTE
+    # clearance above their cells.
     axes = []
     for gs_row, (title, params) in zip(gs_rows, BANDS):
         sub_gs = gs_row.subgridspec(1, 5, wspace=0.75)
         last_ax = None
         for i, p in enumerate(params):
             ax = fig.add_subplot(sub_gs[0, i]); last_ax = ax
-            ax.set_facecolor(PANEL_B_BG)     # panel-b block colour (see backing)
             axes.append(ax)
             if p in RATE_VARS:
                 # reaction/enzyme descriptors go in the figure caption, not
@@ -2061,12 +2056,13 @@ def _draw_process_level_header(fig, leg, legend_sets):
                               lw=0.8, zorder=leg.get_zorder() + 1))
 
 
-def plot(sets, band, out_stem, dpi=300, include_parameters=False,
-         params_only=False, relay_view=False):
-    """relay_view (two-panel layout only): the relay figure -- panel a shows
-    the relay campaign's trajectories (plot_relay_trajectories) and panel b's
-    proteome allocation adds the relay row; otherwise the relay campaign is
-    left out of both panels (the overview)."""
+def plot(sets, band, out_stem, dpi=300, params_only=False, relay_view=False):
+    """The two-panel figure (overview): panel A the outcome trajectories,
+    panel B the proteome allocation. relay_view: the relay figure -- panel a
+    shows the relay campaign's trajectories (plot_relay_trajectories) and
+    panel b's proteome allocation adds the relay row; otherwise the relay
+    campaign is left out of both panels (the overview). params_only: the
+    standalone final-parameters figure (_plot_parameters_only)."""
     apply_fonts()
     LEFT, RIGHT = 0.083, 0.97
     if params_only:
@@ -2074,167 +2070,94 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
     # panel a's IRR cell marks the other campaigns' highest-IRR trials (a
     # fourth mark-key entry when any exist)
     relay_sets = [s for s in sets if s.get('is_relay')]
-    # the relay set(s) shown in this figure's proteome panel and key
-    key_relay = []
     has_best_marks = bool(best_irr_points(sets))
-    if include_parameters:
-        fig = plt.figure(figsize=(9.5, 13.454))
-        # Top-anchored vertical layout, figure fractions. Panel a now holds a
-        # 3x4 grid (was 2x4), so its box is 1.5x taller; the canvas grew by that
-        # one extra row-height (12.4 -> 13.454 in) and panels b and c keep their
-        # absolute inch heights, positions and gaps (their fractions rescaled by
-        # 12.4/13.454). Panel a's bottom edge is unchanged in inches, so the wide
-        # a -> b gap (which carries panel b's letter/title and the first band
-        # title) is preserved. Panel b's four band cells are ~40% shorter than
-        # its single-cell height (~0.0335 vs ~0.0558 of the OLD canvas); the
-        # band -> band gaps stay ~0.05 (hspace 1.49 x the shorter cell) to keep
-        # room for the rate-band titles. Panel c rides up just below the bands.
-        # Each region is its own gridspec so the three vertical positions are
-        # set directly.
-        # panel a's bottom is lifted slightly above the panel-b block to open a
-        # thin strip for the marker/line-style key below the grid
-        a_gs = fig.add_gridspec(1, 1, left=LEFT, right=RIGHT,
-                                top=0.9493, bottom=0.7420)
-        band_gs = fig.add_gridspec(4, 1, left=LEFT, right=RIGHT, top=0.6351,
-                                   bottom=0.3733, hspace=1.49)
-        # panel c is narrowed on the left (left=0.32 vs LEFT) to clear a column
-        # for its framed sector legend, which sits in that margin rather than
-        # above the bars (wide enough for the box + the longest label, clear of
-        # the 0.00 tick)
-        c_gs = fig.add_gridspec(1, 1, left=0.32, right=RIGHT,
-                                top=0.3309, bottom=0.1235)
-        colors = set_colors(sets)
-        a_axes = draw_outcomes(fig, a_gs[0], sets, colors, mark_best=True)
-        b_axes = draw_parameters(fig, [band_gs[0], band_gs[1], band_gs[2],
-                                       band_gs[3]], sets, colors, band)
-        # light-grey backing behind the whole of panel b (band cells, their
-        # titles, the panel-b letter/title and the campaign legend), so the
-        # panel reads as one block set off from the white panels a and c. Drawn
-        # at zorder 0 so the cells, bars, text and legend all sit on top; the
-        # band cells share its colour (set in draw_parameters) so the fill is
-        # seamless across the gaps.
-        b_top = b_axes[0].get_position().y1
-        b_bot = b_axes[-1].get_position().y0
-        fig.add_artist(plt.Rectangle(
-            (0.02, b_bot - 0.030), 0.985 - 0.02,
-            (b_top + 0.058) - (b_bot - 0.030),
-            transform=fig.transFigure, facecolor=PANEL_B_BG, edgecolor='none',
-            zorder=0))
-        axc = draw_burden(fig, c_gs[0], sets, colors)
-        # each panel gets a bold letter and a descriptive title on the same
-        # baseline; the panel title (13 pt) outranks the band sub-titles
-        # (12 pt). Panel b's letter is lifted into the panel-a -> b gap so its
-        # title clears the first band title below it.
-        panels = ((a_axes[0].get_position().y1 + 0.012, 'A',
-                   'Optimization trajectories'),
-                  (b_axes[0].get_position().y1 + 0.035, 'B',
-                   'Final kinetic and process parameters'),
-                  (axc.get_position().y1 + 0.005, 'C',
-                   'Final proteome allocation'))
-        # the campaign legend sits in the empty right columns of panel b's lower
-        # bands and doubles as the row key for panel c (whose categorical y axis
-        # is unlabelled).
-        legend_loc, legend_anchor, legend_ncol = 'center left', (0.635, 0.4147), 1
-        # single vertical column: the swatches follow the set order top-to-bottom
-        legend_sets = sets
-        # the marker/line-style key sits in the thin gap between panel a and the
-        # panel-b block, centered under panel a
-        style_anchor = (0.5, 0.7015)
+    # panel A on top, the proteome-allocation panel B below it; the a -> b gap
+    # carries the framed campaign legend + mark key.
+    # A relay campaign (is_relay) is left out of the overview entirely. In
+    # the relay figure (relay_view) panel a holds the relay's trajectories
+    # instead of the regular campaigns', and the relay takes the last
+    # proteome row and a legend line. Every layout fraction below is
+    # written for the 9.856-in canvas (H0) and mapped by fy(), which keeps
+    # each position's distance from the TOP edge in inches.
+    a_sets = [s for s in sets if not s.get('is_relay')]
+    key_relay = relay_sets if relay_view else []
+    # arrange the swatches into a product-grouped grid that mirrors panel a:
+    # a header row naming the process-level objectives, row 1 the
+    # isobutanol metrics, row 2 the ethanol metrics, columns reading yield
+    # -> titer -> productivity, with the baseline and the financial
+    # campaign leading column 1. fig.legend fills column-major, so the rows
+    # are interleaved into the handle order; falls back to the natural set
+    # order whenever the expected labels aren't all present.
+    # (the relay campaign(s) get their own full-width line below the grid)
+    legend_sets = _legend_order(a_sets)
+    H0 = 9.856
+    # the framed key in the a -> b gap = the campaign grid (<= 4 columns),
+    # one full-width line per relay campaign (its long "seeded with ..."
+    # label would blow up a grid column), and the mark key (two rows when
+    # the highest-IRR circle adds a fourth entry). Each row beyond the
+    # original 2 + 1 grows the key downward by one row height: the legend
+    # top stays put, the mark key and panel b move down by `extra`. The
+    # campaign-legend rows spill into the spare canvas below panel b's
+    # x-axis title (as before); the extra mark-key row grows the canvas.
+    n_grid_rows = -(-len(legend_sets) // min(len(a_sets), 4))
+    extra_grid = LEGEND_ROW_H * max(0, n_grid_rows - 2)
+    extra_leg = LEGEND_ROW_H * max(0, n_grid_rows + len(key_relay) - 2)
+    extra_style = LEGEND_ROW_H if has_best_marks else 0.0
+    extra = extra_leg + extra_style
+    H = H0 + extra_style * H0
+
+    def fy(y):
+        return 1.0 - (1.0 - y) * H0 / H
+
+    fig = plt.figure(figsize=(9.5, H))
+    # panel a's bottom is lifted to widen the a -> b gap enough for the one
+    # framed box that now holds both the campaign key and the mark key
+    a_gs = fig.add_gridspec(1, 1, left=LEFT, right=RIGHT,
+                            top=fy(0.9330), bottom=fy(0.6500))
+    # panel b (proteome) is pushed down ~0.027 vs panel a's bottom to widen
+    # the a -> b gap enough for the legend box to clear both panel a's x-axis
+    # titles above and panel b below with ~equal margins (see the anchors)
+    c_gs = fig.add_gridspec(1, 1, left=0.32, right=RIGHT,
+                            top=fy(0.4204 - extra),
+                            bottom=fy(0.1475 - extra))
+    colors = set_colors(sets)
+    k = H0 / H                     # H0-canvas fraction -> this canvas
+    if relay_view:
+        # the relay alone (plus the baseline reference line); donor_sets:
+        # its preloaded rows are drawn in every cell's preload zone in
+        # their donor campaign's colour. Same value axes as the overview's
+        # panel a, so each cell reads directly against its counterpart.
+        base_sets = [s for s in sets if s.get('is_baseline')]
+        a_axes = draw_outcomes(fig, a_gs[0], base_sets + relay_sets,
+                               colors, donor_sets=a_sets)
+        for ra, (ylim, ticks) in zip(a_axes,
+                                     _panel_a_value_axes(a_sets, colors)):
+            ra.set_ylim(ylim)
+            ra.yaxis.set_major_locator(FixedLocator(ticks))
+        a_title = 'Optimization trajectories of the flagship campaign'
     else:
-        # two-panel variant (panel B omitted): panel A on top, the proteome-
-        # allocation panel below it -- relettered B. A shorter canvas keeps both
-        # panels at ~their three-panel absolute heights; the freed middle band
-        # becomes the a -> b gap that carries panel b's letter/title and the
-        # campaign legend.
-        # panel a holds a 3x4 grid (was 2x4), 1.5x taller; the canvas grew by
-        # that one extra row-height (8.8 -> 9.856 in) and panel c keeps its
-        # absolute inch height, position and the a -> b gap (fractions rescaled
-        # by 8.8/9.856; panel a's bottom edge is unchanged in inches).
-        # A relay campaign (is_relay) is left out of the overview entirely. In
-        # the relay figure (relay_view) panel a holds the relay's trajectories
-        # instead of the regular campaigns', and the relay takes the last
-        # proteome row and a legend line. Every layout fraction below is
-        # written for the 9.856-in canvas (H0) and mapped by fy(), which keeps
-        # each position's distance from the TOP edge in inches.
-        a_sets = [s for s in sets if not s.get('is_relay')]
-        key_relay = relay_sets if relay_view else []
-        # arrange the swatches into a product-grouped grid that mirrors panel a:
-        # a header row naming the process-level objectives, row 1 the
-        # isobutanol metrics, row 2 the ethanol metrics, columns reading yield
-        # -> titer -> productivity, with the baseline and the financial
-        # campaign leading column 1. fig.legend fills column-major, so the rows
-        # are interleaved into the handle order; falls back to the natural set
-        # order whenever the expected labels aren't all present.
-        # (the relay campaign(s) get their own full-width line below the grid)
-        legend_sets = _legend_order(a_sets)
-        H0 = 9.856
-        # the framed key in the a -> b gap = the campaign grid (<= 4 columns),
-        # one full-width line per relay campaign (its long "seeded with ..."
-        # label would blow up a grid column), and the mark key (two rows when
-        # the highest-IRR circle adds a fourth entry). Each row beyond the
-        # original 2 + 1 grows the key downward by one row height: the legend
-        # top stays put, the mark key and panel b move down by `extra`. The
-        # campaign-legend rows spill into the spare canvas below panel b's
-        # x-axis title (as before); the extra mark-key row grows the canvas.
-        n_grid_rows = -(-len(legend_sets) // min(len(a_sets), 4))
-        extra_grid = LEGEND_ROW_H * max(0, n_grid_rows - 2)
-        extra_leg = LEGEND_ROW_H * max(0, n_grid_rows + len(key_relay) - 2)
-        extra_style = LEGEND_ROW_H if has_best_marks else 0.0
-        extra = extra_leg + extra_style
-        H = H0 + extra_style * H0
-
-        def fy(y):
-            return 1.0 - (1.0 - y) * H0 / H
-
-        fig = plt.figure(figsize=(9.5, H))
-        # panel a's bottom is lifted to widen the a -> b gap enough for the one
-        # framed box that now holds both the campaign key and the mark key
-        a_gs = fig.add_gridspec(1, 1, left=LEFT, right=RIGHT,
-                                top=fy(0.9330), bottom=fy(0.6500))
-        # panel b (proteome) is pushed down ~0.027 vs panel a's bottom to widen
-        # the a -> b gap enough for the legend box to clear both panel a's x-axis
-        # titles above and panel b below with ~equal margins (see the anchors)
-        c_gs = fig.add_gridspec(1, 1, left=0.32, right=RIGHT,
-                                top=fy(0.4204 - extra),
-                                bottom=fy(0.1475 - extra))
-        colors = set_colors(sets)
-        k = H0 / H                     # H0-canvas fraction -> this canvas
-        if relay_view:
-            # the relay alone (plus the baseline reference line); donor_sets:
-            # its preloaded rows are drawn in every cell's preload zone in
-            # their donor campaign's colour. Same value axes as the overview's
-            # panel a, so each cell reads directly against its counterpart.
-            base_sets = [s for s in sets if s.get('is_baseline')]
-            a_axes = draw_outcomes(fig, a_gs[0], base_sets + relay_sets,
-                                   colors, donor_sets=a_sets)
-            for ra, (ylim, ticks) in zip(a_axes,
-                                         _panel_a_value_axes(a_sets, colors)):
-                ra.set_ylim(ylim)
-                ra.yaxis.set_major_locator(FixedLocator(ticks))
-            a_title = 'Optimization trajectories of the flagship campaign'
-        else:
-            a_axes = draw_outcomes(fig, a_gs[0], a_sets, colors,
-                                   mark_best=True)
-            a_title = 'Optimization trajectories'
-        # proteome rows: the regular sets in order, the relay campaign(s) last
-        # (bottom row) in the relay figure
-        axc = draw_burden(fig, c_gs[0], a_sets + key_relay, colors,
-                          offset_scale=k)
-        panels = [(a_axes[0].get_position().y1 + 0.012 * k, 'A', a_title),
-                  (axc.get_position().y1 + 0.005 * k, 'B',
-                   'Final proteome allocation')]
-        # the campaign legend sits in the a -> b gap, doubling as the row key for
-        # the proteome panel below. A single vertical column is too tall and
-        # clips panel a's lower cells; a single horizontal row of all campaign
-        # items runs off the figure once there are 6 campaigns (7 sets, the
-        # widest being "Baseline (no optimization)"), so it wraps to at most four
-        # columns -- two rows under the title.
-        legend_loc = 'center'
-        legend_ncol = min(len(a_sets), 4)
-        # the campaign swatches sit a little high in the panel-a -> b gap so the
-        # mark key can share the same framed box just below them
-        legend_anchor = (0.527, fy(0.5394 - extra_grid / 2))   # top fixed
-        style_anchor = (0.527, fy(0.4904 - extra_leg - extra_style / 2))
+        a_axes = draw_outcomes(fig, a_gs[0], a_sets, colors,
+                               mark_best=True)
+        a_title = 'Optimization trajectories'
+    # proteome rows: the regular sets in order, the relay campaign(s) last
+    # (bottom row) in the relay figure
+    axc = draw_burden(fig, c_gs[0], a_sets + key_relay, colors,
+                      offset_scale=k)
+    panels = [(a_axes[0].get_position().y1 + 0.012 * k, 'A', a_title),
+              (axc.get_position().y1 + 0.005 * k, 'B',
+               'Final proteome allocation')]
+    # the campaign legend sits in the a -> b gap, doubling as the row key for
+    # the proteome panel below. A single vertical column is too tall and
+    # clips panel a's lower cells; a single horizontal row of all campaign
+    # items runs off the figure once there are 6 campaigns (7 sets, the
+    # widest being "Baseline (no optimization)"), so it wraps to at most four
+    # columns -- two rows under the title.
+    legend_loc = 'center'
+    legend_ncol = min(len(a_sets), 4)
+    # the campaign swatches sit a little high in the panel-a -> b gap so the
+    # mark key can share the same framed box just below them
+    legend_anchor = (0.527, fy(0.5394 - extra_grid / 2))   # top fixed
+    style_anchor = (0.527, fy(0.4904 - extra_leg - extra_style / 2))
     for y, letter, title in panels:
         fig.text(0.03, y, letter, fontsize=FONTS['panel'], fontweight='bold',
                  va='baseline')
@@ -2247,11 +2170,9 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
     # incumbent; without it the original single row of three
     style_handles = _style_handles(has_best_marks)
     handles = _campaign_legend_handles(legend_sets, colors)
-    # three-panel: the mark key is a standalone strip under panel a and the
-    # campaign legend is its own framed box in panel b's empty columns.
-    # two-panel: both keys share ONE framed box in the panel-a -> b gap -- the
-    # campaign swatches on top, the relay line(s), the mark key rows below, a
-    # single manual frame.
+    # both keys share ONE framed box in the panel-a -> b gap -- the campaign
+    # swatches on top, the relay line(s), the mark key rows below, a single
+    # manual frame.
     style_leg = fig.legend(handles=style_handles, loc='center',
                            bbox_to_anchor=style_anchor,
                            ncol=2 if has_best_marks else 3, frameon=False,
@@ -2260,7 +2181,7 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
     fig.add_artist(style_leg)
     leg = fig.legend(handles=handles, loc=legend_loc,
                      bbox_to_anchor=legend_anchor, ncol=legend_ncol,
-                     frameon=include_parameters,
+                     frameon=False,
                      fontsize=FONTS['legend'] + 1, title='Optimization campaign',
                      labelspacing=0.6, columnspacing=1.6,
                      handlelength=1.7, handleheight=1.1, handletextpad=0.6,
@@ -2268,29 +2189,28 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
     leg.get_title().set_fontweight('bold')
     leg.get_title().set_fontsize(FONTS['legend'] + 2)
     _draw_process_level_header(fig, leg, legend_sets)
-    if not include_parameters:
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    inv = fig.transFigure.inverted()
+    keys = [leg, style_leg]
+    if key_relay:
+        # the relay line(s): full width, centred in the gap between the
+        # campaign grid and the mark key, swatch aligned with column 1
+        lb = leg.get_window_extent(renderer).transformed(inv)
+        sb = style_leg.get_window_extent(renderer).transformed(inv)
+        relay_handles = [
+            plt.Rectangle((0, 0), 1, 1, fc=colors[id(s)],
+                          label=relay_legend_label(s, a_sets))
+            for s in key_relay]
+        relay_leg = fig.legend(
+            handles=relay_handles, loc='center left',
+            bbox_to_anchor=(lb.x0, (lb.y0 + sb.y1) / 2), ncol=1,
+            frameon=False, fontsize=FONTS['legend'] + 1,
+            labelspacing=0.6, handlelength=1.7, handleheight=1.1,
+            handletextpad=0.6, borderpad=0.6)
+        keys.append(relay_leg)
         fig.canvas.draw()
-        renderer = fig.canvas.get_renderer()
-        inv = fig.transFigure.inverted()
-        keys = [leg, style_leg]
-        if key_relay:
-            # the relay line(s): full width, centred in the gap between the
-            # campaign grid and the mark key, swatch aligned with column 1
-            lb = leg.get_window_extent(renderer).transformed(inv)
-            sb = style_leg.get_window_extent(renderer).transformed(inv)
-            relay_handles = [
-                plt.Rectangle((0, 0), 1, 1, fc=colors[id(s)],
-                              label=relay_legend_label(s, a_sets))
-                for s in key_relay]
-            relay_leg = fig.legend(
-                handles=relay_handles, loc='center left',
-                bbox_to_anchor=(lb.x0, (lb.y0 + sb.y1) / 2), ncol=1,
-                frameon=False, fontsize=FONTS['legend'] + 1,
-                labelspacing=0.6, handlelength=1.7, handleheight=1.1,
-                handletextpad=0.6, borderpad=0.6)
-            keys.append(relay_leg)
-            fig.canvas.draw()
-        _frame_keys(fig, keys, zorder=leg.get_zorder() - 1)
+    _frame_keys(fig, keys, zorder=leg.get_zorder() - 1)
     for ext in ('png', 'pdf'):
         fig.savefig(f'{out_stem}.{ext}', dpi=dpi)
     plt.close(fig)
@@ -2367,27 +2287,21 @@ def plot_relay_trajectories(sets, out_stem, dpi=300):
 
 
 def _plot_parameters_only(sets, band, out_stem, dpi):
-    """Standalone render of just the final-parameters panel (panel B of the
-    three-panel variant): the four kinetic/process-parameter bands, a bold
+    """Standalone render of the final kinetic and process parameters (the
+    parameters variant): the four kinetic/process-parameter bands, a bold
     title, and the campaign colour legend, on a plain white background. No
     panel a marks key -- the bands carry no trial points or incumbent lines."""
     LEFT, RIGHT = 0.083, 0.97
     H = 6.2
     fig = plt.figure(figsize=(9.5, H))
-    # the four bands keep the three-panel panel-B cell height and band gaps
     band_gs = fig.add_gridspec(4, 1, left=LEFT, right=RIGHT, top=0.830,
                                bottom=0.280, hspace=1.49)
     colors = set_colors(sets)
-    # the band-title figure-fraction offsets were tuned on the 13.454-in
-    # three-panel canvas; rescale them to this shorter canvas for equal
-    # absolute clearance above the cells
+    # the band-title figure-fraction offsets were tuned on a 13.454-in canvas;
+    # rescale them to this one for equal absolute clearance above the cells
     b_axes = draw_parameters(fig, [band_gs[0], band_gs[1], band_gs[2],
                                    band_gs[3]], sets, colors, band,
                              title_offset_scale=13.454 / H)
-    # standalone figure: no grey panel-B backing -- repaint the band cells white
-    # (draw_parameters fills them with PANEL_B_BG for the three-panel block)
-    for ax in b_axes:
-        ax.set_facecolor('white')
     b_top = b_axes[0].get_position().y1
     # bold heading above the bands (no panel letter -- this is one panel alone)
     fig.text(LEFT, b_top + 0.070, 'Final kinetic and process parameters',
@@ -2602,20 +2516,11 @@ def main(argv=None):
                          'relay = the relay campaign\'s trajectories + the '
                          'proteome allocation with the relay row (skipped '
                          'without a relay set)')
-    # the overview is the two-panel layout (panel A + proteome allocation);
-    # --panel-b renders it as the legacy three-panel layout instead (kinetic/
-    # process-parameter panel B inserted), --no-panel-b is the explicit form
-    # of the default (kept so existing commands still work)
-    ap.add_argument('--panel-b', action=argparse.BooleanOptionalAction,
-                    default=False,
-                    help='overview variant: include panel B (final kinetic '
-                         'and process parameters); omitted by default, in '
-                         'which case the proteome-allocation panel is panel B')
     ap.add_argument('--params-only', action='store_true',
                     help='shorthand for --variants parameters')
     ap.add_argument('--pathway', action='store_true',
                     help='render the enzyme lever-map figure (metabolic_split_12d '
-                         'campaigns only); overrides --panel-b / --params-only')
+                         'campaigns only); overrides --variants / --params-only')
     ap.add_argument('--relay', action=argparse.BooleanOptionalAction,
                     default=True,
                     help='default (no --set) path only: add the PI (log-tail) '
@@ -2703,8 +2608,7 @@ def main(argv=None):
             continue
         out_stem = os.path.join(args.out_dir, f'{stem}_{variant}_{stamp}')
         if variant == 'overview':
-            plot(sets, band, out_stem, dpi=args.dpi,
-                 include_parameters=args.panel_b)
+            plot(sets, band, out_stem, dpi=args.dpi)
         elif variant == 'parameters':
             plot(sets, band, out_stem, dpi=args.dpi, params_only=True)
         elif plot_relay_trajectories(sets, out_stem, dpi=args.dpi) is None:
