@@ -116,7 +116,16 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'split12d_trajectory_path', 'read_trajectory_row',
            'REPRODUCTION_MODES', 'reconstruct_trial_kinetics',
            'REPRODUCTION_DIAGNOSTIC_METRICS', 'compare_tracked_metrics',
-           'reproduce_split12d_trial',)
+           'reproduce_split12d_trial',
+           'RELAY_KWARGS_DEFAULTS', 'RELAY_TRIAL_SYSTEM_ATTR',
+           'RELAY_TRIAL_USER_ATTR', 'RELAY_DROP_REASONS',
+           'resolve_relay_kwargs', 'relay_donor_path', 'relay_spec_json',
+           'relay_study_tag', 'relay_rows_sha1', 'select_relay_rows',
+           'relay_frozen_trials', 'n_relay_trials', 'best_simulated_trial',
+           'relay_manifest_path', 'default_results_dir',
+           'STUDY_OUTPUT_SUFFIXES', 'STUDY_PLOT_SUFFIXES',
+           'PLOT_STAMP_PLACEHOLDER', 'WINDOWS_MAX_PATH',
+           'longest_output_paths',)
 
 FEEDING_VARIABLES = ('threshold_conc', 'target_delta', 'spike_delta',
                      'max_n_spikes')
@@ -2179,7 +2188,7 @@ def method_study_tag(method):
 
 def check_method_kwargs(method, *, enqueue_knockouts=False, seed_from=None,
                         n_startup_trials=None, feasible_sampling=True,
-                        startup_sampling='lhs'):
+                        startup_sampling='lhs', relay_from=None):
     """Validate the driver's optuna-only kwargs against `method`. Under
     'tpe' AND 'gp' (both optuna studies) everything is allowed ('' returned:
     enqueue_baseline / enqueue_knockouts / seed_from / n_startup_trials /
@@ -2189,8 +2198,23 @@ def check_method_kwargs(method, *, enqueue_knockouts=False, seed_from=None,
     SAMPLER settings (n_startup_trials, feasible_sampling, startup_sampling)
     are merely ignored: one printable line naming them is returned, so the
     driver and the supervisor (which forwards them explicitly) can say so
-    once. An unknown method raises (method_study_tag)."""
+    once. An unknown method raises (method_study_tag).
+
+    `relay_from` (a relay campaign's donors, since 2026-09-23; None / empty
+    = off) is GP-ONLY (spec A1): a non-empty value raises ValueError under
+    'tpe' -- optuna's TPE classes a trial without a 'constraints' system
+    attr as INFEASIBLE (score +inf) whenever a constraints_func is set,
+    which is every production TPE path, so the preload would become TPE's
+    "bad" density -- and under 'dual_annealing' (no optuna store)."""
     method_study_tag(method)            # ValueError on an unknown method
+    if _normalize_relay_from(relay_from) and method != 'gp':
+        raise ValueError(
+            f"relay_from (a relay campaign's preloaded donor trials) is "
+            f"GP-only; got method={method!r}. Under 'tpe' a preloaded trial "
+            "carries no 'constraints' system attr, so optuna's TPE would "
+            "score it infeasible whenever a constraints_func is set; "
+            "'dual_annealing' has no optuna store. Pass method='gp' or "
+            'relay_from=None.')
     if method != 'dual_annealing':
         return ''
     if enqueue_knockouts:
@@ -2292,7 +2316,8 @@ def default_study_name(objective, study_target_products, study_type,
                        burden=False, rate_multiplier_bounds=None,
                        inhibition_multiplier_bounds=None,
                        exclude_params=None, stage_1_max_x_bounds=None,
-                       n_seeds=None, method='tpe', ibo_pathway_anchoring=None):
+                       n_seeds=None, method='tpe', ibo_pathway_anchoring=None,
+                       relay_tag=''):
     """Stable study name of a preset study:
     kin_opt_{study_target_products}_{study_type}_{objective slug}
     (slug = lower-cased, spaces -> '_'), e.g.
@@ -2396,6 +2421,18 @@ def default_study_name(objective, study_target_products, study_type,
     only thing keeping a new-scheme study off an old B-anchored study's store
     (the header guard cannot tell them apart -- same columns).
 
+    `relay_tag` (since 2026-09-23; '' = none) is a relay campaign's
+    relay_study_tag(relay_from, relay_kwargs) -- `_rl<sha1-8>` of the sorted
+    donor stems + the resolved selection kwargs -- appended after the seed
+    tag and before `_burden`. A relay campaign has the same columns as the
+    plain study of its objective (the preloaded donor rows live in the
+    optuna store and a manifest, never in the trajectory CSV), so the tag is
+    what keeps it off that study's store; derived from the arguments only,
+    so the driver and the supervisor compute the same name.
+
+    Tag order: objective slug, method tag, `_sc`, `_kb`, `_rb`, `_ib`,
+    `_x`, `_aA`, `_s1x`, `_seed{n}`, `_rl<sha1-8>`, `_burden`.
+
     `burden=True` appends BURDEN_STUDY_SUFFIX ('_burden') after every
     other tag: a burden study (enzyme_burden.py; the driver's default)
     can never resume a burden-free study's CSV/SQLite, or vice versa.
@@ -2422,6 +2459,11 @@ def default_study_name(objective, study_target_products, study_type,
         lo, hi = stage_1_max_x_bounds
         name += f'_s1x{lo:g}-{hi:g}'
     name += seed_points_tag(n_seeds)
+    if relay_tag:
+        if not isinstance(relay_tag, str):
+            raise TypeError('relay_tag must be a str (relay_study_tag); got '
+                            f'{relay_tag!r}')
+        name += relay_tag
     if burden:
         name += BURDEN_STUDY_SUFFIX
     return name
@@ -3655,13 +3697,24 @@ def _n_startup_finished(study):
     start-up-vs-TPE quantity (TPESampler: len(trials) < n_startup_trials)."""
     return len(_finished_trials(study))
 
+def _sampler_drew(trial):
+    """True for a trial the SAMPLER drew: not enqueued (no
+    system_attrs['fixed_params']) and not a preloaded relay trial (no
+    system_attrs['relay'], since 2026-09-23 -- add_trials-inserted donor
+    rows were never drawn from the LHS design). The one predicate of both
+    LHS row-index counters; identical to the old fixed_params test for
+    every non-relay study."""
+    return ('fixed_params' not in trial.system_attrs
+            and not trial.system_attrs.get('relay'))
+
 def _n_sampler_drawn_finished(study):
     """The LHS row index k: COMPLETE|PRUNED trials the SAMPLER drew, i.e. minus
     enqueued trials. Enqueued baseline/probe/seed points carry
     system_attrs['fixed_params'], bypass the sampler (optuna 4.9 Trial._suggest:
-    fixed -> relative -> independent), and consume no design row."""
-    return sum(1 for t in _finished_trials(study)
-               if 'fixed_params' not in t.system_attrs)
+    fixed -> relative -> independent), and consume no design row. Preloaded
+    relay trials (system_attrs['relay'], 2026-09-23) consume none either,
+    while the start-up GATE (_n_startup_finished) still counts them."""
+    return sum(1 for t in _finished_trials(study) if _sampler_drew(t))
 
 def _n_sampler_drawn_consumed(study, current_trial=None):
     """The LHS row index k: design rows already handed out to sampler-drawn
@@ -3678,15 +3731,17 @@ def _n_sampler_drawn_consumed(study, current_trial=None):
     equals _n_sampler_drawn_finished, so the start-up gate (_n_startup_finished)
     and every existing study are unaffected; it only advances k past a row whose
     trial was orphaned. `current_trial=None` counts every non-enqueued
-    sampler-drawn trial (used for diagnostics/tests)."""
+    sampler-drawn trial (used for diagnostics/tests). Preloaded relay trials
+    (system_attrs['relay'], 2026-09-23) are skipped like enqueued ones, so a
+    relay campaign with fewer preloaded trials than n_startup takes LHS rows
+    0, 1, ... for its remaining start-up draws (spec A9)."""
     from optuna.trial import TrialState
     states = (TrialState.COMPLETE, TrialState.PRUNED,
               TrialState.FAIL, TrialState.RUNNING)
     trials = study._get_trials(deepcopy=False, states=states, use_cache=False)
     current = None if current_trial is None else current_trial.number
     return sum(1 for t in trials
-               if 'fixed_params' not in t.system_attrs
-               and t.number != current)
+               if _sampler_drew(t) and t.number != current)
 
 def default_seed_from_datetime(when=None):
     """Default sampler seed derived from a study's start date and time
@@ -3747,6 +3802,878 @@ def record_seed_used(csv_path, *, method, seed, n_done):
     except OSError:
         return None
     return path
+
+#%% Relay campaigns (2026-09-23)
+# Spec docs/superpowers/specs/2026-09-23-relay-preload-pi-campaign-design.md
+# (section 6, amendments A1-A14, BINDING over section 3). A RELAY campaign
+# is a fresh optuna GP study (method='gp' ONLY -- check_method_kwargs) that
+# starts from a MAP of its space built by earlier campaigns of the SAME
+# search space: every trajectory row records every TRACKED_METRICS column,
+# so a process-level campaign's COMPLETE rows already carry the relay's
+# objective (e.g. 'PI (log-tail)') -- they are inserted into the fresh store
+# as COMPLETE trials carrying the donor's RECORDED value, with no
+# re-simulation, before the campaign simulates its own `n_trials`.
+#
+# Selection (select_relay_rows, sim-free, stdlib csv + numpy): COMPLETE rows
+# with a finite value column, quarantined cap hits dropped, out-of-band rows
+# DROPPED (never clipped: the recorded value belongs to the unclipped
+# point), deduplicated in the unit cube (all donors shared lhs_seed 33960,
+# so their start-up rows are bitwise identical and ~0.01 apart in PI --
+# same-x / different-y rows make a deterministic_objective GP
+# ill-conditioned), then a KEEP set (value >= keep_above) plus a
+# deterministic maximin FILL up to max_rows. Identity checks: every donor's
+# full header equals the relay's trajectory columns, its applied_<member>
+# columns reproduce this study's group anchor (a B-anchored donor shares
+# the columns but not the anchor), and every selected row is feasible under
+# this study's burden / volume predicate.
+#
+# Store protocol (run_kinetic_optimization, A7): the study system attrs
+# 'relay_rows_sha1' (selection digest) then 'relay_spec' (relay_spec_json;
+# the detection key last, so a kill between the two leaves no 'relay_spec'
+# and the next launch is simply fresh) are set BEFORE the one
+# study.add_trials call, the manifest
+# <study>_relay_manifest.csv is written, and only then 'relay_n_preloaded'
+# + 'relay_preload_complete' -- so a kill mid-preload is detected and
+# completed idempotently on the next launch. Preloaded trials carry the
+# system attr {'relay': True} and the user attr 'relay_donor' = the
+# '<donor stem>#<trial>' label; n_relay_trials counts them, and the engine's
+# n_done / budget / seed offset count only this campaign's SIMULATED trials.
+# The trajectory CSV holds only simulated rows (its first trial_number is
+# the preload size N, optuna numbering); TRACKED_METRICS and
+# trajectory_columns are unchanged. Nothing here runs for a non-relay study
+# (strict no-op: one extra storage READ of the study system attrs).
+
+#: Defaults of the relay selection knobs (resolve_relay_kwargs; since
+#: 2026-09-23): max_rows = the preload size cap (the GP refits on every
+#: COMPLETE trial each proposal, ~O(n^3.2): 4.2 s / proposal at n = 2000,
+#: 17 s at 3000); keep_above = the value threshold of the KEEP set (None =
+#: no keep set, a pure maximin panel); dedupe_tol = the max-norm unit-cube
+#: distance under which two rows are one point (first occurrence wins);
+#: drop_quarantined = drop COMPLETE rows that hit the sweep cap with a
+#: large final drift (n_sims_run == 5 and final_drift > 1e-4, the
+#: "nearly-converged cap hit" quarantine rule).
+RELAY_KWARGS_DEFAULTS = {'max_rows': 1000, 'keep_above': None,
+                         'dedupe_tol': 1e-3, 'drop_quarantined': True}
+#: Trial markers of a preloaded relay trial: the optuna SYSTEM attr
+#: {RELAY_TRIAL_SYSTEM_ATTR: True} (n_relay_trials; the LHS row index skips
+#: it) and the USER attr RELAY_TRIAL_USER_ATTR = '<donor stem>#<trial>'.
+RELAY_TRIAL_SYSTEM_ATTR = 'relay'
+RELAY_TRIAL_USER_ATTR = 'relay_donor'
+#: The quarantine rule of drop_quarantined (a COMPLETE row whose simulation
+#: hit the load_simulate sweep cap with a final drift above sim_rtol).
+RELAY_QUARANTINE_N_SIMS = 5
+RELAY_QUARANTINE_DRIFT = 1e-4
+#: Relative tolerance of the anchor-identity check (a donor's recorded
+#: applied_<member> vs this study's expand_grouped_values of its multiplier).
+RELAY_ANCHOR_RTOL = 1e-6
+#: Drop reasons counted per donor by select_relay_rows, in filter order.
+RELAY_DROP_REASONS = ('state', 'non_finite', 'quarantine', 'bad_decision',
+                      'out_of_band', 'duplicate')
+
+def _relay_is_number(value):
+    """A real number that is not a bool (numpy scalars included)."""
+    return (isinstance(value, (int, float, np.integer, np.floating))
+            and not isinstance(value, (bool, np.bool_)))
+
+def resolve_relay_kwargs(relay_kwargs):
+    """A fresh copy of RELAY_KWARGS_DEFAULTS updated with `relay_kwargs` (a
+    dict or None; a None VALUE means "use the default"), coerced to the
+    canonical types the relay spec / study tag hash (so 1000 and 1000.0
+    give the same tag): max_rows an int >= 1 (integral numbers accepted,
+    bool refused), keep_above None or a finite float, dedupe_tol a finite
+    float >= 0, drop_quarantined a bool (bool, or the integers 0 / 1). An
+    unknown key or a bad value raises ValueError naming it (the pattern of
+    resolve_gp_kwargs; since 2026-09-23)."""
+    options = dict(RELAY_KWARGS_DEFAULTS)
+    given = dict(relay_kwargs or {})
+    unknown = sorted(set(given) - set(options))
+    if unknown:
+        raise ValueError(f'unknown relay_kwargs key(s) {unknown}; allowed '
+                         f'keys: {sorted(options)}')
+    for key, value in given.items():
+        if value is not None:
+            options[key] = value
+    value = options['max_rows']
+    if (not _relay_is_number(value) or not math.isfinite(float(value))
+            or float(value) != int(value) or int(value) < 1):
+        raise ValueError("relay_kwargs['max_rows'] must be an integer >= 1; "
+                         f'got {value!r}')
+    options['max_rows'] = int(value)
+    value = options['keep_above']
+    if value is not None:
+        if not _relay_is_number(value) or not math.isfinite(float(value)):
+            raise ValueError("relay_kwargs['keep_above'] must be None or a "
+                             f'finite number; got {value!r}')
+        options['keep_above'] = float(value)
+    value = options['dedupe_tol']
+    if (not _relay_is_number(value) or not math.isfinite(float(value))
+            or float(value) < 0.0):
+        raise ValueError("relay_kwargs['dedupe_tol'] must be a finite number "
+                         f'>= 0; got {value!r}')
+    options['dedupe_tol'] = float(value)
+    value = options['drop_quarantined']
+    if isinstance(value, (bool, np.bool_)):
+        options['drop_quarantined'] = bool(value)
+    elif _relay_is_number(value) and value in (0, 1):
+        options['drop_quarantined'] = bool(value)
+    else:
+        raise ValueError("relay_kwargs['drop_quarantined'] must be a bool; "
+                         f'got {value!r}')
+    return options
+
+def _normalize_relay_from(relay_from):
+    """relay_from -> a tuple of donor strings (study names or CSV paths);
+    None / empty -> () (relay off). A single string is one donor."""
+    if relay_from is None:
+        return ()
+    if isinstance(relay_from, (str, os.PathLike)):
+        relay_from = (relay_from,)
+    donors = []
+    for donor in relay_from:
+        if isinstance(donor, os.PathLike):
+            donor = os.fspath(donor)
+        if not isinstance(donor, str) or not donor.strip():
+            raise ValueError('relay_from: every donor must be a non-empty '
+                             'study name or trajectory-CSV path; got '
+                             f'{donor!r}')
+        donors.append(donor)
+    return tuple(donors)
+
+def _relay_donor_stem(donor):
+    """The donor's STEM -- its study name: the basename minus
+    '_trajectory.csv' (or minus '.csv' for another CSV name; a bare study
+    name is its own stem). From the argument string only, never the file,
+    so the driver and the stdlib-only supervisor derive the same tag."""
+    base = os.path.basename(os.fspath(donor).rstrip('/\\'))
+    if base.endswith('_trajectory.csv'):
+        return base[:-len('_trajectory.csv')]
+    if base.lower().endswith('.csv'):
+        return base[:-len('.csv')]
+    return base
+
+def _relay_donor_stems(relay_from):
+    """Sorted donor stems of `relay_from`; a repeated donor or two donors
+    with the same stem (different paths) raise ValueError (A4)."""
+    donors = _normalize_relay_from(relay_from)
+    stems = [_relay_donor_stem(donor) for donor in donors]
+    repeated = sorted({stem for stem in stems if stems.count(stem) > 1})
+    if repeated:
+        raise ValueError(f'relay_from: donor stem(s) {repeated} given more '
+                         'than once (a repeated donor, or two paths with the '
+                         f'same study name): {list(donors)}')
+    return sorted(stems)
+
+def relay_donor_path(donor, results_dir=None):
+    """Trajectory-CSV path of a relay donor: an explicit path (a name ending
+    in '.csv', or an existing file) is returned as given; a study name
+    resolves to '<results_dir>/<name>_trajectory.csv' (results_dir None =
+    this package's analyses/results, the engine default). The seed_from
+    resolution rule, plus the '.csv' test so a mistyped path fails as a
+    missing file instead of silently becoming a study name."""
+    donor = os.fspath(donor)
+    if donor.lower().endswith('.csv') or os.path.isfile(donor):
+        return donor
+    if results_dir is None:
+        results_dir = default_results_dir()
+    return os.path.join(results_dir, donor + '_trajectory.csv')
+
+def relay_spec_json(relay_from, relay_kwargs=None):
+    """Canonical JSON of a relay campaign's identity (A6): {'donors': the
+    sorted donor stems, 'kwargs': resolve_relay_kwargs(relay_kwargs)},
+    json.dumps(sort_keys=True, separators=(',', ':')). A function of the
+    ARGUMENTS only (never the donor files), stored as the study system attr
+    'relay_spec' and hashed by relay_study_tag. ValueError when relay_from
+    is empty, a donor stem repeats, or a kwarg is bad."""
+    stems = _relay_donor_stems(relay_from)
+    if not stems:
+        raise ValueError('relay_spec_json: relay_from is empty (relay off)')
+    return json.dumps({'donors': stems,
+                       'kwargs': resolve_relay_kwargs(relay_kwargs)},
+                      sort_keys=True, separators=(',', ':'))
+
+def relay_study_tag(relay_from, relay_kwargs=None):
+    """Study-name tag of a relay campaign (since 2026-09-23): '_rl' + the
+    first 8 hex digits of sha1(relay_spec_json(relay_from, relay_kwargs)),
+    '' when relay_from is None / empty. Computed from the ARGUMENTS only
+    (sorted donor stems + the canonical resolved kwargs), so the driver and
+    the stdlib-only supervisor derive the same name before any file is
+    read; order-insensitive in the donors, sensitive to every kwarg. The
+    Sobol' `_custom<sha1-8>` precedent; 11 characters, placed by
+    default_study_name after the seed tag and before `_burden`. Path budget
+    (spec §3.1; longest_output_paths): the production name is 103
+    characters, and its longest write -- the driver's end-of-run
+    `<pkg>/analyses/results/<name>_param_trajectory_<16-char stamp>.png`
+    (or `_best_vs_baseline_`, the same length) -- is 254 of Windows' 260
+    (MAX_PATH incl. the terminating NUL) on this checkout; the longest
+    run-data file (`_relay_manifest.csv.tmp`) is 239 (check 103)."""
+    if not _normalize_relay_from(relay_from):
+        return ''
+    import hashlib
+    digest = hashlib.sha1(
+        relay_spec_json(relay_from, relay_kwargs).encode('utf-8')).hexdigest()
+    return '_rl' + digest[:8]
+
+def default_results_dir():
+    """The engine's default results directory, <this package>/analyses/
+    results -- what run_kinetic_optimization and relay_donor_path use when
+    results_dir is None (and where the supervisor's RESULTS_DIR points)."""
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        'analyses', 'results')
+
+# Output-path budget (spec §3.1, 2026-09-23): Windows' MAX_PATH is 260
+# characters INCLUDING the terminating NUL (long paths are disabled on the
+# production machine), so a path of 260+ characters cannot be created. The
+# relay tag `_rl<sha1-8>` keeps the production name at 103 characters; the
+# driver and the supervisor report the longest path a study can write
+# (longest_output_paths) and refuse a relay study whose RUN-DATA path would
+# not fit (the plots are written last and only warned about). The suffix
+# lists mirror every writer: the engine (trajectory CSV, in-flight sidecar +
+# its atomic .tmp, the seed log, the optuna SQLite store + its rollback
+# journal, the relay manifest + its .tmp), the supervisor's run log and the
+# driver's four end-of-run plots (stamp strftime('%Y.%m.%d-%H.%M'), 16
+# characters -- check 103 pins the plot suffixes to the driver source).
+#: Stand-in for the driver's plot time stamp (same length as
+#: datetime.strftime('%Y.%m.%d-%H.%M')).
+PLOT_STAMP_PLACEHOLDER = 'YYYY.MM.DD-HH.MM'
+#: Suffixes (after `<results_dir>/<study>`) of every run-data file a study
+#: writes.
+STUDY_OUTPUT_SUFFIXES = ('_trajectory.csv', '_inflight.json',
+                         '_inflight.json.tmp', '_seeds.txt', '.db',
+                         '.db-journal', '_run.log', '_relay_manifest.csv',
+                         '_relay_manifest.csv.tmp')
+#: Suffixes of the driver's end-of-run plots, in the driver's order.
+STUDY_PLOT_SUFFIXES = tuple(f'_{kind}_{PLOT_STAMP_PLACEHOLDER}.png'
+                            for kind in ('trajectories', 'param_trajectory',
+                                         'best_vs_baseline', 'pca'))
+#: Windows MAX_PATH (characters incl. the terminating NUL): a path must be
+#: SHORTER than this.
+WINDOWS_MAX_PATH = 260
+
+def longest_output_paths(results_dir, study_name):
+    """(longest run-data path, longest plot path) a study named
+    `study_name` writes under `results_dir` (None = default_results_dir();
+    made absolute, as the writers' paths resolve) -- STUDY_OUTPUT_SUFFIXES
+    and STUDY_PLOT_SUFFIXES appended to `<results_dir>/<study_name>` (ties:
+    the first suffix). Pure string arithmetic (sim-free, touches no file;
+    since 2026-09-23). A path is writable on Windows only when
+    len(path) < WINDOWS_MAX_PATH."""
+    base = os.path.join(os.path.abspath(results_dir or default_results_dir()),
+                        study_name)
+    return (max((base + s for s in STUDY_OUTPUT_SUFFIXES), key=len),
+            max((base + s for s in STUDY_PLOT_SUFFIXES), key=len))
+
+def relay_rows_sha1(rows):
+    """Selection digest (A5): sha1 hex over the ordered (label, repr(value))
+    list of select_relay_rows' rows -- stored as the study system attr
+    'relay_rows_sha1', so a relaunch that completes an interrupted preload
+    can prove it re-selected the SAME rows."""
+    import hashlib
+    payload = json.dumps([[row['label'], repr(float(row['value']))]
+                          for row in rows], separators=(',', ':'))
+    return hashlib.sha1(payload.encode('utf-8')).hexdigest()
+
+def _relay_float(cell):
+    """A trajectory-CSV cell as a float: '' / None / unparsable -> NaN;
+    'nan', 'inf', '-inf' parse as such (stdlib float(): round-trip exact,
+    unlike pandas' default parser)."""
+    if cell is None:
+        return math.nan
+    try:
+        return float(cell)
+    except (TypeError, ValueError):
+        return math.nan
+
+def _relay_close(recorded, expected, rtol):
+    """recorded ~ expected within rtol (relative to the larger magnitude;
+    0 == 0 passes; NaN never does)."""
+    return abs(recorded - expected) <= rtol*max(abs(recorded), abs(expected))
+
+def select_relay_rows(donor_paths, search_space, value_column, *,
+                      max_rows=RELAY_KWARGS_DEFAULTS['max_rows'],
+                      keep_above=RELAY_KWARGS_DEFAULTS['keep_above'],
+                      dedupe_tol=RELAY_KWARGS_DEFAULTS['dedupe_tol'],
+                      drop_quarantined=RELAY_KWARGS_DEFAULTS['drop_quarantined'],
+                      columns=None, parameter_groups=None,
+                      kinetic_baselines=None, group_references=None,
+                      is_feasible=None):
+    """The donor rows a relay campaign preloads (spec 2026-09-23 §3.1 +
+    A4/A5), sim-free and deterministic (no RNG). Returns (rows, notes).
+
+    Donors (`donor_paths`, trajectory-CSV paths) are processed in SORTED
+    STEM order (stem = basename minus '_trajectory.csv'; the key
+    relay_study_tag hashes), so any permutation of the list returns the
+    same rows; a repeated stem raises. Each donor is read with the stdlib
+    csv module + float() (round-trip exact). A missing file, decision
+    columns (between 'state' and 'objective') other than `search_space`'s
+    names in order, a missing `value_column`, or -- when `columns` (the
+    relay's own trajectory columns) is given -- any other full header
+    raises ValueError naming the donor.
+
+    Per row, in this order (counted per donor under RELAY_DROP_REASONS):
+    state != 'COMPLETE' -> 'state'; a non-finite / blank value_column ->
+    'non_finite'; drop_quarantined and n_sims_run == 5 and final_drift >
+    1e-4 -> 'quarantine' (NaN diagnostics are not quarantined); a
+    non-finite / unparsable decision cell or trial_number ->
+    'bad_decision'; a decision value with `not (low <= x <= high)` or a
+    non-integral int -> 'out_of_band' (DROPPED, never clipped: the recorded
+    value belongs to that exact point); a repeated trial number of the same
+    donor -> 'duplicate'. ANCHOR IDENTITY (when `parameter_groups` and
+    `kinetic_baselines` are given and non-empty): every surviving row's
+    expand_grouped_values(params, parameter_groups, kinetic_baselines,
+    group_references) must reproduce its recorded applied_<member> columns
+    within RELAY_ANCHOR_RTOL, else ValueError naming donor and trial (a
+    B-anchored or differently referenced donor shares the columns but not
+    the anchor).
+
+    DEDUPE: survivors in canonical order (donor order, then trial number)
+    are mapped to the unit cube (external_to_unit); a row whose max-norm
+    distance to an already-kept row is < dedupe_tol is dropped as
+    'duplicate' (first occurrence wins; exact test through a 2-D bucket
+    hash; dedupe_tol 0 keeps everything). KEEP set: unique rows with value
+    >= keep_above (None -> empty), value-descending, ties by canonical
+    order, truncated to max_rows (noted). FILL: the remaining slots by
+    greedy maximin over the other unique rows -- squared EUCLIDEAN unit-cube
+    distance to the selected set, argmax (first index wins ties) -- seeded
+    by the keep set, or, when it is empty, by the best-valued row, which
+    counts toward max_rows. So the best unique row is always selected.
+    FEASIBILITY IDENTITY: every SELECTED row must satisfy `is_feasible`
+    (the relay's own burden / volume predicate; None skips) -- a COMPLETE
+    donor row infeasible here means the donor ran under different caps.
+
+    rows: [{'label': '<donor stem>#<trial>', 'params': {name: float | int},
+    'value': float, 'record': the donor CSV row as {column: cell}}] in
+    selection order (keep set, then fill) -- the preload order, i.e. the
+    optuna trial numbers 0..N-1. notes: a dict -- 'donors' {stem: {'path',
+    'read', 'candidates', 'selected', <each drop reason>}}, 'n_candidates',
+    'n_unique', 'n_keep_above' (before truncation), 'n_keep',
+    'keep_truncated', 'n_fill', 'n_selected', 'best_value', 'best_label',
+    'max_duplicate_spread' (largest value spread inside a collapsed group)
+    + 'max_duplicate_spread_label', 'rows_sha1' (relay_rows_sha1),
+    'elapsed_s', 'kwargs' (resolved), 'value_column', and 'lines' (printable
+    summary lines; the out-of-band total is printed prominently). ValueError
+    when no row survives."""
+    import itertools
+    import time
+    t0 = time.perf_counter()
+    opts = resolve_relay_kwargs(dict(max_rows=max_rows, keep_above=keep_above,
+                                     dedupe_tol=dedupe_tol,
+                                     drop_quarantined=drop_quarantined))
+    max_rows, keep_above = opts['max_rows'], opts['keep_above']
+    dedupe_tol, drop_quarantined = opts['dedupe_tol'], opts['drop_quarantined']
+    names = list(search_space)
+    if isinstance(donor_paths, (str, os.PathLike)):
+        donor_paths = (donor_paths,)
+    donors = [(_relay_donor_stem(path), os.fspath(path)) for path in donor_paths]
+    if not donors:
+        raise ValueError('select_relay_rows: no donor given')
+    stems = [stem for stem, _ in donors]
+    repeated = sorted({stem for stem in stems if stems.count(stem) > 1})
+    if repeated:
+        raise ValueError(f'relay donors: stem(s) {repeated} given more than '
+                         'once (a repeated donor, or two paths with the same '
+                         f'study name): {[path for _, path in donors]}')
+    donors.sort(key=lambda donor: donor[0])
+    groups = {str(g): list(m) for g, m in dict(parameter_groups or {}).items()}
+    check_anchor = bool(groups) and bool(kinetic_baselines)
+    applied_members = [m for members in groups.values() for m in members]
+
+    per_donor, candidates = {}, []
+    for stem, path in donors:
+        if not os.path.isfile(path):
+            raise ValueError(f'relay donor {stem!r}: no trajectory CSV at {path}')
+        with open(path, newline='') as fh:
+            reader = csv.reader(fh)
+            header = next(reader, None)
+            if (header is None or 'trial_number' not in header
+                    or 'state' not in header or 'objective' not in header):
+                raise ValueError(f'relay donor {stem!r} ({path}) is not a '
+                                 "trajectory CSV (no 'trial_number' / 'state' "
+                                 "/ 'objective' columns)")
+            decision = header[header.index('state') + 1:header.index('objective')]
+            if decision != names:
+                raise ValueError(f'relay donor {stem!r}: decision columns '
+                                 f'{decision} differ from this search space '
+                                 f'{names} (a relay donor must have sampled '
+                                 'the SAME space)')
+            if value_column not in header:
+                raise ValueError(f'relay donor {stem!r}: no {value_column!r} '
+                                 'column (the relay value column)')
+            if columns is not None and header != list(columns):
+                extra = [c for c in header if c not in columns]
+                absent = [c for c in columns if c not in header]
+                raise ValueError(
+                    f'relay donor {stem!r}: header differs from this study\'s '
+                    f'trajectory columns (donor-only {extra}, missing '
+                    f'{absent}{"" if extra or absent else ", order differs"})')
+            if check_anchor:
+                missing = [f'applied_{m}' for m in applied_members
+                           if f'applied_{m}' not in header]
+                if missing:
+                    raise ValueError(f'relay donor {stem!r}: no {missing} '
+                                     'columns, so its group anchor cannot be '
+                                     'verified')
+            counts = {'path': path, 'read': 0, 'candidates': 0, 'selected': 0,
+                      **{reason: 0 for reason in RELAY_DROP_REASONS}}
+            donor_rows, seen_trials = [], set()
+            n_columns = len(header)
+            for cells in reader:
+                if not cells:
+                    continue
+                counts['read'] += 1
+                if len(cells) < n_columns:
+                    cells = cells + ['']*(n_columns - len(cells))
+                record = dict(zip(header, cells))
+                if record['state'] != 'COMPLETE':
+                    counts['state'] += 1
+                    continue
+                value = _relay_float(record[value_column])
+                if not math.isfinite(value):
+                    counts['non_finite'] += 1
+                    continue
+                if (drop_quarantined
+                        and _relay_float(record.get('n_sims_run')) == RELAY_QUARANTINE_N_SIMS
+                        and _relay_float(record.get('final_drift')) > RELAY_QUARANTINE_DRIFT):
+                    counts['quarantine'] += 1
+                    continue
+                trial = _relay_float(record['trial_number'])
+                raw = [_relay_float(record[name]) for name in names]
+                if (not math.isfinite(trial) or trial != int(trial)
+                        or not all(math.isfinite(x) for x in raw)):
+                    counts['bad_decision'] += 1
+                    continue
+                params, in_band = {}, True
+                for name, x in zip(names, raw):
+                    sp = search_space[name]
+                    if not (sp['low'] <= x <= sp['high']):
+                        in_band = False
+                        break
+                    if sp.get('int'):
+                        if x != int(x):
+                            in_band = False
+                            break
+                        params[name] = int(x)
+                    else:
+                        params[name] = x
+                if not in_band:
+                    counts['out_of_band'] += 1
+                    continue
+                trial = int(trial)
+                if trial in seen_trials:
+                    counts['duplicate'] += 1
+                    continue
+                seen_trials.add(trial)
+                if check_anchor:
+                    applied = expand_grouped_values(params, groups,
+                                                    kinetic_baselines,
+                                                    group_references)
+                    for member in applied_members:
+                        recorded = _relay_float(record[f'applied_{member}'])
+                        if not _relay_close(recorded, applied[member],
+                                            RELAY_ANCHOR_RTOL):
+                            raise ValueError(
+                                f'relay donor {stem!r} trial {trial}: '
+                                f'applied_{member} = {recorded!r}, but this '
+                                'study\'s group anchor gives '
+                                f'{applied[member]!r} (rel tol '
+                                f'{RELAY_ANCHOR_RTOL:g}) -- the donor ran '
+                                'under a different anchor / group references '
+                                '(e.g. a B-anchored study with the same '
+                                'columns)')
+                counts['candidates'] += 1
+                donor_rows.append((trial, params, value, record))
+        donor_rows.sort(key=lambda r: r[0])        # stable: canonical order
+        for trial, params, value, record in donor_rows:
+            candidates.append({'stem': stem, 'label': f'{stem}#{trial}',
+                               'params': params, 'value': value,
+                               'record': record})
+        per_donor[stem] = counts
+    if not candidates:
+        raise ValueError('relay: no donor row survived the filters '
+                         f'(per donor: {per_donor})')
+
+    # Unit cube, canonical order.
+    X = np.array([external_to_unit(c['params'], search_space)
+                  for c in candidates], dtype=float).reshape(len(candidates), -1)
+    n, d = X.shape
+    values = np.array([c['value'] for c in candidates], dtype=float)
+    # DEDUPE (first occurrence wins). Exact max-norm test against the kept
+    # rows in the neighbouring buckets of a 2-D grid hash on the two
+    # coordinates with the most distinct buckets: |u - v| < tol in every
+    # coordinate puts two rows in the same or adjacent buckets (width
+    # tol*(1 + 1e-9), so a rounding error cannot push them 2 buckets apart).
+    unique, dup_of = [], {}
+    vmin, vmax = [], []
+    if dedupe_tol > 0.0 and d > 0:
+        width = dedupe_tol*(1.0 + 1e-9)
+        B = np.floor(X/width).astype(np.int64)
+        n_distinct = [len(np.unique(B[:, j])) for j in range(d)]
+        dims = sorted(range(d), key=lambda j: (-n_distinct[j], j))[:min(2, d)]
+        offsets = list(itertools.product((-1, 0, 1), repeat=len(dims)))
+        buckets = {}
+        for i in range(n):
+            key = tuple(int(B[i, j]) for j in dims)
+            near = []
+            for off in offsets:
+                near.extend(buckets.get(tuple(k + o for k, o in zip(key, off)), ()))
+            if near:
+                near.sort()
+                rows_near = X[[unique[p] for p in near]]
+                close = np.abs(rows_near - X[i]).max(axis=1) < dedupe_tol
+                if close.any():
+                    p = near[int(np.argmax(close))]       # the earliest kept row
+                    dup_of[i] = p
+                    vmin[p] = min(vmin[p], values[i])
+                    vmax[p] = max(vmax[p], values[i])
+                    per_donor[candidates[i]['stem']]['duplicate'] += 1
+                    continue
+            buckets.setdefault(key, []).append(len(unique))
+            unique.append(i)
+            vmin.append(values[i])
+            vmax.append(values[i])
+    else:
+        unique = list(range(n))
+        vmin = list(values)
+        vmax = list(values)
+    m = len(unique)
+    spreads = np.asarray(vmax, dtype=float) - np.asarray(vmin, dtype=float)
+    p_spread = int(np.argmax(spreads)) if m else 0
+    values_u = values[unique]
+    Xu = X[unique]
+    # KEEP set: value >= keep_above, value-descending, ties canonical.
+    if keep_above is None:
+        keep_pos = []
+    else:
+        keep_pos = [p for p in range(m) if values_u[p] >= keep_above]
+        keep_pos.sort(key=lambda p: (-values_u[p], p))
+    n_keep_above = len(keep_pos)
+    keep_truncated = n_keep_above > max_rows
+    keep_pos = keep_pos[:max_rows]
+    selected = list(keep_pos)
+    # FILL: incremental maximin (squared explicit Euclidean differences).
+    n_fill_slots = max_rows - len(selected)
+    if n_fill_slots > 0 and len(selected) < m:
+        if not selected:
+            best = min(range(m), key=lambda p: (-values_u[p], p))
+            selected.append(best)                 # counts toward max_rows
+            n_fill_slots -= 1
+        d2 = np.full(m, np.inf)
+        for s in selected:
+            d2 = np.minimum(d2, ((Xu - Xu[s])**2).sum(axis=1))
+        d2[selected] = -np.inf
+        for _ in range(n_fill_slots):
+            i = int(np.argmax(d2))
+            if d2[i] == -np.inf:
+                break                             # every unique row selected
+            selected.append(i)
+            d2 = np.minimum(d2, ((Xu - Xu[i])**2).sum(axis=1))
+            d2[i] = -np.inf
+    rows = []
+    for p in selected:
+        c = candidates[unique[p]]
+        per_donor[c['stem']]['selected'] += 1
+        rows.append({'label': c['label'], 'params': dict(c['params']),
+                     'value': float(c['value']), 'record': c['record']})
+    if is_feasible is not None:
+        infeasible = [row['label'] for row in rows
+                      if not is_feasible(dict(row['params']))]
+        if infeasible:
+            raise ValueError(
+                f'relay: {len(infeasible)} selected donor row(s) are '
+                f'INFEASIBLE under this study\'s burden / volume predicate '
+                f'(e.g. {infeasible[:5]}) -- a COMPLETE donor row cannot be '
+                'infeasible unless the donor ran under different caps / '
+                'constants')
+    best_row = max(rows, key=lambda row: row['value'])
+    digest = relay_rows_sha1(rows)
+    elapsed = time.perf_counter() - t0
+    n_out = sum(counts['out_of_band'] for counts in per_donor.values())
+    n_dup = sum(counts['duplicate'] for counts in per_donor.values())
+    notes = {
+        'donors': per_donor, 'n_candidates': n, 'n_unique': m,
+        'n_keep_above': n_keep_above, 'n_keep': len(keep_pos),
+        'keep_truncated': keep_truncated,
+        'n_fill': len(rows) - len(keep_pos), 'n_selected': len(rows),
+        'best_value': best_row['value'], 'best_label': best_row['label'],
+        'max_duplicate_spread': float(spreads[p_spread]) if m else 0.0,
+        'max_duplicate_spread_label': (candidates[unique[p_spread]]['label']
+                                       if m else None),
+        'rows_sha1': digest, 'elapsed_s': elapsed, 'kwargs': opts,
+        'value_column': value_column}
+    lines = [f'{len(donors)} donor(s), value column {value_column!r}, '
+             f'kwargs {opts}']
+    for stem, counts in per_donor.items():
+        dropped = ', '.join(f'{reason} {counts[reason]}'
+                            for reason in RELAY_DROP_REASONS)
+        lines.append(f'  {stem}: read {counts["read"]}, candidates '
+                     f'{counts["candidates"]}, selected {counts["selected"]}; '
+                     f'dropped: {dropped}')
+    lines.append(f'OUT-OF-BAND rows dropped: {n_out} (expected 0 for donors '
+                 'of the same search space)')
+    lines.append(f'{n} candidates -> {m} unique ({n_dup} duplicates within '
+                 f'max-norm {dedupe_tol:g}; largest value spread inside a '
+                 f'collapsed group {notes["max_duplicate_spread"]:.4g} at '
+                 f'{notes["max_duplicate_spread_label"]})')
+    lines.append(f'keep set (value >= {keep_above}): {n_keep_above} unique rows'
+                 + (f', TRUNCATED to max_rows {max_rows}' if keep_truncated
+                    else '')
+                 + f'; maximin fill {notes["n_fill"]}; selected {len(rows)}')
+    lines.append(f'best preloaded {value_column} = {best_row["value"]:.6g} '
+                 f'({best_row["label"]}); selection sha1 {digest}; '
+                 f'{elapsed:.2f} s')
+    notes['lines'] = lines
+    return rows, notes
+
+def relay_frozen_trials(rows, search_space):
+    """optuna FrozenTrials for select_relay_rows' `rows` (the preload of a
+    relay campaign): create_trial(state=COMPLETE, value=row['value'],
+    params (ints cast to int), distributions=search_space_distributions(
+    search_space) -- exactly what the engine's suggest_* calls record, so
+    the GP's search space is never shrunk --, user_attrs = every
+    TRACKED_METRICS column of the donor record as a float (blank / NaN
+    omitted; +-inf kept, as a simulated trial records it) + 'relay_donor' =
+    the label, system_attrs = {'relay': True}). No 'constraints' system attr
+    (hence GP-only with learned_constraints off). optuna is imported here;
+    create_trial validates every value against its distribution."""
+    import optuna
+    from optuna.trial import TrialState
+    distributions = search_space_distributions(search_space)
+    frozen = []
+    for row in rows:
+        params = {name: (int(row['params'][name]) if sp.get('int')
+                         else float(row['params'][name]))
+                  for name, sp in search_space.items()}
+        record = row.get('record') or {}
+        user_attrs = {}
+        for name in TRACKED_METRICS:
+            if name in record:
+                x = _relay_float(record[name])
+                if not math.isnan(x):
+                    user_attrs[name] = x
+        user_attrs[RELAY_TRIAL_USER_ATTR] = row['label']
+        frozen.append(optuna.trial.create_trial(
+            state=TrialState.COMPLETE, value=float(row['value']),
+            params=params, distributions=distributions,
+            user_attrs=user_attrs,
+            system_attrs={RELAY_TRIAL_SYSTEM_ATTR: True}))
+    return frozen
+
+def _is_relay_trial(trial):
+    return bool(trial.system_attrs.get(RELAY_TRIAL_SYSTEM_ATTR))
+
+def n_relay_trials(study):
+    """Number of stored trials carrying the relay marker (system attr
+    {'relay': True}) -- the authoritative preloaded count of a relay
+    campaign (0 for every other study)."""
+    return sum(1 for t in study.get_trials(deepcopy=False) if _is_relay_trial(t))
+
+def best_simulated_trial(study):
+    """The best COMPLETE trial of `study` that is NOT a preloaded relay
+    trial (None when there is none) -- what an end-of-run summary / plot of
+    a relay campaign must report instead of study.best_trial, which may be a
+    donor row. Single-objective studies only (study.direction)."""
+    from optuna.study import StudyDirection
+    from optuna.trial import TrialState
+    trials = [t for t in study.get_trials(deepcopy=False,
+                                          states=(TrialState.COMPLETE,))
+              if not _is_relay_trial(t)]
+    if not trials:
+        return None
+    if study.direction == StudyDirection.MINIMIZE:
+        return min(trials, key=lambda t: t.value)
+    return max(trials, key=lambda t: t.value)
+
+def relay_manifest_path(results_dir, study_name):
+    """<results_dir>/<study>_relay_manifest.csv: one row per preloaded
+    relay trial (write_relay_manifest)."""
+    return os.path.join(results_dir, study_name + '_relay_manifest.csv')
+
+def _relay_label_numbers(study):
+    """{relay label: optuna trial number} of the stored relay trials."""
+    return {t.user_attrs.get(RELAY_TRIAL_USER_ATTR): t.number
+            for t in study.get_trials(deepcopy=False) if _is_relay_trial(t)}
+
+def _write_relay_manifest(path, rows, label_numbers, columns, value_column):
+    """Write the relay manifest (A11) atomically (tmp + os.replace): columns
+    relay_trial_number, donor (the donor STUDY stem; its trial is the
+    record's own trial_number column), donor_objective (the donor's own
+    'objective' cell) + `columns` (the relay's trajectory columns), where
+    'objective' holds the RELAY value (the donor's `value_column` cell);
+    one row per entry of `rows` present in `label_numbers`, sorted by
+    relay_trial_number. Returns the number of rows written."""
+    lines = []
+    for row in rows:
+        number = label_numbers.get(row['label'])
+        if number is None:
+            continue
+        record = row.get('record') or {}
+        out = {c: record.get(c, '') for c in columns}
+        out['objective'] = record.get(value_column, repr(float(row['value'])))
+        out['relay_trial_number'] = number
+        out['donor'] = row['label'].rsplit('#', 1)[0]
+        out['donor_objective'] = record.get('objective', '')
+        lines.append(out)
+    lines.sort(key=lambda out: out['relay_trial_number'])
+    header = ['relay_trial_number', 'donor', 'donor_objective', *columns]
+    tmp = path + '.tmp'
+    with open(tmp, 'w', newline='') as fh:
+        writer = csv.DictWriter(fh, fieldnames=header, extrasaction='ignore')
+        writer.writeheader()
+        for out in lines:
+            writer.writerow(out)
+    os.replace(tmp, path)
+    return len(lines)
+
+def _relay_store_protocol(study, ctx):
+    """The relay store protocol of run_kinetic_optimization (spec A7), run
+    right after the optuna store is opened; returns n_preloaded (the stored
+    relay-trial count). Reads the study system attrs ONCE; a non-relay store
+    with no relay args returns 0 with nothing else read or written (A10).
+
+    - fresh store + relay args: set 'relay_rows_sha1' then 'relay_spec'
+      (the detection key last), ONE study.add_trials(relay_frozen_trials(
+      ...)), write the manifest, then set 'relay_n_preloaded' and
+      'relay_preload_complete'.
+    - store with 'relay_spec': relay args with a different spec ->
+      ValueError. No complete marker (a kill mid-preload): without relay
+      args -> ValueError (relaunch with the same relay_from / relay_kwargs);
+      with them every stored trial must be relay-marked, every stored label
+      must be in the selection and -- when relay trials are already stored
+      -- the stored digest must equal the re-selection's (else ValueError;
+      with none stored the re-selection's digest is simply recorded); the
+      missing rows are inserted, then the manifest and the markers. Complete: the stored relay count must equal
+      'relay_n_preloaded'; a missing manifest is rewritten from the
+      re-selection (relay args) or warned about (no args).
+    - store WITHOUT 'relay_spec' + relay args + stored trials -> ValueError
+      (not a relay study: use a fresh study name)."""
+    storage, study_id = study._storage, study._study_id
+    attrs = storage.get_study_system_attrs(study_id)
+    rows = ctx.relay_rows
+    spec_stored = attrs.get('relay_spec')
+    if spec_stored is None and rows is None:
+        return 0
+    manifest = relay_manifest_path(ctx.results_dir, ctx.study_name)
+    value_column = (ctx.relay_notes or {}).get('value_column',
+                                               ctx.objective_name)
+    trials = study.get_trials(deepcopy=False)
+
+    def _finish(n_label):
+        label_numbers = _relay_label_numbers(study)
+        n_written = _write_relay_manifest(manifest, rows, label_numbers,
+                                          ctx.columns, value_column)
+        n_pre = n_relay_trials(study)
+        storage.set_study_system_attr(study_id, 'relay_n_preloaded', n_pre)
+        storage.set_study_system_attr(study_id, 'relay_preload_complete', True)
+        print(f'Relay preload {n_label}: {n_pre} donor trials stored as '
+              f'trials 0-{n_pre - 1} (manifest {n_written} rows: {manifest}); '
+              f'best preloaded {value_column} = '
+              f"{ctx.relay_notes['best_value']:.6g} "
+              f"({ctx.relay_notes['best_label']}). The campaign's own "
+              f'simulated trials start at trial {n_pre}.')
+        return n_pre
+
+    if spec_stored is None:
+        if trials:
+            raise ValueError(
+                f'relay_from given, but study {ctx.study_name!r} already holds '
+                f'{len(trials)} trials and no relay spec -- it is not a relay '
+                'study; use a fresh study name (default_study_name(relay_tag='
+                'relay_study_tag(...)) gives one).')
+        # 2026-09-23: the digest is written BEFORE 'relay_spec' because a
+        # relaunch detects an interrupted preload by 'relay_spec' alone. A
+        # kill between the two writes then leaves a store with no
+        # 'relay_spec' and 0 trials, which this fresh path simply overwrites.
+        # The reverse order left 'relay_spec' with a None digest, which the
+        # incomplete branch below refused forever ("donor CSVs changed").
+        # Both are still written before the one add_trials call (A7).
+        storage.set_study_system_attr(study_id, 'relay_rows_sha1',
+                                      ctx.relay_rows_sha1)
+        storage.set_study_system_attr(study_id, 'relay_spec', ctx.relay_spec)
+        study.add_trials(relay_frozen_trials(rows, ctx.search_space))
+        return _finish('done')
+    if rows is not None and spec_stored != ctx.relay_spec:
+        raise ValueError(
+            f'study {ctx.study_name!r} was preloaded with relay spec '
+            f'{spec_stored} but this launch passes {ctx.relay_spec}; resume '
+            'with the SAME relay_from / relay_kwargs (or none), or use a '
+            'fresh study name.')
+    relay_trials = [t for t in trials if _is_relay_trial(t)]
+    if not attrs.get('relay_preload_complete'):
+        if rows is None:
+            raise ValueError(
+                f'study {ctx.study_name!r}: relay preload incomplete '
+                f'({len(relay_trials)} of the preload stored, no completion '
+                'marker -- a previous launch was killed mid-preload); '
+                'relaunch with the same relay_from / relay_kwargs to '
+                'complete it.')
+        others = [t.number for t in trials if not _is_relay_trial(t)]
+        if others:
+            raise ValueError(
+                f'study {ctx.study_name!r}: relay preload incomplete but the '
+                f'store holds non-relay trials {others[:10]} -- cannot '
+                'complete the preload safely; use a fresh study name.')
+        # 2026-09-23 (belt-and-braces to the write order above): the digest
+        # guards only an interrupted preload that already INSERTED relay
+        # trials. With none stored, nothing of the interrupted selection is
+        # in the store (a 'relay_spec' with no digest -- a store written in
+        # the old spec-first order and killed between the two attr writes --
+        # or with another digest, killed before its first insert), so the
+        # re-selection's digest is recorded and every row is preloaded,
+        # exactly as on a fresh store.
+        stored_sha1 = attrs.get('relay_rows_sha1')
+        if relay_trials and stored_sha1 != ctx.relay_rows_sha1:
+            raise ValueError(
+                f'study {ctx.study_name!r}: relay preload incomplete and the '
+                'donor re-selection differs from the interrupted one '
+                f"(sha1 {ctx.relay_rows_sha1} vs stored "
+                f"{stored_sha1}: the donor CSVs changed) -- "
+                'use a fresh study name.')
+        if stored_sha1 != ctx.relay_rows_sha1:
+            storage.set_study_system_attr(study_id, 'relay_rows_sha1',
+                                          ctx.relay_rows_sha1)
+        selected = {row['label'] for row in rows}
+        stored = [t.user_attrs.get(RELAY_TRIAL_USER_ATTR) for t in relay_trials]
+        unknown = [label for label in stored if label not in selected]
+        if unknown:
+            raise ValueError(
+                f'study {ctx.study_name!r}: stored relay trials {unknown[:5]} '
+                'are not in the re-selection -- use a fresh study name.')
+        stored_set = set(stored)
+        missing = [row for row in rows if row['label'] not in stored_set]
+        print(f'Relay preload was interrupted: {len(stored)} of {len(rows)} '
+              f'donor trials stored; inserting the {len(missing)} missing.')
+        study.add_trials(relay_frozen_trials(missing, ctx.search_space))
+        return _finish('completed')
+    n_pre = len(relay_trials)
+    if n_pre != attrs.get('relay_n_preloaded'):
+        raise ValueError(
+            f'study {ctx.study_name!r}: {n_pre} relay-marked trials stored but '
+            f"the completed preload recorded {attrs.get('relay_n_preloaded')}"
+            ' -- the store was modified; use a fresh study name.')
+    if rows is not None and attrs.get('relay_rows_sha1') != ctx.relay_rows_sha1:
+        print('WARNING: the donor re-selection differs from the stored '
+              f"preload (sha1 {ctx.relay_rows_sha1} vs "
+              f"{attrs.get('relay_rows_sha1')}: the donor CSVs changed since); "
+              'the stored preload is kept.')
+    if not os.path.isfile(manifest):
+        if rows is None:
+            print(f'WARNING: relay manifest {manifest} is missing; relaunch '
+                  'with the same relay_from / relay_kwargs to rewrite it.')
+        else:
+            label_numbers = _relay_label_numbers(study)
+            selected = {row['label'] for row in rows}
+            absent = [label for label in label_numbers if label not in selected]
+            if absent:
+                print(f'WARNING: relay manifest {manifest} is missing and '
+                      f'{len(absent)} stored relay labels are not in the '
+                      're-selection; manifest not rewritten.')
+            else:
+                n_written = _write_relay_manifest(manifest, rows, label_numbers,
+                                                  ctx.columns, value_column)
+                print(f'Rewrote the missing relay manifest ({n_written} rows): '
+                      f'{manifest}')
+    print(f'Relay study: {n_pre} preloaded donor trials stored (trials '
+          f'0-{n_pre - 1}); they are not budgeted.')
+    return n_pre
 
 #%% Engine
 
@@ -3887,7 +4814,11 @@ class OptimizationContext:
     handles carry no snapshot function, e.g. offline fakes). `group_references`
     is the normalized {group: {member: reference}} of the referenced capacity
     groups ({} when none; since 2026-09-15): evaluate_decision_point and the
-    sampler predicate expand the group multipliers with it."""
+    sampler predicate expand the group multipliers with it. The relay_*
+    fields (since 2026-09-23) are None unless the study is a relay campaign
+    (relay_from): relay_rows / relay_notes = select_relay_rows' output,
+    relay_spec = relay_spec_json(relay_from, relay_kwargs) (the study system
+    attr 'relay_spec'), relay_rows_sha1 = its selection digest."""
     handles: dict
     r_te: object
     fbs_spec: object
@@ -3917,6 +4848,10 @@ class OptimizationContext:
     seed_points: dict
     seed_notes: list
     state_snapshot: object = None
+    relay_rows: object = None
+    relay_notes: object = None
+    relay_spec: object = None
+    relay_rows_sha1: object = None
 
 
 @dataclasses.dataclass
@@ -3946,7 +4881,8 @@ def _prepare_optimization(objective, *, direction, level, objective_units,
                           spike_conc_bounds, study_name, results_dir, handles,
                           burden_model, volume_feasibility, volume_cap,
                           seed_from, parameter_groups, group_multiplier_bounds,
-                          group_references=None, method_tag=''):
+                          group_references=None, method_tag='',
+                          relay_from=None, relay_kwargs=None):
     """Shared set-up of both engines (run_kinetic_optimization and
     run_kinetic_dual_annealing), in the order and with the prints the TPE
     engine always had: objective resolution -> kinetic baselines -> burden
@@ -3956,12 +4892,28 @@ def _prepare_optimization(objective, *, direction, level, objective_units,
     kin_opt_{scenario_label}_{slug}{method_tag}[_burden] (`method_tag` is
     '' for TPE and '_da' for dual annealing; an explicit study_name is used
     as given) -> csv/inflight paths + columns -> seed_from resolution ->
-    trajectory header guard -> orphan-sidecar recovery. Returns an
-    OptimizationContext."""
+    relay-row selection -> trajectory header guard -> orphan-sidecar
+    recovery. Returns an OptimizationContext.
+
+    `relay_from` / `relay_kwargs` (a relay campaign, since 2026-09-23; None
+    = off, the context's relay_* fields stay None): the donor rows are
+    selected sim-free by select_relay_rows NEXT TO the seed_from block --
+    before the header guard, the orphan recovery, the optuna store and any
+    simulation, so a bad donor fails with no .db / CSV written. The
+    objective must be a REGISTRY name (the value column is that name, a
+    tracked-metric column; a callable is refused) with direction
+    'maximize' (spec A3); relay_kwargs without relay_from is refused. The
+    identity checks use this context's own trajectory columns, group anchor
+    (kinetic_baselines + group_references) and burden / volume predicate."""
     if handles is None:
         handles = get_handles()
     r_te, fbs_spec = handles['r_te'], handles['fbs_spec']
 
+    relay_donors = _normalize_relay_from(relay_from)
+    if relay_kwargs and not relay_donors:
+        raise ValueError(f'relay_kwargs={relay_kwargs!r} given without '
+                         'relay_from (no donors): pass relay_from or drop the '
+                         'relay knobs.')
     if isinstance(objective, str):
         entry = OBJECTIVE_REGISTRY[objective]
         objective_getter = entry['getter']
@@ -3976,6 +4928,27 @@ def _prepare_optimization(objective, *, direction, level, objective_units,
         if direction not in ('maximize', 'minimize'):
             raise ValueError("A custom objective callable requires "
                              "direction='maximize' or 'minimize'.")
+    if relay_donors:
+        # A relay preloads the donors' RECORDED values of this objective,
+        # read from the trajectory column of the same name: a registry
+        # objective that is a tracked metric, maximized (the keep set /
+        # best-first selection assume maximize).
+        if not isinstance(objective, str):
+            raise ValueError('relay_from needs a REGISTRY objective (the relay '
+                             'value column is its name); a custom objective '
+                             'callable is refused.')
+        if (OBJECTIVE_REGISTRY[objective]['direction'] != 'maximize'
+                or direction != 'maximize'):
+            raise ValueError(f'relay_from needs a maximized objective; '
+                             f'{objective!r} runs with direction '
+                             f'{direction!r} (the relay selection assumes '
+                             'maximize).')
+        if objective not in TRACKED_METRICS:
+            raise ValueError(f'relay_from: objective {objective!r} must be a '
+                             'trajectory column (a TRACKED_METRICS name) -- '
+                             'the donors\' recorded values are read from it.')
+        relay_options = resolve_relay_kwargs(relay_kwargs)
+        relay_spec = relay_spec_json(relay_donors, relay_options)
 
     kinetic_baselines = discover_kinetic_parameters(r_te)
     if isinstance(burden_model, str):
@@ -4151,6 +5124,9 @@ def _prepare_optimization(objective, *, direction, level, objective_units,
     slug = objective_slug(objective_name)
     if study_name is None:
         study_name = f'kin_opt_{scenario_label}_{slug}{method_tag}'
+        if relay_donors:
+            # A relay campaign never falls back onto the plain study's store.
+            study_name += relay_study_tag(relay_donors, relay_kwargs)
         if burden_on:
             study_name += BURDEN_STUDY_SUFFIX
     csv_path = os.path.join(results_dir, study_name + '_trajectory.csv')
@@ -4172,6 +5148,32 @@ def _prepare_optimization(objective, *, direction, level, objective_units,
             parameter_groups=parameter_groups)
         seed_points.update(points)
         seed_notes.extend(notes)
+    # Relay donor rows (2026-09-23): selected now, sim-free, so a bad donor
+    # (missing file, other columns / anchor / caps) fails before the header
+    # guard, the store and the first simulation. The identity checks use
+    # this study's own columns, group anchor and feasibility predicate (the
+    # caps, independent of feasible_sampling).
+    relay_rows = relay_notes = relay_rows_sha1_ = None
+    if relay_donors:
+        relay_predicate = None
+        if burden_on or volume_on:
+            relay_predicate = feasibility_predicate(
+                burden_on=burden_on, volume_on=volume_on,
+                burden_model=burden_model, parameter_groups=parameter_groups,
+                group_references=group_references,
+                kinetic_baselines=kinetic_baselines,
+                baseline_model_kwargs=baseline_model_kwargs,
+                baseline_max_n_spikes=baseline_max_n_spikes,
+                volume_cap=volume_cap)
+        relay_rows, relay_notes = select_relay_rows(
+            [relay_donor_path(donor, results_dir) for donor in relay_donors],
+            search_space, objective, **relay_options, columns=columns,
+            parameter_groups=parameter_groups,
+            kinetic_baselines=kinetic_baselines,
+            group_references=group_references, is_feasible=relay_predicate)
+        relay_rows_sha1_ = relay_notes['rows_sha1']
+        for line in relay_notes['lines']:
+            print(f'Relay selection: {line}')
     # Pre-flight: a study name colliding with a trajectory of a different
     # column set (search space or burden on/off changed, e.g. a legacy
     # study_name resumed without burden_model=None) must fail HERE --
@@ -4207,7 +5209,10 @@ def _prepare_optimization(objective, *, direction, level, objective_units,
         results_dir=results_dir, study_name=study_name,
         csv_path=csv_path, inflight_path=inflight_path, columns=columns,
         seed_points=seed_points, seed_notes=seed_notes,
-        state_snapshot=state_snapshot)
+        state_snapshot=state_snapshot,
+        relay_rows=relay_rows, relay_notes=relay_notes,
+        relay_spec=(relay_spec if relay_donors else None),
+        relay_rows_sha1=relay_rows_sha1_)
 
 
 def _snapshot_flowsheet(ctx):
@@ -4419,6 +5424,8 @@ def run_kinetic_optimization(objective='IRR',
                              group_references=None,
                              method='tpe',
                              gp_kwargs=None,
+                             relay_from=None,
+                             relay_kwargs=None,
                              ):
     """Run the Bayesian optimization. `objective` is a name in
     OBJECTIVE_REGISTRY (direction/level/units filled from the entry) or a
@@ -4644,6 +5651,37 @@ def run_kinetic_optimization(objective='IRR',
     `--stall-timeout-min` of about 10 or more to the supervisor for a GP
     study expected to pass a few hundred COMPLETE trials.
 
+    `relay_from` / `relay_kwargs` (since 2026-09-23; spec
+    docs/superpowers/specs/2026-09-23-relay-preload-pi-campaign-design.md,
+    amendments A1-A11) make the study a RELAY campaign: `relay_from` is a
+    sequence of donor studies (study names resolved in results_dir, or
+    trajectory-CSV paths) of the SAME search space, `relay_kwargs` the
+    selection knobs (RELAY_KWARGS_DEFAULTS: max_rows, keep_above,
+    dedupe_tol, drop_quarantined). The donors' COMPLETE rows -- which
+    recorded this study's objective as a tracked metric -- are selected
+    sim-free (select_relay_rows: filters, identity checks, unit-cube dedupe,
+    keep set + maximin fill) before the store is opened, and a FRESH store
+    receives them as COMPLETE trials 0..N-1 carrying the donors' recorded
+    values (relay_frozen_trials; system attr 'relay', user attr
+    'relay_donor'), with no re-simulation; <study>_relay_manifest.csv lists
+    them. GP only (check_method_kwargs); a registry, maximized objective
+    that is a tracked metric; learned_constraints must stay False (the
+    donor rows carry no constraint values) -- all refused with ValueError
+    before any .db / CSV exists. `n_trials` then counts this campaign's
+    SIMULATED trials only (n_done = stored trials - n_relay_trials, which
+    also drives the seed offset, the seeds sidecar and the fresh-study
+    enqueue branch), so a relay study simulates exactly `n_trials` across
+    any number of resumes; its trajectory CSV holds only simulated rows,
+    from trial_number N. The GP start-up GATE counts the preloaded trials
+    (N >= n_startup -> GP guidance from the first simulated trial) while the
+    LHS row index skips them (design sized n_startup - N). A resume needs
+    no relay args (the stored spec is authoritative); passing different
+    ones raises; a launch killed mid-preload is completed idempotently by a
+    relaunch with the same args (store system attrs 'relay_spec',
+    'relay_rows_sha1', 'relay_n_preloaded', 'relay_preload_complete'). None
+    / empty = off: nothing of this runs (one extra read of the study system
+    attrs), so every non-relay study behaves exactly as before.
+
     Returns (study, csv_path, kinetic_baselines)."""
     import optuna
     if method not in ('tpe', 'gp'):
@@ -4655,6 +5693,24 @@ def run_kinetic_optimization(objective='IRR',
                          f"{method!r}; gp_kwargs is only meaningful under "
                          "method='gp'")
     gp_options = resolve_gp_kwargs(gp_kwargs)     # validates even the defaults
+    relay_donors = _normalize_relay_from(relay_from)
+    if relay_donors:
+        # Relay refusals BEFORE _prepare_optimization (no .db, no CSV, no
+        # LOST row from an orphan sidecar): GP only (A1) and no learned
+        # constraints (A2 -- the preloaded trials carry no 'constraints'
+        # system attr, and optuna's constraint GP would raise on them).
+        check_method_kwargs(method, relay_from=relay_donors)
+        if gp_options['learned_constraints']:
+            raise ValueError(
+                "relay_from with gp_kwargs['learned_constraints']=True: the "
+                'preloaded donor trials carry no constraint values, so '
+                "optuna's constraint GP cannot be fit; keep "
+                'learned_constraints=False for a relay campaign.')
+        resolve_relay_kwargs(relay_kwargs)       # a bad knob fails here too
+    elif relay_kwargs:
+        raise ValueError(f'relay_kwargs={relay_kwargs!r} given without '
+                         'relay_from (no donors): pass relay_from or drop the '
+                         'relay knobs.')
     ctx = _prepare_optimization(
         objective, direction=direction, level=level,
         objective_units=objective_units, objective_name=objective_name,
@@ -4677,7 +5733,8 @@ def run_kinetic_optimization(objective='IRR',
         parameter_groups=parameter_groups,
         group_multiplier_bounds=group_multiplier_bounds,
         group_references=group_references,
-        method_tag=method_study_tag(method))
+        method_tag=method_study_tag(method),
+        relay_from=relay_donors or None, relay_kwargs=relay_kwargs)
     # Local names for the sampler / enqueue / finally code below (unchanged).
     handles, r_te = ctx.handles, ctx.r_te
     objective_name, direction = ctx.objective_name, ctx.direction
@@ -4705,7 +5762,24 @@ def run_kinetic_optimization(objective='IRR',
     study = optuna.create_study(study_name=study_name, storage=storage,
                                 direction=direction,
                                 load_if_exists=True)
-    n_done = len(study.trials)
+    # Relay store protocol (2026-09-23, spec A7): preloads a fresh relay
+    # store, completes an interrupted preload, validates a resumed one; for
+    # every non-relay study it only READS the study system attrs and
+    # returns 0. n_done then counts this campaign's own (simulated /
+    # enqueued) trials only -- the seed offset, the seeds sidecar, the
+    # fresh-study branch and the budget below are unchanged for non-relay
+    # studies and exclude the preloaded trials of a relay study (A8).
+    n_preloaded = _relay_store_protocol(study, ctx)
+    if n_preloaded and method != 'gp':
+        raise ValueError(
+            f'study {study_name!r} holds {n_preloaded} preloaded relay trials: '
+            f"a relay campaign is GP-only (got method={method!r}).")
+    if n_preloaded and gp_options['learned_constraints']:
+        raise ValueError(
+            f'study {study_name!r} holds {n_preloaded} preloaded relay trials, '
+            "which carry no constraint values: gp_kwargs['learned_constraints']"
+            '=True is refused for a relay campaign.')
+    n_done = len(study.trials) - n_preloaded
     if seed is None:
         seed = default_seed_from_datetime()
         print(f'Default sampler seed from the launch datetime: {seed} '
@@ -4752,27 +5826,45 @@ def run_kinetic_optimization(objective='IRR',
     # read back thereafter. A 'random' run never touches study system-attrs.
     # Use the STORAGE-level API: study.set_system_attr/system_attrs are
     # @deprecated_func (3.1.0 -> removal 5.0.0) and warn on every launch.
+    # A relay campaign's preloaded trials count toward the start-up GATE but
+    # consume no design row (spec A9), so its design has n_startup -
+    # n_preloaded rows and is not built at all when the preload covers the
+    # start-up (n_lhs == n_startup for every non-relay study).
+    n_lhs = max(0, n_startup - n_preloaded)
     lhs_design = None
-    if startup_sampling == 'lhs' and n_startup > 0:
+    if startup_sampling == 'lhs' and n_lhs > 0:
         stored = study._storage.get_study_system_attrs(
             study._study_id).get('lhs_seed')
         lhs_seed = stored if stored is not None else seed
         if stored is None:
             study._storage.set_study_system_attr(
                 study._study_id, 'lhs_seed', lhs_seed)
-        lhs_design = LHSDesign(search_space, n_startup, lhs_seed)
-        print(f'Start-up sampling: Latin hypercube ({n_startup}-row design, '
-              f'lhs_seed {lhs_seed}).')
+        lhs_design = LHSDesign(search_space, n_lhs, lhs_seed)
+        print(f'Start-up sampling: Latin hypercube ({n_lhs}-row design, '
+              f'lhs_seed {lhs_seed})'
+              + (f'; the {n_preloaded} preloaded relay trials fill the rest '
+                 f'of the {n_startup}-trial start-up' if n_preloaded else '')
+              + '.')
+    elif startup_sampling == 'lhs' and n_startup > 0:
+        print(f'Start-up sampling: none needed -- the {n_preloaded} preloaded '
+              f'relay trials already fill the {n_startup}-trial start-up (no '
+              'LHS design).')
     elif startup_sampling == 'lhs':
         print('Start-up sampling: Latin hypercube requested but n_startup=0; '
               'no start-up phase.')
     else:
         print('Start-up sampling: uniform random.')
     feasible_on = bool(feasible_sampling and (burden_on or volume_on))
+    # The start-up GATE counts every stored trial (a relay study's preloaded
+    # trials included), so guidance begins once n_done + n_preloaded reach
+    # n_startup (optuna numbering: after trial n_startup - 1).
+    n_gate = n_done + n_preloaded
     print(f'{"GP" if method == "gp" else "TPE"} random start-up: {n_startup} '
-          f'trials ({startup_rule}); {n_done} trials already stored, so '
-          'guidance begins '
-          f'{"now" if n_done >= n_startup else f"after trial {n_startup - 1}"}'
+          f'trials ({startup_rule}); {n_done} trials already stored'
+          + (f' + {n_preloaded} preloaded relay trials (counted by the '
+             'start-up gate)' if n_preloaded else '')
+          + ', so guidance begins '
+          f'{"now" if n_gate >= n_startup else f"after trial {n_startup - 1}"}'
           + (' (feasibility-aware: joint uniform-feasible draws)'
              if feasible_on else '') + '.')
     predicate = None
@@ -4793,7 +5885,7 @@ def run_kinetic_optimization(objective='IRR',
     if method == 'gp':
         learned = bool(gp_options['learned_constraints']
                        and (burden_on or volume_on))
-        if learned and n_done:
+        if learned and n_gate:        # keyed on the TOTAL stored count (A8)
             # optuna's constraint GP needs the 'constraints' system attr on
             # EVERY stored COMPLETE trial (it raises 'The number of
             # constraints must be the same for all trials' otherwise), so a
@@ -4876,10 +5968,18 @@ def run_kinetic_optimization(objective='IRR',
             group_references=group_references)
         if enqueue_baseline:
             study.enqueue_trial(baseline_point)
-            print('Enqueued the scenario baseline configuration as trial 0.')
+            # (a relay study's preloaded trials hold numbers 0..N-1)
+            print('Enqueued the scenario baseline configuration as trial '
+                  f'{n_preloaded}.')
         else:
+            # (a relay study's preloaded trials hold numbers 0..N-1, so its
+            # first sampled trial is N; 2026-09-23, A8. For n_preloaded == 0
+            # the line is byte-identical to the pre-relay one.)
             print('Baseline NOT enqueued (enqueue_baseline=False): no trial '
-                  'is pre-seeded; the sampler draws every trial from trial 0.')
+                  'is pre-seeded; the sampler draws every trial from trial '
+                  f'{n_preloaded}'
+                  + (f' (trials 0-{n_preloaded - 1} are the preloaded relay '
+                     'rows)' if n_preloaded else '') + '.')
         if enqueue_knockouts:
             # Then the single-knockout probes (one k_* at its floor, all
             # else at the baseline), FIFO in search-space order, so the
@@ -4898,7 +5998,7 @@ def run_kinetic_optimization(objective='IRR',
             # The probes follow the baseline only when it was enqueued, so
             # they start at trial 1 with enqueue_baseline and at trial 0
             # without it.
-            first = 1 if enqueue_baseline else 0
+            first = (1 if enqueue_baseline else 0) + n_preloaded
             span = (f'as trials {first}-{first + len(probes) - 1} '
                     if probes else '')
             print(f'Enqueued {len(probes)} single-knockout probes {span}'
@@ -4917,6 +6017,19 @@ def run_kinetic_optimization(objective='IRR',
     elif seed_points:
         print(f'Resumed study: the {len(seed_points)} seed points are NOT '
               're-enqueued (a fresh study enqueues them once).')
+
+    # Relay study (2026-09-23): the status line counts and ranks THIS
+    # campaign's simulated trials only (study.best_value may be a donor
+    # row's; the preloaded best is printed once by the preload summary).
+    relay_best = [np.nan]
+    if n_preloaded:
+        stored_sim = [t.value for t in study.get_trials(
+                          deepcopy=False,
+                          states=(optuna.trial.TrialState.COMPLETE,))
+                      if not _is_relay_trial(t)]
+        if stored_sim:
+            relay_best[0] = (max(stored_sim) if direction == 'maximize'
+                             else min(stored_sim))
 
     def _objective(trial):
         values = {name: (trial.suggest_int(name, sp['low'], sp['high'])
@@ -4938,7 +6051,28 @@ def run_kinetic_optimization(objective='IRR',
         obj = ev.objective
         for mname in TRACKED_METRICS:
             trial.set_user_attr(mname, ev.record[mname])
-        if trial.number % print_status_every == 0:
+        if n_preloaded:
+            # Relay study: best over this campaign's simulated COMPLETE
+            # trials (this one included), never a preloaded donor value.
+            if (np.isnan(relay_best[0])
+                    or (obj > relay_best[0] if direction == 'maximize'
+                        else obj < relay_best[0])):
+                relay_best[0] = obj
+        sim_index = trial.number - n_preloaded   # == trial.number (non-relay)
+        if sim_index % print_status_every == 0:
+            if n_preloaded:
+                # The trial line and the solver line are printed separately,
+                # so the ranking survives handles without solver details.
+                try:
+                    print(f'\nTrial {trial.number} (simulated {sim_index + 1}'
+                          f'/{n_trials}): {objective_name} = {obj:.6g} '
+                          f'(best simulated so far {relay_best[0]:.6g})')
+                    print(f'integrator: {r_te.integrator.getName()}; '
+                          'HXN Qbal error = '
+                          f"{handles['HXN'].energy_balance_percent_error:.2f} %")
+                except Exception:  # cosmetic only -- never abort the study
+                    pass
+                return obj
             try:
                 best = study.best_value
             except Exception:  # no completed trial stored yet
@@ -4956,8 +6090,10 @@ def run_kinetic_optimization(objective='IRR',
 
     n_remaining = max(0, n_trials - n_done)
     if n_done:
-        print(f'Resuming study {study_name}: {n_done} trials stored; '
-              f'running {n_remaining} more (budget {n_trials}).')
+        print(f'Resuming study {study_name}: {n_done} trials stored'
+              + (f' (plus {n_preloaded} preloaded relay trials, not budgeted)'
+                 if n_preloaded else '')
+              + f'; running {n_remaining} more (budget {n_trials}).')
     from biorefineries.isobutanol import system as _system
     if burden_on:
         _system.set_active_burden(burden_model)

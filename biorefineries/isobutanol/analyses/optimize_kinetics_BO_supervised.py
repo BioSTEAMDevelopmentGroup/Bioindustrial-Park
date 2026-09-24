@@ -95,6 +95,16 @@ sequentially) -- ask-first, like the unsupervised driver. Examples:
     python optimize_kinetics_BO_supervised.py --objective IRR \\
         --study-type metabolic --seed-from <donor study> 1553 1914 \\
         --seed-from <other donor> 1162
+    # relay campaign (GP only, since 2026-09-23): a FRESH store first
+    # receives up to 1000 selected COMPLETE rows of the donor campaigns (same
+    # search space) with their RECORDED objective, then 2000 NEW trials are
+    # simulated; the name gains _rl<sha1-8> before _burden
+    # (..._pi_log-tail_gp_rb0.001-4_ib0.75-1.5_aA_rl<sha1-8>_burden):
+    python optimize_kinetics_BO_supervised.py --objective "PI (log-tail)" \\
+        --study-type metabolic_split_12d --method gp --gp-deterministic \\
+        --n-trials 2000 --seed 20260923 --stall-timeout-min 10 \\
+        --relay-from <donor study> <other donor> --relay-max-rows 1000 \\
+        --relay-keep-above -0.12953
 """
 import argparse
 import importlib.util
@@ -132,7 +142,8 @@ def default_study_name(scenario, objective, kinetic_bounds_scenario,
                        burden=False, rate_multiplier_bounds=None,
                        exclude_params=None, stage_1_max_x_bounds=_UNSET,
                        seed_from=None, method='tpe',
-                       group_multiplier_bounds=None):
+                       group_multiplier_bounds=None,
+                       relay_from=None, relay_kwargs=None):
     """Mirror the driver's stable study naming (resume finds the same
     study): the preset convention
     kin_opt_{study_target_products}_{study_type}_{slug} whenever a
@@ -186,7 +197,13 @@ def default_study_name(scenario, objective, kinetic_bounds_scenario,
     both paths, exactly as the driver does.
     Preset names now carry the scenario-A IBO-pathway anchoring tag `_aA`
     (`ibo_pathway_anchoring='scenario_A'` is passed to ko.default_study_name),
-    mirroring the driver; the legacy path never anchors and gets no tag."""
+    mirroring the driver; the legacy path never anchors and gets no tag.
+    `relay_from` / `relay_kwargs` (a relay campaign's donors and selection
+    knobs, since 2026-09-23; None = off) add ko.relay_study_tag(relay_from,
+    relay_kwargs) -- `_rl<sha1-8>` of the sorted donor stems + the knobs
+    resolved by ko.resolve_relay_kwargs, a function of the ARGUMENTS only --
+    after the seed tag and before `_burden`, exactly as the driver does; the
+    legacy path has no relay tag, so relay_from there raises ValueError."""
     n_seeds = seed_count(seed_from)
     if study_target_products is not None:
         # The _ib / _x / _s1x tags of the preset's own values come from
@@ -220,7 +237,14 @@ def default_study_name(scenario, objective, kinetic_bounds_scenario,
                                                else tuple(stage_1_max_x_bounds))),
                                      n_seeds=n_seeds,
                                      method=method,
-                                     ibo_pathway_anchoring='scenario_A')
+                                     ibo_pathway_anchoring='scenario_A',
+                                     # '' when relay_from is None / empty
+                                     relay_tag=ko.relay_study_tag(
+                                         relay_from, relay_kwargs))
+    if relay_from:
+        raise ValueError('relay_from requires a study preset; the legacy '
+                         'flag path (study_target_products=None) has no '
+                         f'relay tag: got relay_from={relay_from!r}')
     scenario = scenario or 'B'
     slug = ko.objective_slug(objective)
     tag = ko.method_study_tag(method)
@@ -285,7 +309,8 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
                exclude_params=None,
                stage_1_max_x_bounds=_UNSET, seed_from=None,
                method='tpe', annealing_kwargs=None, gp_kwargs=None,
-               group_multiplier_bounds=None):
+               group_multiplier_bounds=None,
+               relay_from=None, relay_kwargs=None):
     """The -c program for one supervised attempt of the driver.
     `study_target_products=None` selects the driver's legacy flag path.
     `rate_multiplier_bounds=None` leaves the k_* band to the preset (the
@@ -307,7 +332,16 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
     GP defaults) likewise only when non-empty. `group_multiplier_bounds=None` leaves
     the effector-family group band to the preset (the kwarg is omitted;
     the grouped presets put every family on the default band, 0.75x-1.5x); a
-    (lo, hi) tuple is forwarded as ONE shared band for every group."""
+    (lo, hi) tuple is forwarded as ONE shared band for every group.
+    `relay_from` (None / empty = no relay; since 2026-09-23) is forwarded as
+    a list of donor strings and `relay_kwargs` (None / {} = the engine
+    defaults; supervise() passes the ko.resolve_relay_kwargs-resolved dict)
+    as a dict, each ONLY when set -- appended after every other kwarg, so
+    the program of every non-relay attempt is byte-identical to before.
+    relay_kwargs without relay_from raises ValueError (the child would)."""
+    if relay_kwargs and not relay_from:
+        raise ValueError(f'relay_kwargs={relay_kwargs!r} given without '
+                         'relay_from (no donors)')
     seeds = [(str(donor), tuple(int(n) for n in trials))
              for donor, trials in (seed_from or ())]
     seed_kw = ('' if not seeds else
@@ -331,6 +365,13 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
                     f'          annealing_kwargs={dict(annealing_kwargs)!r},\n')
     gp_kw = ('' if not gp_kwargs else
              f'          gp_kwargs={dict(gp_kwargs)!r},\n')
+    if isinstance(relay_from, (str, os.PathLike)):
+        relay_from = [relay_from]
+    relay_donors = [os.fspath(donor) for donor in (relay_from or ())]
+    relay_from_kw = ('' if not relay_donors else
+                     f'          relay_from={relay_donors!r},\n')
+    relay_kw = ('' if not relay_kwargs else
+                f'          relay_kwargs={dict(relay_kwargs)!r},\n')
     return (
         'import runpy\n'
         f'ns = runpy.run_path({DRIVER!r})\n'
@@ -358,6 +399,8 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
         f'{exclude_kw}'
         f'{s1x_kw}'
         f'{seed_kw}'
+        f'{relay_from_kw}'
+        f'{relay_kw}'
         f'          )\n')
 
 
@@ -376,7 +419,8 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
               exclude_params=None,
               stage_1_max_x_bounds=_UNSET, seed_from=None,
               method='tpe', annealing_kwargs=None, gp_kwargs=None,
-              group_multiplier_bounds=None):
+              group_multiplier_bounds=None,
+              relay_from=None, relay_kwargs=None):
     """Run attempts until 'complete' or 'abort'; returns the final
     outcome string ('complete' or 'abort'). `study_target_products` /
     `study_type` name the driver's study preset (defaults = the engine's;
@@ -442,9 +486,51 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
     --gp-deterministic; None = the engine defaults) is forwarded on every
     attempt (a sampler setting, not part of the study name; note that
     learned constraints cannot be switched back ON for a study whose stored
-    trials ran without them -- the engine falls back and prints)."""
+    trials ran without them -- the engine falls back and prints).
+    `relay_from` (None = off; --relay-from STUDY_OR_CSV [...], since
+    2026-09-23) makes the study a RELAY campaign: the driver's engine
+    preloads the selected COMPLETE rows of those donor campaigns (same
+    search space) into a FRESH store as trials 0..N-1 with their recorded
+    objective value, then simulates n_trials new ones. `relay_kwargs`
+    (--relay-max-rows / --relay-keep-above / --relay-dedupe-tol /
+    --relay-keep-quarantined; None = the engine defaults) are resolved HERE
+    by the same ko.resolve_relay_kwargs the driver uses (the resolved dict
+    is what the child receives, the settings line logs and the name
+    hashes). Refused with ValueError before the name, the log and any
+    child: relay under any method but 'gp' (ko.check_method_kwargs), on the
+    legacy path, with learned constraints, or knobs without donors. The
+    derived study name gains ko.relay_study_tag(relay_from, relay_kwargs).
+    For a relay study the longest path it can write under RESULTS_DIR
+    (ko.longest_output_paths, spec §3.1) is appended to the settings line;
+    a run-data path at or over Windows' MAX_PATH (260 incl. the NUL) raises
+    ValueError before the log and any child, an over-long plot path is a
+    WARNING event only.
+    Nothing else changes: the trajectory CSV holds only simulated rows, so
+    the stall guard, the row count and ko.attempt_outcome are unchanged."""
     seed_from = [(donor, tuple(int(n) for n in trials))
                  for donor, trials in (seed_from or ())]
+    # Relay campaign (2026-09-23): normalize (None / empty = off; one
+    # string = one donor) and refuse misuse up front, mirroring the driver.
+    if isinstance(relay_from, (str, os.PathLike)):
+        relay_from = [relay_from]
+    relay_from = [os.fspath(donor) for donor in (relay_from or ())] or None
+    if relay_from:
+        ko.check_method_kwargs(method, relay_from=relay_from)   # GP only (A1)
+        if study_target_products is None:
+            raise ValueError('relay_from (--relay-from) requires a study '
+                             'preset; refused under the legacy flag path '
+                             '(--legacy-flags)')
+        if ko.resolve_gp_kwargs(gp_kwargs)['learned_constraints']:
+            raise ValueError("relay_from with gp_kwargs['learned_constraints']"
+                             '=True: the preloaded donor trials carry no '
+                             'constraint values')
+        relay_kwargs = ko.resolve_relay_kwargs(relay_kwargs)   # A12
+        ko.relay_study_tag(relay_from, relay_kwargs)   # repeated donor stem -> ValueError
+    elif relay_kwargs:
+        raise ValueError(f'relay_kwargs={relay_kwargs!r} (--relay-*) given '
+                         'without relay_from (--relay-from)')
+    else:
+        relay_kwargs = None
     if group_multiplier_bounds is not None:
         # An explicit shared effector-family band only means something
         # under a GROUPED preset (parameter_groups in the study type's
@@ -471,7 +557,26 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
                                         stage_1_max_x_bounds=stage_1_max_x_bounds,
                                         seed_from=seed_from,
                                         method=method,
-                                        group_multiplier_bounds=group_multiplier_bounds)
+                                        group_multiplier_bounds=group_multiplier_bounds,
+                                        relay_from=relay_from,
+                                        relay_kwargs=relay_kwargs)
+    # Output-path budget of a relay study (spec §3.1, 2026-09-23; relay only,
+    # so every non-relay settings line is unchanged): the longest run-data
+    # and plot paths under RESULTS_DIR (the driver's engine default too). A
+    # run-data path that cannot exist on Windows (MAX_PATH 260 incl. the NUL)
+    # is refused BEFORE the log and any child; the plots only warn.
+    path_note, plot_path = '', None
+    if relay_from:
+        data_path, plot_path = ko.longest_output_paths(RESULTS_DIR, study_name)
+        if len(data_path) >= ko.WINDOWS_MAX_PATH:
+            raise ValueError(
+                f'relay study {study_name!r}: its longest run-data path is '
+                f'{len(data_path)} characters, over Windows MAX_PATH '
+                f'{ko.WINDOWS_MAX_PATH} (incl. the NUL): {data_path} -- use '
+                'a shorter --study-name')
+        path_note = (f', longest output path {len(plot_path)} characters '
+                     f'(run data {len(data_path)}; Windows MAX_PATH '
+                     f'{ko.WINDOWS_MAX_PATH})')
     csv_path = os.path.join(RESULTS_DIR, study_name + '_trajectory.csv')
     inflight_path = ko.inflight_path_for(RESULTS_DIR, study_name)
     if python is None:
@@ -496,7 +601,8 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
                       seed_from=seed_from,
                       method=method, annealing_kwargs=annealing_kwargs,
                       gp_kwargs=gp_kwargs,
-                      group_multiplier_bounds=group_multiplier_bounds)
+                      group_multiplier_bounds=group_multiplier_bounds,
+                      relay_from=relay_from, relay_kwargs=relay_kwargs)
     guard = ko.StallGuard(stall_timeout_s=60.0*stall_timeout_min)
 
     def event(msg):
@@ -529,8 +635,15 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
           f'exclude_params={exclude_params!r}, '
           f'stage_1_max_x_bounds={stage_1_max_x_bounds!r}, '
           f'seed_from={seed_from!r}, '
+          f'relay_from={relay_from!r}, '
+          f'relay_kwargs={relay_kwargs!r}, '
           f'stall_timeout_min={stall_timeout_min:g}, '
-          f'max_empty_attempts={max_empty_attempts!r}')
+          f'max_empty_attempts={max_empty_attempts!r}'
+          + path_note)
+    if plot_path is not None and len(plot_path) >= ko.WINDOWS_MAX_PATH:
+        event(f'WARNING: the end-of-run plots ({len(plot_path)} characters) '
+              'exceed Windows MAX_PATH and will fail to save; the run itself '
+              'is unaffected')
     attempt = 0
     empty_streak = 0   # consecutive attempts that logged no new trial
     while True:
@@ -893,6 +1006,48 @@ if __name__ == '__main__':
                         help='method gp: tell the GP the objective is '
                              'noise-free (optuna deterministic_objective=True; '
                              'default False)')
+    # Relay campaign flags (2026-09-23; spec 2026-09-23-relay-preload-pi-
+    # campaign-design §3.3 + A12). --relay-from EXTENDS (repeatable and
+    # multi-valued: two --relay-from groups concatenate); the knobs are
+    # collected only when given, then resolved by ko.resolve_relay_kwargs
+    # below (a bad value is a parser.error) -- the same resolution supervise()
+    # and the driver apply, so all three hash one canonical spec.
+    parser.add_argument('--relay-from', nargs='+', action='extend',
+                        default=None, metavar='STUDY_OR_CSV',
+                        help='method gp only: make the study a RELAY '
+                             'campaign -- a FRESH store first receives the '
+                             'selected COMPLETE rows of these donor '
+                             'campaigns (study names under analyses/results '
+                             'or trajectory-CSV paths; SAME search space) as '
+                             'preloaded trials carrying their RECORDED '
+                             'objective value (no re-simulation), then '
+                             '--n-trials NEW trials are simulated. The '
+                             'derived study name gains _rl<sha1-8> of the '
+                             'sorted donor stems + the resolved --relay-* '
+                             'knobs (before _burden). Refused under --method '
+                             'tpe / dual_annealing and --legacy-flags')
+    parser.add_argument('--relay-max-rows', type=int, default=None,
+                        metavar='N',
+                        help='relay: preload at most N donor rows (default '
+                             '1000; the GP refits on every COMPLETE trial per '
+                             'proposal, ~n^3.2). Requires --relay-from')
+    parser.add_argument('--relay-keep-above', type=float, default=None,
+                        metavar='X',
+                        help='relay: every unique donor row whose recorded '
+                             'objective is >= X is kept (best first, capped '
+                             'at --relay-max-rows) before the maximin fill '
+                             '(default: no keep set). Requires --relay-from')
+    parser.add_argument('--relay-dedupe-tol', type=float, default=None,
+                        metavar='X',
+                        help='relay: two donor rows within this max-norm '
+                             'unit-cube distance are one point (first '
+                             'occurrence wins; default 1e-3). Requires '
+                             '--relay-from')
+    parser.add_argument('--relay-keep-quarantined', action='store_true',
+                        help='relay: KEEP COMPLETE donor rows that hit the '
+                             'sweep cap with a large final drift (n_sims_run '
+                             '== 5 and final_drift > 1e-4; dropped by '
+                             'default). Requires --relay-from')
     args = parser.parse_args()
     seed_from = None
     if args.seed_from:
@@ -941,6 +1096,32 @@ if __name__ == '__main__':
     if args.method == 'dual_annealing' and (args.enqueue_knockouts or seed_from):
         parser.error('--enqueue-knockouts and --seed-from have no '
                      'dual-annealing counterpart (optuna enqueue)')
+    relay_kwargs = {}
+    if args.relay_max_rows is not None:
+        relay_kwargs['max_rows'] = args.relay_max_rows
+    if args.relay_keep_above is not None:
+        relay_kwargs['keep_above'] = args.relay_keep_above
+    if args.relay_dedupe_tol is not None:
+        relay_kwargs['dedupe_tol'] = args.relay_dedupe_tol
+    if args.relay_keep_quarantined:
+        relay_kwargs['drop_quarantined'] = False
+    if relay_kwargs and not args.relay_from:
+        parser.error('--relay-max-rows / --relay-keep-above / '
+                     '--relay-dedupe-tol / --relay-keep-quarantined require '
+                     '--relay-from')
+    if args.relay_from:
+        if args.method != 'gp':
+            parser.error(f'--relay-from is GP-only (--method gp); got --method '
+                         f'{args.method} (TPE would score a preloaded trial '
+                         'infeasible; dual annealing has no optuna store)')
+        if args.legacy_flags:
+            parser.error('--relay-from requires a study preset; refused under '
+                         '--legacy-flags')
+        try:   # the SAME resolution the driver applies (A12)
+            relay_kwargs = ko.resolve_relay_kwargs(relay_kwargs)
+            ko.relay_study_tag(args.relay_from, relay_kwargs)   # repeated donor
+        except ValueError as e:
+            parser.error(str(e))
     outcome = supervise(scenario=args.scenario, objective=args.objective,
                         n_trials=args.n_trials,
                         kinetic_bounds_scenario=args.kinetic_bounds_scenario,
@@ -973,5 +1154,8 @@ if __name__ == '__main__':
                         gp_kwargs=gp_kwargs or None,
                         group_multiplier_bounds=(
                             None if args.group_multiplier_bounds is None
-                            else tuple(args.group_multiplier_bounds)))
+                            else tuple(args.group_multiplier_bounds)),
+                        relay_from=args.relay_from or None,
+                        relay_kwargs=(relay_kwargs if args.relay_from
+                                      else None))
     sys.exit(0 if outcome == 'complete' else 1)

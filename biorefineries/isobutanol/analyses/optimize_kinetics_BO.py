@@ -141,7 +141,22 @@ Runner pattern (fresh kernel, one process):
     result, csv_path = ns['run'](objective='IRR', study_type='metabolic_minimal_subset', method='gp')
     result, csv_path = ns['run'](objective='IRR', study_type='metabolic_minimal_subset', method='gp',
                                  gp_kwargs={'learned_constraints': False})
+    # relay campaign (GP only, since 2026-09-23): a FRESH store first receives
+    # up to 1000 COMPLETE rows of the donor campaigns (same search space) as
+    # preloaded trials carrying their RECORDED 'PI (log-tail)' -- no
+    # re-simulation -- then simulates n_trials NEW trials; the name gains
+    # _rl<sha1-8> (ko.relay_study_tag) before _burden
+    result, csv_path = ns['run'](objective='PI (log-tail)', study_type='metabolic_split_12d',
+                                 method='gp', gp_kwargs={'deterministic_objective': True},
+                                 relay_from=['<donor study name>', '<other donor>'],
+                                 relay_kwargs={'max_rows': 1000, 'keep_above': -0.12953})
+
+Relay campaigns (relay_from / relay_kwargs, since 2026-09-23; spec
+docs/superpowers/specs/2026-09-23-relay-preload-pi-campaign-design.md) are
+GP-only preset studies on a registry, maximized, tracked-metric objective;
+see run()'s RELAY paragraph.
 """
+import os
 from datetime import datetime
 
 from biorefineries import isobutanol
@@ -279,6 +294,18 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
         # (ko.GP_KWARGS_DEFAULTS: learned_constraints False,
         # deterministic_objective True, n_fallback_candidates 2048,
         # max_fallback_batches 20); ValueError under any other method.
+        relay_from=None,  # RELAY campaign (since 2026-09-23; GP only): donor
+        # study names (resolved to analyses/results/<name>_trajectory.csv) or
+        # trajectory-CSV paths of the SAME search space; a FRESH store preloads
+        # their selected COMPLETE rows, with the recorded objective value, as
+        # trials 0..N-1 (no re-simulation), then simulates n_trials NEW ones.
+        # None / empty = off; one string = one donor. The derived name gains
+        # ko.relay_study_tag (`_rl<sha1-8>`) before `_burden`.
+        relay_kwargs=None,  # dict of the relay selection knobs
+        # (ko.RELAY_KWARGS_DEFAULTS: max_rows 1000, keep_above None,
+        # dedupe_tol 1e-3, drop_quarantined True; ko.resolve_relay_kwargs,
+        # the same resolution the supervisor applies); ValueError without
+        # relay_from.
         **engine_kwargs,  # bounds/overrides/etc. -> run_kinetic_optimization
         ):
     """Set up the scenario baseline (same recipe as the smoke tests), run
@@ -513,7 +540,40 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     seed / sampler setting is honoured as under TPE. `gp_kwargs` (dict;
     ValueError under any other method) forwards learned_constraints (False),
     deterministic_objective (True), n_fallback_candidates (2048),
-    max_fallback_batches (20)."""
+    max_fallback_batches (20).
+
+    RELAY (`relay_from` / `relay_kwargs`, default None; since 2026-09-23,
+    spec docs/superpowers/specs/2026-09-23-relay-preload-pi-campaign-design.md
+    §3.2 + amendments A1 / A6 / A8 / A12). `relay_from` names donor
+    campaigns of the SAME search space (study names or trajectory-CSV
+    paths); the engine (ko.run_kinetic_optimization) selects their COMPLETE
+    rows sim-free (ko.select_relay_rows: filters, identity checks, unit-cube
+    dedupe, keep set above `keep_above` + maximin fill up to `max_rows`) and
+    a FRESH store receives them as COMPLETE trials 0..N-1 carrying the
+    donors' RECORDED objective value, then `n_trials` NEW trials are
+    simulated (n_trials counts SIMULATED trials only; the trajectory CSV
+    holds only those, from trial_number N; <study>_relay_manifest.csv lists
+    the preloaded rows). Refused here with ValueError BEFORE the preset
+    resolution and the scenario load: any method but 'gp'
+    (ko.check_method_kwargs -- TPE would score a constraint-less preloaded
+    trial infeasible, DA has no store), the legacy path
+    (study_target_products=None), an objective that is not a registry,
+    maximized, tracked-metric name (the donors' value column), learned
+    constraints (the donor rows carry no constraint values), relay_kwargs
+    without relay_from. The knobs are resolved by ko.resolve_relay_kwargs
+    (the supervisor resolves them identically) and the derived study name
+    gains ko.relay_study_tag(relay_from, relay_kwargs) -- `_rl<sha1-8>` of
+    the sorted donor stems + resolved knobs, argument-only -- after the seed
+    tag and before `_burden`; an explicit study_name is used as given. The
+    longest path the relay study can write (ko.longest_output_paths) is
+    printed; a run-data path at or over Windows' MAX_PATH (260 incl. the
+    NUL) is refused with ValueError before the scenario load, an over-long
+    plot path only warned about (spec §3.1). A
+    resume re-passes the same relay args (the stored spec must match; the
+    preload is never repeated). The end-of-run PCA marks the enqueued
+    baseline at the trajectory's FIRST trial_number (N for a relay
+    campaign, 0 otherwise), and the plots / final print use only SIMULATED
+    trials (the CSV; ko.best_simulated_trial)."""
     if 'burden_model' in engine_kwargs:
         raise ValueError("pass burden=True/False to run(), not the engine's "
                          'burden_model (run() builds it so the reports can '
@@ -524,15 +584,55 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
                  for donor, trials in (seed_from or ())]
     n_seeds = sum(len(trials) for _, trials in seed_from)
     method_tag = ko.method_study_tag(method)        # ValueError on a bad method
+    # Relay donors (2026-09-23): None / empty = off; one string (or path) =
+    # one donor; normalized BEFORE check_method_kwargs, which refuses a
+    # non-empty relay_from under any method but 'gp' (spec A1).
+    if isinstance(relay_from, (str, os.PathLike)):
+        relay_from = (relay_from,)
+    relay_from = tuple(os.fspath(donor) for donor in (relay_from or ())) or None
     method_note = ko.check_method_kwargs(
         method, enqueue_knockouts=enqueue_knockouts, seed_from=seed_from,
         n_startup_trials=n_startup_trials, feasible_sampling=feasible_sampling,
-        startup_sampling=startup_sampling)
+        startup_sampling=startup_sampling, relay_from=relay_from)
     if method_note:
         print(method_note)
     if gp_kwargs and method != 'gp':
         raise ValueError(f'gp_kwargs={gp_kwargs!r} requires method=\'gp\'; '
                          f'got method={method!r}')
+    # Relay refusals (2026-09-23; spec §3.2 + A1-A3 / A12), all BEFORE the
+    # preset resolution and the ~20 s scenario load, so a misconfigured
+    # relay fails in seconds -- the engine repeats every one of them (it is
+    # authoritative for direct callers), this only fails earlier. The knobs
+    # go through the SAME ko.resolve_relay_kwargs the supervisor applies, so
+    # the driver and the supervisor hash one canonical spec into one tag.
+    relay_tag = ''
+    if relay_from:
+        if study_target_products is None:
+            raise ValueError(
+                'relay_from requires a study preset (study_target_products): '
+                'the legacy flag path (study_target_products=None) has no '
+                'relay tag in its study name; got relay_from='
+                f'{list(relay_from)!r}')
+        if (not isinstance(objective, str)
+                or objective not in ko.OBJECTIVE_REGISTRY
+                or objective not in ko.TRACKED_METRICS
+                or ko.OBJECTIVE_REGISTRY[objective]['direction'] != 'maximize'
+                or engine_kwargs.get('direction') not in (None, 'maximize')):
+            raise ValueError(
+                'relay_from needs a REGISTRY objective that is MAXIMIZED and a '
+                'tracked trajectory column (the donors\' recorded values are '
+                f'read from it); got objective={objective!r}')
+        if ko.resolve_gp_kwargs(gp_kwargs)['learned_constraints']:
+            raise ValueError(
+                "relay_from with gp_kwargs['learned_constraints']=True: the "
+                'preloaded donor trials carry no constraint values; keep '
+                'learned_constraints=False for a relay campaign.')
+        relay_kwargs = ko.resolve_relay_kwargs(relay_kwargs)
+        relay_tag = ko.relay_study_tag(relay_from, relay_kwargs)
+    elif relay_kwargs:
+        raise ValueError(f'relay_kwargs={relay_kwargs!r} given without '
+                         'relay_from (no donors): pass relay_from or drop the '
+                         'relay knobs.')
     if study_target_products is not None:
         if not restrict_to_workbook:
             raise ValueError(
@@ -591,7 +691,12 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
                 # anchored on scenario A (antimony), a numeric-range change over
                 # the SAME columns, so only the name keeps a new study off an
                 # old B-anchored store.
-                ibo_pathway_anchoring='scenario_A')
+                ibo_pathway_anchoring='scenario_A',
+                # A relay campaign (2026-09-23) has the columns of the plain
+                # study of its objective (the preload lives in the store and
+                # a manifest, never in the CSV), so only this tag -- '' when
+                # relay_from is off -- keeps it off that study's store.
+                relay_tag=relay_tag)
         excluded = tuple(engine_kwargs['exclude_params'] or ())
         groups = dict(engine_kwargs['parameter_groups'] or {})
         grouped = {m for members in groups.values() for m in members}
@@ -675,6 +780,37 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     if seed_from:
         print(f'Seed points: {n_seeds} donor trials enqueued after the '
               f'probes of a fresh study: {seed_from}')
+    if relay_from:
+        # One line: the canonical spec (sorted donor stems + resolved knobs)
+        # is exactly what the engine stores as the 'relay_spec' system attr
+        # and what the tag hashes; the engine prints the selection itself.
+        print(f'Relay campaign (tag {relay_tag}): a FRESH store preloads the '
+              f'selected COMPLETE donor rows with their recorded '
+              f'{objective!r} (no re-simulation) before {n_trials} SIMULATED '
+              'trials (a resume never re-preloads); spec '
+              + ko.relay_spec_json(relay_from, relay_kwargs))
+        # Output-path budget (spec §3.1, 2026-09-23): the longest file this
+        # study can write under the engine's results directory, reported on
+        # its own line (never folded into the one-line summary above). A
+        # run-data path (CSV / store / manifest) that cannot exist on
+        # Windows (MAX_PATH 260 incl. the NUL) is refused HERE, before the
+        # scenario load; the end-of-run plots are written last and inside
+        # a try, so an over-long plot path is only warned about.
+        data_path, plot_path = ko.longest_output_paths(
+            engine_kwargs.get('results_dir'), study_name)
+        if len(data_path) >= ko.WINDOWS_MAX_PATH:
+            raise ValueError(
+                f'relay study {study_name!r}: its longest run-data path is '
+                f'{len(data_path)} characters, over Windows MAX_PATH '
+                f'{ko.WINDOWS_MAX_PATH} (incl. the NUL): {data_path} -- use '
+                'a shorter study_name / results_dir.')
+        print(f'Longest output path: {len(plot_path)} characters (run data '
+              f'{len(data_path)}; Windows MAX_PATH {ko.WINDOWS_MAX_PATH} '
+              f'incl. the NUL): {plot_path}')
+        if len(plot_path) >= ko.WINDOWS_MAX_PATH:
+            print(f'WARNING: the end-of-run plots ({len(plot_path)} '
+                  'characters) exceed Windows MAX_PATH and will fail to '
+                  'save; the run itself is unaffected.')
     # Consolidated scenario baseline: workbook kinetics + distributions +
     # feeding strategy + one baseline model_specification (single source of
     # truth in scenarios.SCENARIOS). The BO samples on top of this baseline.
@@ -712,7 +848,28 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
             volume_feasibility=volume_feasibility,
             startup_sampling=startup_sampling,
             seed_from=seed_from,
+            # None / None for every non-relay study (the engine's no-op path)
+            relay_from=relay_from,
+            relay_kwargs=relay_kwargs,
             **engine_kwargs)
+        if method == 'gp':
+            # A relay store's best trial may be a PRELOADED donor row: report
+            # the best SIMULATED one (spec A8). n_relay_trials is 0 -- and
+            # nothing is printed -- for every other GP study. Report-only: a
+            # failed store read here must never fail a finished run (a
+            # non-zero exit would make the supervisor relaunch it).
+            try:
+                n_preloaded = ko.n_relay_trials(result)
+                if n_preloaded:
+                    best_sim = ko.best_simulated_trial(result)
+                    print(f'Relay campaign: {n_preloaded} preloaded trials; '
+                          'best SIMULATED trial '
+                          + (f'#{best_sim.number} = {best_sim.value!r}'
+                             if best_sim is not None else
+                             'none yet (no COMPLETE simulated trial)'))
+            except Exception as e:
+                print('Relay summary failed (the study is intact on disk): '
+                      f'{repr(e)[:300]}')
     else:
         result, csv_path, kinetic_baselines = ko.run_kinetic_dual_annealing(
             objective=objective,
@@ -740,7 +897,13 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
             objective_units = (ko.OBJECTIVE_REGISTRY[objective]['units']
                                if isinstance(objective, str)
                                else engine_kwargs.get('objective_units', ''))
+            # The trajectory CSV holds only SIMULATED trials (a relay
+            # campaign's preloaded donor rows live in the store and the
+            # manifest), so every plot below -- best-vs-baseline included --
+            # reads simulated trials only.
             df = ko.load_trajectory(csv_path)
+            first_trial_number = (int(df['trial_number'].min()) if len(df)
+                                  else None)
             stamp = datetime.now().strftime('%Y.%m.%d-%H.%M')
             base = csv_path[:-len('_trajectory.csv')]
             ko.plot_optimization_trajectories(
@@ -771,9 +934,14 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
                 objective_name=objective_name,
                 objective_units=objective_units,
                 filename=base + f'_pca_{stamp}.png',
-                # Trial 0 is the baseline ONLY when it was enqueued;
-                # otherwise it is a sampled draw and gets no marker.
-                baseline_trial=(0 if enqueue_baseline else None))
+                # The FIRST trial of the trajectory is the baseline ONLY
+                # when it was enqueued; otherwise it is a sampled draw and
+                # gets no marker. Its number is the CSV's first
+                # trial_number, not a literal 0 (spec A8, 2026-09-23): a
+                # relay campaign numbers its simulated trials from the
+                # preload size N (optuna numbering); 0 for every other study.
+                baseline_trial=(first_trial_number if enqueue_baseline
+                                else None))
             print(f'Plots saved next to {csv_path}')
         except Exception as e:
             print('Plotting failed (the trajectory CSV and study are '

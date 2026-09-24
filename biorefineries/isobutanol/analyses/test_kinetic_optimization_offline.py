@@ -6801,4 +6801,1193 @@ compile(run99, 'reproduce_split12d_trial.py', 'exec')         # syntax only; not
 PASS('reproduce_split12d_trial: spec signature (+ restore), input errors raise before the model '
      'is touched; runner has the UIUC header, load()s first, guarded by __main__')
 
+#%% 100. Relay selection (spec 2026-09-23-relay-preload-pi-campaign-design,
+# §3.1 + A4/A5): select_relay_rows on temp donor CSVs of check 86's grouped,
+# REFERENCED 12d-like space -- every per-donor filter (FAIL state, blank /
+# -inf value, quarantined cap hit vs a sub-threshold drift and NaN
+# diagnostics, unparsable / out-of-band / non-integral decision -- DROPPED,
+# never clipped --, repeated trial number), first-occurrence unit-cube
+# dedupe (an exact and a near duplicate with DIFFERENT values; the spread
+# noted), the value read from the relay column (not the donor's own
+# objective), the value-descending keep set + truncation, the maximin fill
+# (== a brute-force re-implementation; identical on a second call and under
+# a permuted donor list), the digest; and the refusals: missing file, other
+# decision columns, missing value column, a full header other than
+# `columns`, a repeated stem, a different group anchor (B-anchored
+# applied_*), an infeasible selected row, no surviving row.
+import csv as _csv100
+import re as _re100
+kb100 = dict(kb86)
+groups100 = {g: list(m) for g, m in groups86.items()}
+refs100 = {g: dict(r) for g, r in refs86.items()}
+space100, _ = ko.build_search_space(
+    kb100, parameter_groups=groups100, group_multiplier_bounds=gmb86,
+    group_references=refs100, param_bounds_override={'k_13': (5.81e-3, 23.24)},
+    spike_delta_bounds=None)
+applied100 = [f'applied_{m}' for ms in groups100.values() for m in ms]
+cols100 = ko.trajectory_columns(space100, extra_columns=applied100)
+outdir100 = tempfile.mkdtemp()
+rng100 = np.random.default_rng(100)
+d100 = len(space100)
+params100 = {}                     # label -> the external decision vector written
+
+def _row100(stem, trial, u=None, value=0.0, state='COMPLETE', refs=None,
+            params=None, **over):
+    """A donor row: decision vector at unit point u (a fresh interior draw
+    when None) or `params`; 'PI (log-tail)' = value while the donor's own
+    'objective' is a DIFFERENT number; applied_* from `refs` (default: this
+    study's anchor); `over` overrides cells after the fact."""
+    if params is None:
+        u = 0.1 + 0.8*rng100.random(d100) if u is None else u
+        params = ko.unit_to_external(u, space100)
+    rec = {'trial_number': trial, 'state': state, **params}
+    applied = ko.expand_grouped_values(params, groups100, kb100,
+                                       refs100 if refs is None else refs)
+    for col in applied100:
+        rec[col] = applied[col[len('applied_'):]]
+    if state == 'COMPLETE':
+        rec.update({'objective': 0.5 + 0.001*trial, 'PI (log-tail)': value,
+                    'PI': value, 'IRR': 0.2, 'IBO titer': 10.0 + trial,
+                    'n_sims_run': 2, 'final_drift': 1e-6})
+    rec.update(over)
+    params100.setdefault(f'{stem}#{trial}', dict(params))
+    return rec
+
+def _write100(stem, rows, columns=cols100, directory=outdir100):
+    path = os.path.join(directory, stem + '_trajectory.csv')
+    for rec in rows:
+        ko.append_trajectory_row(path, columns, rec)
+    return path
+
+uA0 = 0.1 + 0.8*rng100.random(d100)
+uA4 = 0.1 + 0.8*rng100.random(d100)
+pA4 = ko.unit_to_external(uA4, space100)
+k3_hi100 = space100['k_3']['high']
+pathA100 = _write100('donorA100', [
+    _row100('donorA100', 0, uA0, 0.30),                                     # kept: the best
+    _row100('donorA100', 1, state='FAIL', error='boom'),                    # state
+    _row100('donorA100', 2, value=''),                                      # blank value -> non_finite
+    _row100('donorA100', 3, value=0.9, n_sims_run=5, final_drift=1e-3),     # quarantined cap hit (would be the best)
+    _row100('donorA100', 4, uA4, 0.05, n_sims_run=5, final_drift=5e-5),     # cap hit, drift <= 1e-4: kept
+    _row100('donorA100', 5, value=0.8, k_3=k3_hi100*1.01),                  # out of band: dropped, NOT clipped
+    _row100('donorA100', 6, value=0.8, threshold_conc='abc'),               # unparsable decision -> bad_decision
+    _row100('donorA100', 7, value=0.8, max_n_spikes=3.5),                   # non-integral int -> out_of_band
+    _row100('donorA100', 8, value=0.12, n_sims_run='', final_drift=''),     # NaN diagnostics: not quarantined
+    _row100('donorA100', 9, value=float('-inf')),                           # non_finite
+    _row100('donorA100', 10, value=-0.4),
+    _row100('donorA100', 11, value=0.12),                                   # ties A#8 on value
+    _row100('donorA100', 12, value=-0.05)])
+pB1 = dict(pA4, k_3=pA4['k_3']*1.001)            # ~2e-4 in the unit cube from A#4
+pathB100 = _write100('donorB100', [
+    _row100('donorB100', 0, uA0, 0.31),          # exact duplicate of A#0, other value
+    _row100('donorB100', 1, params=pB1, value=0.07),   # near duplicate of A#4, other value
+    _row100('donorB100', 2, value=0.2),
+    _row100('donorB100', 2, value=0.25),         # repeated trial number -> duplicate
+    _row100('donorB100', 3, value=-0.3),
+    _row100('donorB100', 4, value=0.0),
+    _row100('donorB100', 5, value=-1.2),
+    _row100('donorB100', 6, value=0.02)])
+kw100 = dict(columns=cols100, parameter_groups=groups100, kinetic_baselines=kb100,
+             group_references=refs100)
+rows100, notes100 = ko.select_relay_rows([pathA100, pathB100], space100, 'PI (log-tail)',
+                                         max_rows=9, keep_above=0.0, **kw100)
+nA100, nB100 = notes100['donors']['donorA100'], notes100['donors']['donorB100']
+assert {k: nA100[k] for k in ('read', 'candidates', *ko.RELAY_DROP_REASONS)} == dict(
+    read=13, candidates=6, state=1, non_finite=2, quarantine=1, bad_decision=1,
+    out_of_band=2, duplicate=0), nA100
+assert {k: nB100[k] for k in ('read', 'candidates', *ko.RELAY_DROP_REASONS)} == dict(
+    read=8, candidates=7, state=0, non_finite=0, quarantine=0, bad_decision=0,
+    out_of_band=0, duplicate=3), nB100
+assert notes100['n_candidates'] == 13 and notes100['n_unique'] == 11
+# canonical (sorted-stem, trial) order of the unique rows; first occurrence wins
+unique100 = ['donorA100#0', 'donorA100#4', 'donorA100#8', 'donorA100#10', 'donorA100#11',
+             'donorA100#12', 'donorB100#2', 'donorB100#3', 'donorB100#4', 'donorB100#5',
+             'donorB100#6']
+val100 = {'donorA100#0': 0.30, 'donorA100#4': 0.05, 'donorA100#8': 0.12, 'donorA100#10': -0.4,
+          'donorA100#11': 0.12, 'donorA100#12': -0.05, 'donorB100#2': 0.2,
+          'donorB100#3': -0.3, 'donorB100#4': 0.0, 'donorB100#5': -1.2, 'donorB100#6': 0.02}
+assert np.isclose(notes100['max_duplicate_spread'], 0.02, rtol=1e-12, atol=1e-15)
+assert notes100['max_duplicate_spread_label'] == 'donorA100#4'
+# keep set: value >= 0, value-descending, ties (A#8 / A#11) in canonical order
+keep100 = ['donorA100#0', 'donorB100#2', 'donorA100#8', 'donorA100#11', 'donorA100#4',
+           'donorB100#6', 'donorB100#4']
+X100 = np.array([ko.external_to_unit(params100[l], space100) for l in unique100])
+
+def _maximin100(start, n_total):
+    """Brute-force greedy maximin (squared Euclidean, first index wins ties)."""
+    sel = [unique100.index(l) for l in start]
+    while len(sel) < min(n_total, len(unique100)):
+        best_i, best_d = None, -1.0
+        for i in range(len(unique100)):
+            if i in sel:
+                continue
+            dist = min(float(((X100[i] - X100[s])**2).sum()) for s in sel)
+            if dist > best_d:
+                best_i, best_d = i, dist
+        sel.append(best_i)
+    return [unique100[i] for i in sel]
+assert [r['label'] for r in rows100] == _maximin100(keep100, 9), [r['label'] for r in rows100]
+assert [r['label'] for r in rows100][:7] == keep100
+assert notes100['n_keep'] == notes100['n_keep_above'] == 7 and notes100['n_fill'] == 2
+assert notes100['keep_truncated'] is False and notes100['n_selected'] == 9
+for r100 in rows100:
+    assert r100['value'] == val100[r100['label']]             # the relay column, not 'objective'
+    assert float(r100['record']['objective']) != r100['value']
+    assert r100['params'] == params100[r100['label']]           # round-trip exact (stdlib csv)
+    assert isinstance(r100['params']['max_n_spikes'], int)
+    assert set(r100['params']) == set(space100)
+assert notes100['best_value'] == 0.30 and notes100['best_label'] == 'donorA100#0'
+assert notes100['rows_sha1'] == ko.relay_rows_sha1(rows100)
+assert _re100.fullmatch(r'[0-9a-f]{40}', notes100['rows_sha1'])
+assert notes100['elapsed_s'] >= 0.0 and any('OUT-OF-BAND rows dropped: 2' in l for l in notes100['lines'])
+# deterministic; permutation of the donor list -> identical selection
+rows100b, notes100b = ko.select_relay_rows([pathB100, pathA100], space100, 'PI (log-tail)',
+                                           max_rows=9, keep_above=0.0, **kw100)
+assert [(r['label'], r['value']) for r in rows100b] == [(r['label'], r['value']) for r in rows100]
+assert notes100b['rows_sha1'] == notes100['rows_sha1']
+rows100c, _ = ko.select_relay_rows([pathA100, pathB100], space100, 'PI (log-tail)',
+                                   max_rows=9, keep_above=0.0, **kw100)
+assert [r['label'] for r in rows100c] == [r['label'] for r in rows100]
+# truncation: the keep set exceeds max_rows -> its top max_rows, no fill
+rows100t, notes100t = ko.select_relay_rows([pathA100, pathB100], space100, 'PI (log-tail)',
+                                           max_rows=3, keep_above=0.0, **kw100)
+assert [r['label'] for r in rows100t] == keep100[:3]
+assert notes100t['keep_truncated'] is True and notes100t['n_keep_above'] == 7
+assert notes100t['n_keep'] == 3 and notes100t['n_fill'] == 0
+assert any('TRUNCATED' in l for l in notes100t['lines'])
+# no keep set: the best row seeds the fill and counts toward max_rows
+rows100n, notes100n = ko.select_relay_rows([pathA100, pathB100], space100, 'PI (log-tail)',
+                                           max_rows=4, **kw100)
+assert [r['label'] for r in rows100n] == _maximin100(['donorA100#0'], 4)
+assert notes100n['n_keep'] == 0 and notes100n['n_fill'] == 4
+# max_rows above the unique count: every unique row, keep set first
+rows100a, _ = ko.select_relay_rows([pathA100, pathB100], space100, 'PI (log-tail)',
+                                   max_rows=100, keep_above=0.0, **kw100)
+assert [r['label'] for r in rows100a] == _maximin100(keep100, 100)
+assert sorted(r['label'] for r in rows100a) == sorted(unique100)
+# dedupe_tol 0: only the repeated trial number is dropped
+_, notes100z = ko.select_relay_rows([pathA100, pathB100], space100, 'PI (log-tail)',
+                                    max_rows=100, dedupe_tol=0, **kw100)
+assert notes100z['n_unique'] == 13 and notes100z['donors']['donorB100']['duplicate'] == 1
+# drop_quarantined=False keeps the cap hit A#3 (then the best)
+_, notes100q = ko.select_relay_rows([pathA100], space100, 'PI (log-tail)', max_rows=2,
+                                    drop_quarantined=False, **kw100)
+assert notes100q['donors']['donorA100']['quarantine'] == 0
+assert notes100q['best_label'] == 'donorA100#3' and notes100q['best_value'] == 0.9
+# blank / unparsable cells parse to NaN (stdlib float, no pandas)
+assert np.isnan(ko._relay_float('')) and np.isnan(ko._relay_float('abc'))
+assert np.isnan(ko._relay_float(None)) and ko._relay_float('-inf') == -np.inf
+assert ko._relay_float('0.1') == 0.1
+
+def _raises100(needles, *args, **kwargs):
+    try:
+        ko.select_relay_rows(*args, **kwargs)
+    except ValueError as e:
+        for needle in needles:
+            assert needle in str(e), (needle, str(e))
+    else:
+        raise AssertionError(f'select_relay_rows accepted {args!r} {kwargs!r}')
+_raises100(['donorZ100', 'no trajectory CSV'],
+           [pathA100, os.path.join(outdir100, 'donorZ100_trajectory.csv')], space100,
+           'PI (log-tail)', **kw100)                                           # missing file
+_raises100(['donorA100', 'more than once'], [pathA100, pathA100], space100, 'PI (log-tail)')
+otherdir100 = tempfile.mkdtemp()
+_raises100(['donorA100', 'more than once'],                                   # same stem, other path
+           [pathA100, _write100('donorA100', [_row100('x', 0)], directory=otherdir100)],
+           space100, 'PI (log-tail)')
+space100e = {k: v for k, v in space100.items() if k != 'k_13'}
+pathE100 = os.path.join(outdir100, 'donorE100_trajectory.csv')
+ko.append_trajectory_row(pathE100, ko.trajectory_columns(space100e, extra_columns=applied100),
+                         {'trial_number': 0, 'state': 'COMPLETE'})
+_raises100(['donorE100', 'decision columns'], [pathE100], space100, 'PI (log-tail)')
+cols100f = [c for c in cols100 if c != 'PI (log-tail)']
+pathF100 = _write100('donorF100', [_row100('donorF100', 0, value=0.1)], columns=cols100f)
+_raises100(['donorF100', "'PI (log-tail)'"], [pathF100], space100, 'PI (log-tail)')
+cols100g = [*cols100[:-1], 'extra_column', 'error']
+pathG100 = _write100('donorG100', [_row100('donorG100', 0, value=0.1)], columns=cols100g)
+_raises100(['donorG100', 'header differs', 'extra_column'], [pathG100], space100,
+           'PI (log-tail)', **kw100)
+ko.select_relay_rows([pathG100], space100, 'PI (log-tail)', max_rows=1)   # no `columns`: accepted
+# another anchor on the same columns: check 86's space references the
+# B-scaled 4.8 / 4.872 / 4.219, this donor row the A-anchored weights
+refsX100 = {'ehrlich_downstream': dict(ko.EHRLICH_DOWNSTREAM_WEIGHTS)}
+pathH100 = _write100('donorH100', [_row100('donorH100', 0, value=0.1),
+                                   _row100('donorH100', 1, value=0.2, refs=refsX100)])
+_raises100(['donorH100', 'trial 1', 'applied_k_14', 'anchor'], [pathH100], space100,
+           'PI (log-tail)', **kw100)
+ko.select_relay_rows([pathH100], space100, 'PI (log-tail)', max_rows=2)    # no anchor given: not checked
+_raises100(['INFEASIBLE', 'donorA100#0'], [pathA100], space100, 'PI (log-tail)',
+           is_feasible=lambda v: v['k_3'] != params100['donorA100#0']['k_3'], **kw100)
+seen100 = []
+ko.select_relay_rows([pathA100], space100, 'PI (log-tail)', max_rows=3,
+                     is_feasible=lambda v: seen100.append(dict(v)) or True, **kw100)
+assert len(seen100) == 3 and all(isinstance(v['max_n_spikes'], int) for v in seen100)
+pathI100 = _write100('donorI100', [_row100('donorI100', 0, state='FAIL')])
+_raises100(['no donor row survived'], [pathI100], space100, 'PI (log-tail)')
+PASS('relay selection: per-donor filters (state / non-finite / quarantine / bad decision / '
+     'out-of-band dropped not clipped / repeated trial), first-occurrence unit-cube dedupe with '
+     'the spread noted, keep set + truncation, brute-force-identical maximin fill, permutation '
+     'invariant, relay column not objective, digest; bad donor / header / anchor / feasibility '
+     'refusals')
+
+#%% 101. Relay frozen trials + study tag + guards (spec A1/A4/A6/A13):
+# relay_frozen_trials validates against search_space_distributions (int cast,
+# COMPLETE, relay markers, tracked metrics as floats with blanks omitted and
+# -inf kept); n_relay_trials / best_simulated_trial in a study; the '_rl'
+# tag is deterministic, argument-only (no file access), order-insensitive in
+# the donors, path/name-form-insensitive, equal for 1000 vs 1000.0, sensitive
+# to every kwarg, '' when off, the sha1-8 of relay_spec_json; its place in
+# default_study_name (after _seed{n}, before _burden); check_method_kwargs
+# refuses relay_from under 'tpe' and 'dual_annealing'; resolve_relay_kwargs
+# coerces / refuses; relay_donor_path resolves names and passes paths.
+import hashlib as _hashlib101
+D101 = ['kin_opt_a101', 'kin_opt_b101']
+KW101 = {'max_rows': 1000, 'keep_above': -0.12953}
+spec101 = ko.relay_spec_json(D101, KW101)
+assert spec101 == ('{"donors":["kin_opt_a101","kin_opt_b101"],"kwargs":{"dedupe_tol":0.001,'
+                   '"drop_quarantined":true,"keep_above":-0.12953,"max_rows":1000}}'), spec101
+tag101 = ko.relay_study_tag(D101, KW101)
+assert tag101 == '_rl' + _hashlib101.sha1(spec101.encode('utf-8')).hexdigest()[:8]
+assert _re100.fullmatch(r'_rl[0-9a-f]{8}', tag101) and len(tag101) == 11
+assert ko.relay_study_tag(D101, KW101) == tag101                                   # deterministic
+assert ko.relay_study_tag(list(reversed(D101)), KW101) == tag101                   # order-insensitive
+assert ko.relay_study_tag(tuple(D101), dict(KW101, max_rows=1000.0,
+                                            dedupe_tol=None)) == tag101           # 1000.0 / None -> default
+assert ko.relay_study_tag([os.path.join('Z:', os.sep, 'nowhere', 'kin_opt_a101_trajectory.csv'),
+                           'kin_opt_b101'], KW101) == tag101                        # arg-only, path form
+for change101 in ({'max_rows': 999}, {'keep_above': -0.12}, {'keep_above': None},
+                  {'dedupe_tol': 2e-3}, {'drop_quarantined': False}):
+    assert ko.relay_study_tag(D101, dict(KW101, **change101)) != tag101, change101
+assert ko.relay_study_tag(D101[:1], KW101) != tag101
+assert ko.relay_study_tag(None) == ko.relay_study_tag([]) == ko.relay_study_tag(()) == ''
+assert ko.relay_study_tag(None, {'max_rows': 5}) == ''
+assert ko.relay_study_tag('kin_opt_a101', KW101) == ko.relay_study_tag(['kin_opt_a101'], KW101)
+for bad101 in (['kin_opt_a101', 'kin_opt_a101'],
+               ['kin_opt_a101', os.path.join('elsewhere', 'kin_opt_a101_trajectory.csv')]):
+    try:
+        ko.relay_study_tag(bad101, KW101)
+    except ValueError as e101:
+        assert 'kin_opt_a101' in str(e101) and 'more than once' in str(e101)
+    else:
+        raise AssertionError(f'repeated donor accepted: {bad101}')
+# default_study_name: after the seed tag, before _burden; '' leaves the name unchanged
+NAME101 = ko.default_study_name('PI (log-tail)', 'ethanol_isobutanol', 'metabolic_split_12d',
+                                burden=True, rate_multiplier_bounds=(1e-3, 4.0),
+                                inhibition_multiplier_bounds={}, exclude_params=(),
+                                method='gp', ibo_pathway_anchoring='scenario_A')
+assert NAME101 == ('kin_opt_ethanol_isobutanol_metabolic_split_12d_pi_log-tail_gp_rb0.001-4'
+                   '_ib0.75-1.5_aA_burden'), NAME101
+NAME101r = ko.default_study_name('PI (log-tail)', 'ethanol_isobutanol', 'metabolic_split_12d',
+                                 burden=True, rate_multiplier_bounds=(1e-3, 4.0),
+                                 inhibition_multiplier_bounds={}, exclude_params=(),
+                                 method='gp', ibo_pathway_anchoring='scenario_A',
+                                 relay_tag=tag101)
+assert NAME101r == NAME101[:-len('_burden')] + tag101 + '_burden'
+assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic', n_seeds=2,
+                             relay_tag=tag101, burden=True).endswith(f'_seed2{tag101}_burden')
+assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic', relay_tag='') == \
+    ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic')
+assert _inspect.signature(ko.default_study_name).parameters['relay_tag'].default == ''
+# check_method_kwargs: relay is GP-only
+assert ko.check_method_kwargs('gp', relay_from=D101) == ''
+for method101 in ('tpe', 'dual_annealing'):
+    try:
+        ko.check_method_kwargs(method101, relay_from=D101)
+    except ValueError as e101:
+        assert 'GP-only' in str(e101) and method101 in str(e101), str(e101)
+    else:
+        raise AssertionError(f'relay_from accepted under {method101}')
+assert ko.check_method_kwargs('tpe', relay_from=None) == ''
+assert ko.check_method_kwargs('tpe', relay_from=[]) == ''
+assert _inspect.signature(ko.check_method_kwargs).parameters['relay_from'].default is None
+# resolve_relay_kwargs: defaults (a copy), coercion, refusals
+assert ko.RELAY_KWARGS_DEFAULTS == {'max_rows': 1000, 'keep_above': None,
+                                    'dedupe_tol': 1e-3, 'drop_quarantined': True}
+res101 = ko.resolve_relay_kwargs({'max_rows': np.float64(50.0), 'keep_above': np.int64(0),
+                                  'dedupe_tol': 0, 'drop_quarantined': 0})
+assert res101 == {'max_rows': 50, 'keep_above': 0.0, 'dedupe_tol': 0.0,
+                  'drop_quarantined': False}
+assert type(res101['max_rows']) is int and type(res101['keep_above']) is float
+assert type(res101['dedupe_tol']) is float and type(res101['drop_quarantined']) is bool
+assert ko.resolve_relay_kwargs(None) == ko.resolve_relay_kwargs({}) == ko.RELAY_KWARGS_DEFAULTS
+assert ko.resolve_relay_kwargs({'max_rows': None}) == ko.RELAY_KWARGS_DEFAULTS
+assert ko.resolve_relay_kwargs(None) is not ko.RELAY_KWARGS_DEFAULTS
+for bad101 in ({'bogus': 1}, {'max_rows': True}, {'max_rows': 0}, {'max_rows': 2.5},
+               {'max_rows': '10'}, {'max_rows': float('inf')}, {'keep_above': float('nan')},
+               {'keep_above': 'x'}, {'dedupe_tol': -1e-3}, {'dedupe_tol': True},
+               {'drop_quarantined': 'yes'}, {'drop_quarantined': 2}):
+    try:
+        ko.resolve_relay_kwargs(bad101)
+    except ValueError as e101:
+        assert list(bad101)[0] in str(e101), (bad101, str(e101))
+    else:
+        raise AssertionError(f'resolve_relay_kwargs accepted {bad101}')
+# relay_donor_path: a study name resolves in results_dir; a CSV path passes
+dir101 = tempfile.mkdtemp()
+assert ko.relay_donor_path('kin_opt_a101', dir101) == os.path.join(dir101, 'kin_opt_a101_trajectory.csv')
+assert ko.relay_donor_path(pathA100, dir101) == pathA100
+assert ko.relay_donor_path('other_dir/some.csv', dir101) == 'other_dir/some.csv'
+if _optuna is None:
+    print('SKIP 101 (frozen-trial part): optuna not installed')
+else:
+    TS101 = _optuna.trial.TrialState
+    dist101 = ko.search_space_distributions(space100)
+    rows101 = [dict(r, record=dict(r['record'])) for r in rows100]
+    rows101[0]['record']['IRR'] = '-inf'          # kept as -inf (a simulated trial records it too)
+    rows101[1]['record']['IRR'] = ''              # blank -> omitted
+    frozen101 = ko.relay_frozen_trials(rows101, space100)
+    assert len(frozen101) == len(rows101) == 9
+    for fr101, r101 in zip(frozen101, rows101):
+        assert fr101.state == TS101.COMPLETE and fr101.value == r101['value']
+        assert fr101.distributions == dist101
+        assert fr101.params == r101['params'] and type(fr101.params['max_n_spikes']) is int
+        assert fr101.system_attrs == {ko.RELAY_TRIAL_SYSTEM_ATTR: True} == {'relay': True}
+        assert fr101.user_attrs['relay_donor'] == r101['label']
+        assert fr101.user_attrs['PI (log-tail)'] == r101['value']
+        assert fr101.user_attrs['IBO titer'] == float(r101['record']['IBO titer'])
+        assert 'EtOH titer' not in fr101.user_attrs and 'tau' not in fr101.user_attrs   # blank cells
+        assert 'constraints' not in fr101.system_attrs and 'fixed_params' not in fr101.system_attrs
+        assert set(fr101.user_attrs) - {'relay_donor'} <= set(ko.TRACKED_METRICS)
+    assert frozen101[0].user_attrs['IRR'] == -np.inf and 'IRR' not in frozen101[1].user_attrs
+    try:                                           # optuna validates: out-of-band refused
+        ko.relay_frozen_trials([dict(rows101[0], params=dict(rows101[0]['params'],
+                                                             k_3=k3_hi100*2))], space100)
+    except ValueError as e101:
+        assert 'k_3' in str(e101)
+    else:
+        raise AssertionError('out-of-band relay trial accepted')
+    st101 = _optuna.create_study(direction='maximize')
+    assert ko.best_simulated_trial(st101) is None and ko.n_relay_trials(st101) == 0
+    st101.add_trials(frozen101)
+    assert [t.number for t in st101.trials] == list(range(9)) and ko.n_relay_trials(st101) == 9
+    assert ko.best_simulated_trial(st101) is None and st101.best_value == 0.30
+    t101 = st101.ask({n: dist101[n] for n in dist101})
+    st101.tell(t101, 0.1)
+    assert ko.n_relay_trials(st101) == 9 and ko.best_simulated_trial(st101).number == 9
+    assert ko.best_simulated_trial(st101).value == 0.1
+    assert ko._n_startup_finished(st101) == 10 and ko._n_sampler_drawn_finished(st101) == 1
+    assert ko._n_sampler_drawn_consumed(st101) == 1
+PASS('relay frozen trials validate against the engine distributions (int cast, markers, tracked '
+     'metrics, no constraints); _rl tag deterministic / argument-only / order- and form-insensitive '
+     '/ kwarg-sensitive / sha1-8 of relay_spec_json; default_study_name placement; GP-only '
+     'check_method_kwargs; resolve_relay_kwargs coercion + refusals; relay_donor_path')
+
+#%% 102. Relay engine (spec A2/A3/A7-A10/A13) with method='gp' on check 30's
+# fake handles (every simulated trial scores PI (log-tail) 0.1; the donor
+# values straddle it): a fresh preload stores N relay trials 0..N-1 then
+# simulates exactly n_trials (CSV rows from trial N; manifest of N rows;
+# model_specification = n_trials + restore; store markers + digest; no LHS
+# design when N >= n_startup; start-up print names the preload; the status
+# line's best excludes the relay values; a preloaded trial's distributions
+# == a simulated one's); a resume with the same args inserts nothing and
+# simulates the remainder; a resume WITHOUT args keeps the budget (a missing
+# manifest is warned about, then rewritten by a with-args launch); a
+# different relay spec / relay args on a non-relay store raise; a kill
+# mid-preload (Study.add_trial monkeypatched) leaves a partial store, a
+# no-args relaunch raises and a with-args relaunch completes it
+# idempotently (a non-relay trial in a partial store is refused); with
+# N < n_startup the LHS design is sized n_startup - N and its rows 0.. feed
+# the remaining start-up; refusals BEFORE any .db / CSV: TPE, learned
+# constraints (an orphan sidecar is left alone -- no LOST row), a
+# minimized / untracked / callable objective, a missing donor, knobs
+# without donors; learned constraints on a relay store without args; a
+# non-relay GP store gets no relay_* attr and no manifest.
+# 2026-09-23 review fixes: the fresh-study enqueue print names trial N (0 for a
+# plain study, verbatim); a kill between the two fresh-preload attr writes
+# (digest alone; or an old-order 'relay_spec' alone / + a stale digest, no
+# relay trial stored) completes like a fresh launch, while a stale digest with
+# relay trials stored still refuses; the ENGINE-built feasibility predicate
+# with the caps on (volume cap; a stub burden on burden-column donors) refuses
+# an infeasible selected row before any .db / CSV and preloads a feasible one.
+if _optuna is None:
+    print('SKIP 102: optuna not installed')
+else:
+    _optuna.logging.set_verbosity(_optuna.logging.WARNING)
+    TS102 = _optuna.trial.TrialState
+    space102, _ = ko.build_search_space({'k_1e': 47.1, 'k_7': 1.203, 'K_1e': 0.12})
+    cols102 = ko.trajectory_columns(space102)
+    donordir102 = tempfile.mkdtemp()
+    rng102 = np.random.default_rng(102)
+    vals102 = {'donorP102': [0.35, -0.2, 0.05, 0.2], 'donorQ102': [-0.5, 0.15, 0.0, 0.12]}
+    paths102 = []
+    for stem102, v102s in vals102.items():
+        path102 = os.path.join(donordir102, stem102 + '_trajectory.csv')
+        for t102, v102 in enumerate(v102s):
+            p102 = ko.unit_to_external(0.05 + 0.9*rng102.random(len(space102)), space102)
+            ko.append_trajectory_row(path102, cols102, {
+                'trial_number': t102, 'state': 'COMPLETE', **p102, 'objective': 7.0 + t102,
+                'PI (log-tail)': v102, 'PI': v102, 'IRR': 0.1})
+        paths102.append(path102)
+    n_calls102 = [0]
+    def _ms102(**kw):
+        n_calls102[0] += 1
+    handles102 = dict(handles30, model_specification=_ms102)
+    common102 = dict(objective='PI (log-tail)', scenario_label='X', seed=1,
+                     handles=handles102, print_status_every=1, burden_model=None,
+                     enqueue_knockouts=False, volume_feasibility=False, method='gp')
+
+    def _run102(outdir, name, **kw):
+        buf = _io.StringIO()
+        with _contextlib.redirect_stdout(buf):
+            st, csv_path, _ = ko.run_kinetic_optimization(
+                study_name=name, results_dir=outdir, **dict(common102, **kw))
+        return st, csv_path, buf.getvalue()
+
+    def _store102(outdir, name):
+        return _optuna.load_study(study_name=name, storage='sqlite:///' + os.path.join(
+            outdir, name + '.db').replace('\\', '/'))
+
+    def _attrs102(st):
+        return st._storage.get_study_system_attrs(st._study_id)
+
+    def _manifest102(outdir, name):
+        with open(ko.relay_manifest_path(outdir, name), newline='') as fh:
+            return list(_csv100.reader(fh))
+
+    def _refused102(needles, outdir, name, **kw):
+        try:
+            _run102(outdir, name, **kw)
+        except ValueError as e:
+            for needle in needles:
+                assert needle in str(e), (needle, str(e))
+        else:
+            raise AssertionError(f'relay run accepted: {kw}')
+
+    # --- case A: N = 6 >= n_startup = 4 ---
+    relayA102 = dict(relay_from=paths102, relay_kwargs={'max_rows': 6, 'keep_above': 0.1})
+    rowsA102, notesA102 = ko.select_relay_rows(paths102, space102, 'PI (log-tail)',
+                                               max_rows=6, keep_above=0.1, columns=cols102)
+    labelsA102 = [r['label'] for r in rowsA102]
+    assert labelsA102[:4] == ['donorP102#0', 'donorP102#3', 'donorQ102#1', 'donorQ102#3']
+    assert min(r['value'] for r in rowsA102) < 0.1 < max(r['value'] for r in rowsA102)
+    outA102 = tempfile.mkdtemp()
+    n_calls102[0] = 0
+    stA102, csvA102, txtA102 = _run102(outA102, 'relay102a', n_trials=3, n_startup_trials=4,
+                                       **relayA102)
+    assert len(stA102.trials) == 9 and ko.n_relay_trials(stA102) == 6
+    assert [t.number for t in stA102.trials if ko._is_relay_trial(t)] == list(range(6))
+    assert [t.user_attrs['relay_donor'] for t in stA102.trials[:6]] == labelsA102
+    assert [t.value for t in stA102.trials[:6]] == [r['value'] for r in rowsA102]
+    assert all(t.state == TS102.COMPLETE for t in stA102.trials)
+    assert stA102.trials[0].distributions == stA102.trials[6].distributions
+    dfA102 = ko.load_trajectory(csvA102)
+    assert dfA102['trial_number'].tolist() == [6, 7, 8]
+    assert dfA102['state'].tolist() == ['COMPLETE']*3 and np.allclose(dfA102['objective'], 0.1)
+    assert n_calls102[0] == 3 + 1                                   # 3 trials + restore_baseline
+    attrsA102 = _attrs102(stA102)
+    assert attrsA102['relay_spec'] == ko.relay_spec_json(paths102, relayA102['relay_kwargs'])
+    assert attrsA102['relay_rows_sha1'] == notesA102['rows_sha1'] == ko.relay_rows_sha1(rowsA102)
+    assert attrsA102['relay_n_preloaded'] == 6 and attrsA102['relay_preload_complete'] is True
+    assert 'lhs_seed' not in attrsA102 and stA102.sampler._lhs_design is None
+    assert stA102.sampler._n_startup_trials == 4
+    assert 'Start-up sampling: none needed' in txtA102
+    assert '0 trials already stored + 6 preloaded relay trials' in txtA102
+    assert 'guidance begins now' in txtA102
+    best102 = _re100.findall(r'best simulated so far ([-+0-9.e]+|nan)\)', txtA102)
+    assert best102 == ['0.1']*3, best102                            # never a donor value (0.35)
+    assert '\nTrial 6 (simulated 1/3)' in txtA102 and '\nTrial 8 (simulated 3/3)' in txtA102
+    assert 'Relay preload done: 6 donor trials stored as trials 0-5' in txtA102
+    assert 'best preloaded PI (log-tail) = 0.35 (donorP102#0)' in txtA102
+    # the enqueue print offsets its trial by the preload too (A8; 2026-09-23 fix)
+    assert ('Baseline NOT enqueued (enqueue_baseline=False): no trial is pre-seeded; the '
+            'sampler draws every trial from trial 6 (trials 0-5 are the preloaded relay '
+            'rows).') in txtA102, txtA102
+    mfA102 = _manifest102(outA102, 'relay102a')
+    assert mfA102[0] == ['relay_trial_number', 'donor', 'donor_objective', *cols102]
+    assert [int(r[0]) for r in mfA102[1:]] == list(range(6))
+    i_tn102, i_obj102 = mfA102[0].index('trial_number'), mfA102[0].index('objective')
+    assert [f'{r[1]}#{r[i_tn102]}' for r in mfA102[1:]] == labelsA102
+    assert [float(r[i_obj102]) for r in mfA102[1:]] == [r['value'] for r in rowsA102]
+    assert [float(r[2]) for r in mfA102[1:]] == [7.0 + int(r[i_tn102]) for r in mfA102[1:]]
+    assert not os.path.isfile(ko.relay_manifest_path(outA102, 'relay102a') + '.tmp')
+    assert ko.best_simulated_trial(stA102).value == 0.1 and stA102.best_value == 0.35
+    # resume with the SAME args: nothing inserted, the remainder simulated
+    n_calls102[0] = 0
+    stA102b, _, txtA102b = _run102(outA102, 'relay102a', n_trials=5, n_startup_trials=4,
+                                   **relayA102)
+    assert len(stA102b.trials) == 11 and ko.n_relay_trials(stA102b) == 6
+    assert ko.load_trajectory(csvA102)['trial_number'].tolist() == [6, 7, 8, 9, 10]
+    assert n_calls102[0] == 2 + 1
+    assert ('Resuming study relay102a: 3 trials stored (plus 6 preloaded relay trials, '
+            'not budgeted); running 2 more (budget 5).') in txtA102b
+    with open(ko.seed_sidecar_path(csvA102), encoding='utf-8') as f102:
+        seeds102 = f102.read().splitlines()
+    assert ['n_stored_at_launch=0' in seeds102[0], 'n_stored_at_launch=3' in seeds102[1]] == [True]*2
+    # resume WITHOUT relay args: the stored spec is authoritative, budget kept;
+    # a missing manifest is warned about (not rewritten without the donors)
+    os.remove(ko.relay_manifest_path(outA102, 'relay102a'))
+    n_calls102[0] = 0
+    stA102c, _, txtA102c = _run102(outA102, 'relay102a', n_trials=6, n_startup_trials=4)
+    assert len(stA102c.trials) == 12 and n_calls102[0] == 1 + 1
+    assert 'WARNING: relay manifest' in txtA102c
+    assert not os.path.isfile(ko.relay_manifest_path(outA102, 'relay102a'))
+    # ... rewritten by a with-args launch (budget spent: nothing simulated)
+    n_calls102[0] = 0
+    stA102d, _, txtA102d = _run102(outA102, 'relay102a', n_trials=6, n_startup_trials=4,
+                                   **relayA102)
+    assert len(stA102d.trials) == 12 and n_calls102[0] == 1
+    assert 'Rewrote the missing relay manifest (6 rows)' in txtA102d
+    assert _manifest102(outA102, 'relay102a') == mfA102
+    # a different relay spec -> refused, store untouched
+    _refused102(['relay spec'], outA102, 'relay102a', n_trials=7, n_startup_trials=4,
+                relay_from=paths102, relay_kwargs={'max_rows': 5, 'keep_above': 0.1})
+    assert len(_store102(outA102, 'relay102a').trials) == 12
+    # learned constraints on a relay store, without relay args -> refused
+    _refused102(['preloaded relay trials', 'learned_constraints'], outA102, 'relay102a',
+                n_trials=7, n_startup_trials=4, gp_kwargs={'learned_constraints': True})
+    assert len(_store102(outA102, 'relay102a').trials) == 12
+    # --- case B: N = 2 < n_startup = 5: LHS design of 5 - 2 = 3 rows ---
+    outB102 = tempfile.mkdtemp()
+    stB102, csvB102, txtB102 = _run102(outB102, 'relay102b', n_trials=4, n_startup_trials=5,
+                                       relay_from=paths102, relay_kwargs={'max_rows': 2})
+    assert len(stB102.trials) == 6 and ko.n_relay_trials(stB102) == 2
+    assert stB102.trials[0].user_attrs['relay_donor'] == 'donorP102#0'   # best seeds the fill
+    designB102 = ko.LHSDesign(space102, 3, 1)
+    assert [stB102.trials[k].params for k in (2, 3, 4)] == [designB102.external_point(j)
+                                                            for j in range(3)]
+    assert _attrs102(stB102)['lhs_seed'] == 1 and stB102.sampler._lhs_design.size == 3
+    assert ('Latin hypercube (3-row design, lhs_seed 1); the 2 preloaded relay trials fill '
+            'the rest of the 5-trial start-up') in txtB102
+    assert 'guidance begins after trial 4' in txtB102
+    assert ko._n_startup_finished(stB102) == 6
+    assert ko._n_sampler_drawn_consumed(stB102) == ko._n_sampler_drawn_finished(stB102) == 4
+    assert ko.load_trajectory(csvB102)['trial_number'].tolist() == [2, 3, 4, 5]
+    assert stB102.sampler.n_lhs_infeasible_fallbacks == 0
+    # --- a kill mid-preload, then completion ---
+    outC102 = tempfile.mkdtemp()
+    orig_add102 = _optuna.study.Study.add_trial
+    count102 = [0]
+    def _flaky_add102(self, trial):
+        count102[0] += 1
+        if count102[0] > 3:
+            raise RuntimeError('killed mid-preload')
+        return orig_add102(self, trial)
+    _optuna.study.Study.add_trial = _flaky_add102
+    try:
+        _run102(outC102, 'relay102c', n_trials=1, n_startup_trials=4, **relayA102)
+    except RuntimeError as e102:
+        assert 'killed mid-preload' in str(e102)
+    else:
+        raise AssertionError('the monkeypatched add_trial did not interrupt the preload')
+    finally:
+        _optuna.study.Study.add_trial = orig_add102
+    stC102 = _store102(outC102, 'relay102c')
+    assert len(stC102.trials) == 3 and ko.n_relay_trials(stC102) == 3
+    attrsC102 = _attrs102(stC102)
+    assert 'relay_spec' in attrsC102 and 'relay_rows_sha1' in attrsC102
+    assert 'relay_preload_complete' not in attrsC102 and 'relay_n_preloaded' not in attrsC102
+    assert not os.path.isfile(ko.relay_manifest_path(outC102, 'relay102c'))
+    assert not os.path.isfile(os.path.join(outC102, 'relay102c_trajectory.csv'))
+    _refused102(['relay preload incomplete', 'same relay_from'], outC102, 'relay102c',
+                n_trials=1, n_startup_trials=4)
+    n_calls102[0] = 0
+    stC102b, csvC102, txtC102 = _run102(outC102, 'relay102c', n_trials=1, n_startup_trials=4,
+                                        **relayA102)
+    assert 'Relay preload was interrupted: 3 of 6 donor trials stored; inserting the 3 missing' in txtC102
+    assert len(stC102b.trials) == 7 and ko.n_relay_trials(stC102b) == 6
+    assert [t.user_attrs['relay_donor'] for t in stC102b.trials[:6]] == labelsA102
+    assert _attrs102(stC102b)['relay_preload_complete'] is True
+    assert _attrs102(stC102b)['relay_n_preloaded'] == 6
+    assert _manifest102(outC102, 'relay102c') == mfA102
+    assert ko.load_trajectory(csvC102)['trial_number'].tolist() == [6] and n_calls102[0] == 2
+    # a partial store holding a NON-relay trial cannot be completed
+    outD102 = tempfile.mkdtemp()
+    count102[0] = 0
+    _optuna.study.Study.add_trial = _flaky_add102
+    try:
+        _run102(outD102, 'relay102d', n_trials=1, n_startup_trials=4, **relayA102)
+    except RuntimeError:
+        pass
+    finally:
+        _optuna.study.Study.add_trial = orig_add102
+    stD102 = _store102(outD102, 'relay102d')
+    stD102.add_trial(_optuna.trial.create_trial(
+        value=0.0, params=stD102.trials[0].params,
+        distributions=stD102.trials[0].distributions))
+    _refused102(['non-relay trials'], outD102, 'relay102d', n_trials=1, n_startup_trials=4,
+                **relayA102)
+    # --- a kill BETWEEN the two attr writes of a fresh preload (2026-09-23 review
+    # fix). The digest is written first, so such a kill leaves (k1) the digest
+    # alone -> the next launch is simply fresh (and rewrites it); a store left
+    # by the old spec-first order -- (k2) 'relay_spec' alone, (k3) 'relay_spec'
+    # + a stale digest -- holds NO relay trial, so the re-selection's digest is
+    # recorded and every row preloaded instead of refusing the name forever as
+    # "the donor CSVs changed". Each ends exactly like a clean fresh launch. ---
+    spec102 = ko.relay_spec_json(paths102, relayA102['relay_kwargs'])
+    for nameK102, plantK102, msgK102 in (
+            ('relay102k1', {'relay_rows_sha1': 'stale102'},
+             'Relay preload done: 6 donor trials stored as trials 0-5'),
+            ('relay102k2', {'relay_spec': spec102},
+             'Relay preload was interrupted: 0 of 6 donor trials stored; inserting the 6 missing'),
+            ('relay102k3', {'relay_spec': spec102, 'relay_rows_sha1': 'stale102'},
+             'Relay preload was interrupted: 0 of 6 donor trials stored; inserting the 6 missing')):
+        outK102 = tempfile.mkdtemp()
+        stK102 = _optuna.create_study(study_name=nameK102, direction='maximize',
+                                      storage='sqlite:///' + os.path.join(
+                                          outK102, nameK102 + '.db').replace('\\', '/'))
+        for keyK102, valK102 in plantK102.items():
+            stK102._storage.set_study_system_attr(stK102._study_id, keyK102, valK102)
+        n_calls102[0] = 0
+        stK102b, csvK102, txtK102 = _run102(outK102, nameK102, n_trials=1, n_startup_trials=4,
+                                            **relayA102)
+        assert msgK102 in txtK102, (nameK102, txtK102)
+        assert len(stK102b.trials) == 7 and ko.n_relay_trials(stK102b) == 6, nameK102
+        assert [t.user_attrs['relay_donor'] for t in stK102b.trials[:6]] == labelsA102
+        attrsK102 = _attrs102(stK102b)
+        assert attrsK102['relay_spec'] == spec102
+        assert attrsK102['relay_rows_sha1'] == notesA102['rows_sha1'], (nameK102, attrsK102)
+        assert attrsK102['relay_preload_complete'] is True and attrsK102['relay_n_preloaded'] == 6
+        assert _manifest102(outK102, nameK102) == mfA102
+        assert ko.load_trajectory(csvK102)['trial_number'].tolist() == [6] and n_calls102[0] == 2
+    # ... but once relay trials ARE stored, a digest mismatch still refuses (the
+    # interrupted selection is partly in the store): kill after 3 inserts, then
+    # corrupt the stored digest
+    outS102 = tempfile.mkdtemp()
+    count102[0] = 0
+    _optuna.study.Study.add_trial = _flaky_add102
+    try:
+        _run102(outS102, 'relay102s', n_trials=1, n_startup_trials=4, **relayA102)
+    except RuntimeError:
+        pass
+    finally:
+        _optuna.study.Study.add_trial = orig_add102
+    stS102 = _store102(outS102, 'relay102s')
+    assert ko.n_relay_trials(stS102) == 3
+    stS102._storage.set_study_system_attr(stS102._study_id, 'relay_rows_sha1', 'stale102')
+    _refused102(['differs from the interrupted one', 'stale102'], outS102, 'relay102s',
+                n_trials=1, n_startup_trials=4, **relayA102)
+    assert len(_store102(outS102, 'relay102s').trials) == 3
+    assert not os.path.isfile(ko.relay_manifest_path(outS102, 'relay102s'))
+    # --- burden-column donors (the same rows re-written under the burden study's
+    # columns, same stems) + a stub burden model (check 44's _FakeBurden44 shape)
+    # that rejects exactly one donor row's k_1e: exercises the ENGINE-built
+    # feasibility predicate of _prepare_optimization with the burden cap on ---
+    colsB102 = ko.trajectory_columns(space102, extra_columns=list(eb.BURDEN_COLUMNS))
+    donordirB102 = tempfile.mkdtemp()
+    pathsB102, rejectB102 = [], None
+    for path102 in paths102:
+        pathB102 = os.path.join(donordirB102, os.path.basename(path102))
+        with open(path102, newline='') as fh102:
+            for rec102 in _csv100.DictReader(fh102):
+                ko.append_trajectory_row(pathB102, colsB102, rec102)
+                if (os.path.basename(path102) == 'donorQ102_trajectory.csv'
+                        and rec102['trial_number'] == '1'):
+                    rejectB102 = float(rec102['k_1e'])
+        pathsB102.append(pathB102)
+    assert rejectB102 is not None and 'donorQ102#1' in labelsA102
+
+    class _FakeBurden102:
+        F_flex = 0.245
+        Phi_M_wt = 0.05
+        phi_T_wt = 0.05
+        reference = {}                      # never stale (check 44)
+        def __init__(self, reject_k_1e=None):
+            self.reject_k_1e = reject_k_1e
+            self.seen = []
+        def evaluate(self, values):
+            self.seen.append(dict(values))
+            bad = values.get('k_1e') == self.reject_k_1e
+            record = {col: 0.0 for col in eb.BURDEN_COLUMNS}
+            return SimpleNamespace(feasible=not bad, violation=1.0 if bad else -1.0,
+                                   Phi_M=0.01, F_flex=self.F_flex, k_7_eff=0.0,
+                                   k_8_eff=0.0, as_record=lambda: record)
+        def apply(self, values):
+            return dict(values)
+    relayB102 = dict(relay_from=pathsB102, relay_kwargs=relayA102['relay_kwargs'])
+    # --- refusals before any .db / CSV (an orphan sidecar is left alone) ---
+    outE102 = tempfile.mkdtemp()
+    side102 = ko.inflight_path_for(outE102, 'relay102e')
+    ko.write_inflight(side102, cols102, {'trial_number': 99, **ko.unit_to_external(
+        [0.5]*len(space102), space102)})
+    for needles102, kw102 in (
+            (['learned_constraints'], dict(gp_kwargs={'learned_constraints': True}, **relayA102)),
+            (['GP-only', "'tpe'"], dict(relayA102, method='tpe')),
+            (['maximized'], dict(relayA102, objective='TCI')),
+            (['trajectory column'], dict(relayA102, objective='NPV')),
+            (['REGISTRY objective'], dict(relayA102, objective=lambda h: 0.0,
+                                          direction='maximize', objective_name='custom102')),
+            (['no trajectory CSV'], dict(relay_from=[*paths102, os.path.join(
+                donordir102, 'donorZ102_trajectory.csv')])),
+            (['without relay_from'], dict(relay_kwargs={'max_rows': 3})),
+            # the engine-built feasibility predicate (A4) with the caps ON: the
+            # volume cap (5 of the 6 selected rows exceed 20x; donorP102#0 by
+            # ~2e10) and the stub burden rejecting donorQ102#1
+            (['INFEASIBLE', 'donorP102#0'], dict(relayA102, volume_feasibility=True,
+                                                 volume_cap=20.0)),
+            (['INFEASIBLE', 'donorQ102#1'], dict(relayB102,
+                                                 burden_model=_FakeBurden102(rejectB102)))):
+        _refused102(needles102, outE102, 'relay102e', n_trials=1, n_startup_trials=4, **kw102)
+        assert not os.path.isfile(os.path.join(outE102, 'relay102e.db')), kw102
+        assert not os.path.isfile(os.path.join(outE102, 'relay102e_trajectory.csv')), kw102
+        assert os.path.isfile(side102), kw102                       # no LOST row recovered
+    # --- positive counterparts with the caps ON: the same selection preloads when
+    # every row is feasible (volume cap 1e12x; a stub burden rejecting nothing),
+    # and the burden predicate saw every selected row's k_1e ---
+    outV102 = tempfile.mkdtemp()
+    stV102, csvV102, txtV102 = _run102(outV102, 'relay102v', n_trials=2, n_startup_trials=4,
+                                       volume_feasibility=True, volume_cap=1e12, **relayA102)
+    assert 'Fed-batch volume-ratio check ON' in txtV102 and 'cap 1e+12x' in txtV102
+    assert ko.n_relay_trials(stV102) == 6
+    assert [t.user_attrs['relay_donor'] for t in stV102.trials[:6]] == labelsA102
+    assert ko.load_trajectory(csvV102)['trial_number'].tolist() == [6, 7]
+    burdenOK102 = _FakeBurden102()
+    outBB102 = tempfile.mkdtemp()
+    stBB102, csvBB102, txtBB102 = _run102(outBB102, 'relay102bb', n_trials=1, n_startup_trials=4,
+                                          burden_model=burdenOK102, **relayB102)
+    assert 'Enzyme burden ON' in txtBB102
+    assert ko.n_relay_trials(stBB102) == 6
+    assert [t.user_attrs['relay_donor'] for t in stBB102.trials[:6]] == labelsA102
+    assert {r['params']['k_1e'] for r in rowsA102} <= {s['k_1e'] for s in burdenOK102.seen}
+    assert list(ko.load_trajectory(csvBB102).columns) == colsB102
+    assert ko.load_trajectory(csvBB102)['trial_number'].tolist() == [6]
+    # --- a non-relay GP study: no relay_* attr, no manifest; relay args on it refused ---
+    outN102 = tempfile.mkdtemp()
+    stN102, csvN102, txtN102 = _run102(outN102, 'plain102', n_trials=2)
+    assert [k for k in _attrs102(stN102) if k.startswith('relay')] == []
+    assert not os.path.isfile(ko.relay_manifest_path(outN102, 'plain102'))
+    assert ko.n_relay_trials(stN102) == 0
+    assert 'Relay' not in txtN102 and 'preloaded' not in txtN102
+    assert ('Baseline NOT enqueued (enqueue_baseline=False): no trial is pre-seeded; the '
+            'sampler draws every trial from trial 0.\n') in txtN102    # the pre-relay line, verbatim
+    assert ko.load_trajectory(csvN102)['trial_number'].tolist() == [0, 1]
+    _refused102(['not a relay study'], outN102, 'plain102', n_trials=3, **relayA102)
+    assert len(_store102(outN102, 'plain102').trials) == 2
+    # the engine / context / prepare accept the new kwargs
+    sig102 = _inspect.signature(ko.run_kinetic_optimization).parameters
+    assert sig102['relay_from'].default is None and sig102['relay_kwargs'].default is None
+    assert {'relay_from', 'relay_kwargs'} <= set(_inspect.signature(ko._prepare_optimization).parameters)
+    assert {'relay_rows', 'relay_notes', 'relay_spec', 'relay_rows_sha1'} <= {
+        f.name for f in __import__('dataclasses').fields(ko.OptimizationContext)}
+PASS('relay engine (gp): fresh preload of N relay trials then exactly n_trials simulated (CSV '
+     'from trial N, manifest, markers + digest, start-up print, best excludes relay values), '
+     'resume with / without args, spec mismatch, crash mid-preload completed idempotently, '
+     'kill between the attr writes recoverable, N < n_startup LHS sizing, refusals before any '
+     '.db / CSV (incl. the engine-built burden / volume predicate), caps-on preload, non-relay '
+     'store untouched')
+
+#%% 103. Relay driver + supervisor plumbing (spec 2026-09-23-relay-preload-pi-
+# campaign-design §3.2 / §3.3 + A1 / A6 / A8 / A12 / A13). Supervisor: its
+# default_study_name threads ko.relay_study_tag (production name pinned,
+# donor-order / kwarg-form insensitive, legacy + relay refused);
+# child_code emits relay_from= / relay_kwargs= ONLY when set, appended after
+# every other kwarg (a non-relay program is unchanged; the relay program
+# compiles and carries the resolved knobs); supervise() refuses relay misuse
+# BEFORE the name / log / child (a nonexistent child python, so a regression
+# cannot launch anything); the real CLI block is exec'd with a STUB
+# supervise() (so nothing can ever launch) for a two-flag --relay-from
+# parse, the knobs, and every parser.error; no optuna / package import.
+# Driver: its real run() (and kinetic_bounds_from_scenario) is exec'd from
+# source -- never the module, which load()s -- against the real ko with the
+# engine and scenarios.load_scenario stubbed: the production relay name ==
+# the supervisor's CLI-derived name, relay_from / resolved relay_kwargs
+# forwarded, the one-line summary printed, every refusal raised BEFORE the
+# scenario load, a non-relay run forwards None / None under the untagged
+# name, and the end-of-run PCA marks the enqueued baseline at the
+# trajectory's FIRST trial_number with the best SIMULATED trial printed.
+# Path budget (spec §3.1; 2026-09-23 review fix): ko.longest_output_paths of
+# the production name (254 / 239 characters in this checkout), its suffix
+# lists pinned to every writer and to the driver's savefig names; the driver
+# prints it on its own line and supervise() appends it to a relay settings
+# line (a non-relay line unchanged); both refuse an over-MAX_PATH run-data
+# path before the scenario load / the log.
+import ast as _ast103
+import textwrap as _textwrap103
+from datetime import datetime as _datetime103
+HERE103 = os.path.dirname(os.path.abspath(__file__))
+DRV103_PATH = os.path.join(HERE103, 'optimize_kinetics_BO.py')
+SUP103_PATH = os.path.join(HERE103, 'optimize_kinetics_BO_supervised.py')
+drv103 = open(DRV103_PATH, encoding='utf-8').read()
+supsrc103 = open(SUP103_PATH, encoding='utf-8').read()
+sup103 = _runpy.run_path(SUP103_PATH)
+# The production relay panel (spec §4): the seven process-level split_12d _aA
+# campaigns; names only -- nothing here reads a donor file.
+DONORS103 = [f'kin_opt_ethanol_isobutanol_metabolic_split_12d_{d}_gp_rb0.001-4_ib0.75-1.5_aA_burden'
+             for d in ('ibo_yield', 'ibo_titer', 'ibo_productivity', 'etoh_yield',
+                       'etoh_titer', 'etoh_productivity', 'price-weighted_yield')]
+KW103 = {'max_rows': 1000, 'keep_above': -0.12953}
+KWR103 = ko.resolve_relay_kwargs(KW103)
+TAG103 = ko.relay_study_tag(DONORS103, KW103)
+assert TAG103 == '_rlba1b2315', TAG103          # pinned: a changed scheme forks the study
+PLAIN103 = 'kin_opt_ethanol_isobutanol_metabolic_split_12d_pi_log-tail_gp_rb0.001-4_ib0.75-1.5_aA_burden'
+NAME103 = PLAIN103[:-len('_burden')] + TAG103 + '_burden'
+assert len(NAME103) == 103, len(NAME103)
+# --- output-path budget (spec §3.1, 2026-09-23 review fix; ko.longest_output_paths):
+# Windows' MAX_PATH is 260 INCLUDING the NUL (long paths disabled here), so the
+# longest file a relay campaign writes must stay SHORTER than 260. The longest
+# is the driver's end-of-run <name>_param_trajectory_ / _best_vs_baseline_
+# <%Y.%m.%d-%H.%M>.png: 254 in this checkout's 112-character results dir (5 to
+# spare); the longest run-data file, _relay_manifest.csv.tmp, is 239. ---
+RD103 = os.path.abspath(os.path.join(HERE103, 'results'))
+assert RD103 == os.path.abspath(ko.default_results_dir()) == os.path.abspath(sup103['RESULTS_DIR'])
+data103, plot103 = ko.longest_output_paths(RD103, NAME103)
+assert ko.longest_output_paths(None, NAME103) == (data103, plot103)       # None = the engine default
+assert (len(ko.PLOT_STAMP_PLACEHOLDER)
+        == len(_datetime103(2026, 9, 23, 12, 0).strftime('%Y.%m.%d-%H.%M')) == 16)
+assert len(NAME103) + max(map(len, ko.STUDY_PLOT_SUFFIXES)) == 103 + 38 == 141
+assert len(plot103) == len(RD103) + 1 + 103 + 38, (len(plot103), plot103)
+assert plot103.endswith(('_param_trajectory_YYYY.MM.DD-HH.MM.png',
+                         '_best_vs_baseline_YYYY.MM.DD-HH.MM.png')), plot103
+assert len(data103) == len(RD103) + 1 + 103 + len('_relay_manifest.csv.tmp'), data103
+assert data103.endswith('_relay_manifest.csv.tmp'), data103
+if len(RD103) == 112:                                                   # this checkout
+    assert (len(plot103), len(data103)) == (254, 239), (len(plot103), len(data103))
+assert len(plot103) < ko.WINDOWS_MAX_PATH == 260 and len(data103) < 260, (len(plot103), plot103)
+# the suffix lists cover every writer (engine CSV / sidecar tmp / seed log /
+# store journal / manifest tmp, the supervisor's run log) ...
+csvp103 = os.path.join(RD103, NAME103 + '_trajectory.csv')
+for p103 in (csvp103, ko.inflight_path_for(RD103, NAME103) + '.tmp',
+             ko.seed_sidecar_path(csvp103), os.path.join(RD103, NAME103 + '.db') + '-journal',
+             ko.relay_manifest_path(RD103, NAME103) + '.tmp',
+             os.path.join(RD103, NAME103 + '_run.log')):
+    assert p103[len(RD103) + 1 + len(NAME103):] in ko.STUDY_OUTPUT_SUFFIXES, p103
+    assert len(p103) <= len(data103), p103
+assert "study_name + '_run.log'" in supsrc103
+# ... and the plot suffixes ARE the driver's savefig names (a renamed / longer
+# suffix breaks this check instead of silently overflowing at the end of a run)
+drvplots103 = set(_re100.findall(r"base \+ f'(_[a-z_]+_\{stamp\}\.png)'", drv103))
+assert drvplots103 == {s.replace(ko.PLOT_STAMP_PLACEHOLDER, '{stamp}')
+                       for s in ko.STUDY_PLOT_SUFFIXES}, drvplots103
+assert "stamp = datetime.now().strftime('%Y.%m.%d-%H.%M')" in drv103
+assert 'ko.longest_output_paths(' in drv103 and 'ko.longest_output_paths(' in supsrc103
+# --- supervisor default_study_name: the relay tag, parity with ko ---
+def _sup_name103(**kw):
+    return sup103['default_study_name'](None, 'PI (log-tail)', None,
+                                        study_target_products='ethanol_isobutanol',
+                                        study_type='metabolic_split_12d', burden=True,
+                                        method='gp', **kw)
+nd103 = ko.study_type_name_defaults('metabolic_split_12d')
+assert _sup_name103(relay_from=DONORS103, relay_kwargs=KW103) == NAME103 == ko.default_study_name(
+    'PI (log-tail)', 'ethanol_isobutanol', 'metabolic_split_12d', burden=True,
+    rate_multiplier_bounds=ko.DEFAULT_RATE_MULTIPLIER_BOUNDS,
+    inhibition_multiplier_bounds=nd103['inhibition_multiplier_bounds'],
+    exclude_params=nd103['exclude_params'], stage_1_max_x_bounds=nd103['stage_1_max_x_bounds'],
+    n_seeds=0, method='gp', ibo_pathway_anchoring='scenario_A', relay_tag=TAG103)
+assert _sup_name103(relay_from=list(reversed(DONORS103)),
+                    relay_kwargs=dict(KWR103, max_rows=1000.0)) == NAME103
+assert _sup_name103(relay_from=[os.path.join(HERE103, 'results', d + '_trajectory.csv')
+                                for d in DONORS103], relay_kwargs=KW103) == NAME103
+assert _sup_name103() == _sup_name103(relay_from=None) == _sup_name103(relay_from=[]) == PLAIN103
+assert _sup_name103(relay_from=DONORS103) != NAME103                  # knobs are hashed too
+for kw103 in ({'relay_from': ['a103']}, {'relay_from': 'a103'}):
+    try:
+        sup103['default_study_name']('A', 'IRR', 'B', burden=True, **kw103)
+    except ValueError as e103:
+        assert 'preset' in str(e103), e103
+    else:
+        raise AssertionError(f'legacy default_study_name accepted {kw103}')
+_n103 = _inspect.signature(sup103['default_study_name']).parameters
+assert _n103['relay_from'].default is None and _n103['relay_kwargs'].default is None
+# --- child_code: relay kwargs only when set, appended last, program compiles ---
+args103 = (None, 'PI (log-tail)', 2000, None, True, NAME103)
+ckw103 = dict(study_target_products='ethanol_isobutanol', study_type='metabolic_split_12d',
+              method='gp', gp_kwargs={'deterministic_objective': True}, seed=20260923)
+code103_plain = sup103['child_code'](*args103, **ckw103)
+assert 'relay' not in code103_plain
+assert (sup103['child_code'](*args103, relay_from=None, relay_kwargs=None, **ckw103)
+        == sup103['child_code'](*args103, relay_from=[], relay_kwargs={}, **ckw103)
+        == code103_plain)
+code103 = sup103['child_code'](*args103, relay_from=DONORS103, relay_kwargs=KWR103, **ckw103)
+compile(code103, '<child103>', 'exec')
+lines103 = code103.splitlines(keepends=True)
+assert lines103[-3] == f'          relay_from={DONORS103!r},\n', lines103[-3]
+assert lines103[-2] == f'          relay_kwargs={KWR103!r},\n', lines103[-2]
+assert ''.join(lines103[:-3] + lines103[-1:]) == code103_plain      # purely appended
+call103 = _ast103.parse(code103).body[-1].value
+kwv103 = {k.arg: _ast103.literal_eval(k.value) for k in call103.keywords
+          if k.arg in ('relay_from', 'relay_kwargs', 'method', 'study_name')}
+assert kwv103 == {'relay_from': DONORS103, 'relay_kwargs': KWR103, 'method': 'gp',
+                  'study_name': NAME103}, kwv103
+assert ko.resolve_relay_kwargs(kwv103['relay_kwargs']) == KWR103     # the child re-resolves identically
+assert "relay_from=['a103']," in sup103['child_code'](*args103, relay_from='a103', **ckw103)
+try:
+    sup103['child_code'](*args103, relay_kwargs={'max_rows': 3}, **ckw103)
+except ValueError as e103:
+    assert 'without relay_from' in str(e103), e103
+else:
+    raise AssertionError('child_code accepted relay_kwargs without relay_from')
+_c103 = _inspect.signature(sup103['child_code']).parameters
+_s103 = _inspect.signature(sup103['supervise']).parameters
+assert _c103['relay_from'].default is None and _c103['relay_kwargs'].default is None
+assert _s103['relay_from'].default is None and _s103['relay_kwargs'].default is None
+# --- supervise(): refusals before the name / log / child. A nonexistent
+# child python and a temp log path: were a refusal ever to regress, Popen
+# would raise FileNotFoundError instead of launching a simulation. ---
+outdir103 = tempfile.mkdtemp()
+log103 = os.path.join(outdir103, 'sup103_run.log')
+for needle103, kw103 in (
+        ('GP-only', dict(relay_from=['a103'], method='tpe')),
+        ('GP-only', dict(relay_from=['a103'], method='dual_annealing')),
+        ('preset', dict(relay_from=['a103'], method='gp', study_target_products=None)),
+        ('learned_constraints', dict(relay_from=['a103'], method='gp',
+                                     gp_kwargs={'learned_constraints': True})),
+        ('without relay_from', dict(relay_kwargs={'max_rows': 3}, method='gp')),
+        ('max_rows', dict(relay_from=['a103'], method='gp', relay_kwargs={'max_rows': 0})),
+        ('unknown relay_kwargs', dict(relay_from=['a103'], method='gp',
+                                      relay_kwargs={'bogus': 1})),
+        ('more than once', dict(relay_from=['a103', 'a103'], method='gp'))):
+    try:
+        sup103['supervise'](objective='PI (log-tail)', study_name='sup103_never',
+                            python=os.path.join(outdir103, 'no_such_python.exe'),
+                            log_path=log103, poll_s=0.01, settle_s=0.0, **kw103)
+    except ValueError as e103:
+        assert needle103 in str(e103), (needle103, str(e103))
+    else:
+        raise AssertionError(f'supervise() accepted {kw103}')
+    assert not os.path.exists(log103), kw103                      # refused before any event
+assert not os.path.isfile(os.path.join(sup103['RESULTS_DIR'], 'sup103_never_trajectory.csv'))
+# supervise() path budget (2026-09-23 review fix): a relay run-data path at or
+# over MAX_PATH is refused before the log; a relay study's settings line ends
+# with its longest output path, a non-relay line is unchanged. The nonexistent
+# child python makes the first Popen raise, so nothing can ever launch.
+logm103 = os.path.join(outdir103, 'sup103_long_run.log')
+try:
+    sup103['supervise'](objective='PI (log-tail)', study_name='x103' * 50, method='gp',
+                        relay_from=['a103'], python=os.path.join(outdir103, 'no_such_python.exe'),
+                        log_path=logm103, poll_s=0.01, settle_s=0.0)
+except ValueError as e103:
+    n103m = len(os.path.abspath(sup103['RESULTS_DIR'])) + 1 + 200 + len('_relay_manifest.csv.tmp')
+    assert 'MAX_PATH' in str(e103) and f'{n103m} characters' in str(e103), str(e103)
+else:
+    raise AssertionError('supervise() accepted a relay study whose run-data path overflows')
+assert not os.path.exists(logm103)
+for name103s, relay103s in (('sup103_path', ['a103']), ('sup103_plainpath', None)):
+    logp103 = os.path.join(outdir103, name103s + '_run.log')
+    try:
+        with _contextlib.redirect_stdout(_io.StringIO()):     # the events go to logp103 too
+            sup103['supervise'](objective='PI (log-tail)', study_name=name103s, method='gp',
+                                relay_from=relay103s,
+                                python=os.path.join(outdir103, 'no_such_python.exe'),
+                                log_path=logp103, poll_s=0.01, settle_s=0.0)
+    except OSError:
+        pass                                     # FileNotFoundError at the first Popen
+    else:
+        raise AssertionError('supervise() returned with a nonexistent child python')
+    with open(logp103) as fh103:
+        set103 = [l for l in fh103.read().splitlines() if 'settings: study' in l]
+    assert len(set103) == 1, set103
+    d103s, p103s = ko.longest_output_paths(sup103['RESULTS_DIR'], name103s)
+    if relay103s:
+        assert set103[0].endswith(
+            f', longest output path {len(p103s)} characters (run data {len(d103s)}; '
+            'Windows MAX_PATH 260)'), set103[0]
+    else:
+        assert set103[0].endswith(
+            f"max_empty_attempts={_s103['max_empty_attempts'].default!r}"), set103[0]
+        assert 'longest output path' not in set103[0]
+    assert not os.path.isfile(os.path.join(sup103['RESULTS_DIR'], name103s + '_trajectory.csv'))
+src103_sup = _inspect.getsource(sup103['supervise'])
+assert 'relay_from=relay_from' in src103_sup and 'relay_kwargs=relay_kwargs' in src103_sup
+assert src103_sup.count('relay_from=relay_from') == 3   # check_method_kwargs + default_study_name + child_code
+assert 'relay_from={relay_from!r}' in src103_sup and 'relay_kwargs={relay_kwargs!r}' in src103_sup
+assert src103_sup.index('ko.resolve_relay_kwargs(') < src103_sup.index('default_study_name(scenario')
+assert 'import biorefineries' not in supsrc103 and 'import optuna' not in supsrc103
+assert "'--relay-from', nargs='+', action='extend'" in supsrc103
+for flag103 in ("'--relay-max-rows', type=int", "'--relay-keep-above', type=float",
+                "'--relay-dedupe-tol', type=float",
+                "'--relay-keep-quarantined', action='store_true'"):
+    assert flag103 in supsrc103, flag103
+assert '--relay-from <donor study> <other donor>' in supsrc103       # module-docstring example
+# --- the REAL CLI block, exec'd with a stub supervise() (never launches) ---
+main103 = supsrc103[supsrc103.index("if __name__ == '__main__':"):].split('\n', 1)[1]
+main103 = compile(_textwrap103.dedent(main103), SUP103_PATH, 'exec')
+def _cli103(*argv):
+    calls = []
+    def _stub_supervise103(**kw):
+        calls.append(kw)
+        return 'complete'
+    ns = dict(sup103, supervise=_stub_supervise103)
+    argv_saved = _sys.argv
+    _sys.argv = ['optimize_kinetics_BO_supervised.py', *argv]
+    err = _io.StringIO()
+    try:
+        with _contextlib.redirect_stderr(err):
+            exec(main103, ns)
+    except SystemExit as e:
+        status = e.code
+    else:
+        raise AssertionError(f'CLI {argv} did not exit')
+    finally:
+        _sys.argv = argv_saved
+    return status, calls, err.getvalue()
+st103, calls103, err103 = _cli103(
+    '--objective', 'PI (log-tail)', '--study-type', 'metabolic_split_12d',
+    '--method', 'gp', '--gp-deterministic', '--n-trials', '2000', '--seed', '20260923',
+    '--stall-timeout-min', '10', '--relay-from', *DONORS103[:3], '--relay-max-rows', '1000',
+    '--relay-from', *DONORS103[3:], '--relay-keep-above', '-0.12953')
+assert st103 == 0 and len(calls103) == 1, (st103, err103)
+k103 = calls103[0]
+assert k103['relay_from'] == DONORS103                             # two groups extended, in order
+assert k103['relay_kwargs'] == KWR103
+assert k103['method'] == 'gp' and k103['gp_kwargs'] == {'deterministic_objective': True}
+assert k103['study_name'] is None and k103['n_trials'] == 2000 and k103['seed'] == 20260923
+cli_name103 = sup103['default_study_name'](
+    k103['scenario'], k103['objective'], k103['kinetic_bounds_scenario'],
+    study_target_products=k103['study_target_products'], study_type=k103['study_type'],
+    burden=k103['burden'], rate_multiplier_bounds=k103['rate_multiplier_bounds'],
+    exclude_params=k103['exclude_params'], stage_1_max_x_bounds=k103['stage_1_max_x_bounds'],
+    seed_from=k103['seed_from'], method=k103['method'],
+    group_multiplier_bounds=k103['group_multiplier_bounds'],
+    relay_from=k103['relay_from'], relay_kwargs=k103['relay_kwargs'])
+assert cli_name103 == NAME103, cli_name103
+st103, calls103, _ = _cli103('--method', 'gp', '--relay-from', 'a103',
+                             '--relay-keep-quarantined', '--relay-dedupe-tol', '0.002')
+assert st103 == 0 and calls103[0]['relay_kwargs'] == ko.resolve_relay_kwargs(
+    {'drop_quarantined': False, 'dedupe_tol': 0.002}), calls103
+assert calls103[0]['relay_kwargs']['drop_quarantined'] is False
+st103, calls103, _ = _cli103('--method', 'gp')                    # no relay flag at all
+assert st103 == 0 and calls103[0]['relay_from'] is None and calls103[0]['relay_kwargs'] is None
+for needle103, argv103 in (
+        ('require --relay-from', ('--method', 'gp', '--relay-max-rows', '5')),
+        ('require --relay-from', ('--method', 'gp', '--relay-keep-quarantined')),
+        ('require --relay-from', ('--method', 'gp', '--relay-keep-above', '0.1')),
+        ('GP-only', ('--relay-from', 'a103')),                             # default method tpe
+        ('GP-only', ('--relay-from', 'a103', '--method', 'dual_annealing')),
+        ('--legacy-flags', ('--relay-from', 'a103', '--method', 'gp', '--legacy-flags')),
+        ('more than once', ('--relay-from', 'a103', 'a103', '--method', 'gp')),
+        ('max_rows', ('--relay-from', 'a103', '--method', 'gp', '--relay-max-rows', '0')),
+        ('dedupe_tol', ('--relay-from', 'a103', '--method', 'gp', '--relay-dedupe-tol', '-1')),
+        ('--relay-from', ('--method', 'gp', '--relay-from'))):             # nargs='+'
+    st103, calls103, err103 = _cli103(*argv103)
+    assert st103 == 2 and calls103 == [], (argv103, st103, calls103)
+    assert needle103 in err103, (needle103, err103)
+# --- driver: source plumbing ---
+body103 = drv103[drv103.index('def run('):]
+assert 'relay_from=None,' in body103 and 'relay_kwargs=None,' in body103
+assert 'relay_from=relay_from,' in body103 and 'relay_kwargs=relay_kwargs,' in body103
+assert 'startup_sampling=startup_sampling, relay_from=relay_from)' in body103   # check_method_kwargs
+call103d = body103[body103.index('ko.default_study_name('):body103.index('excluded = tuple(')]
+assert 'relay_tag=relay_tag)' in call103d, call103d
+assert (body103.index('ko.check_method_kwargs(') < body103.index('ko.resolve_relay_kwargs(')
+        < body103.index('relay_tag = ko.relay_study_tag(') < body103.index('ko.resolve_study_preset(')
+        < body103.index('scenarios.load_scenario('))
+assert 'baseline_trial=(0 if' not in drv103 and 'first_trial_number' in body103
+assert 'ko.best_simulated_trial(' in body103 and 'ko.n_relay_trials(' in body103
+assert 'study.best_trial' not in drv103
+assert "relay_from=['<donor study name>', '<other donor>']" in drv103     # runner example
+# --- driver: the REAL run() exec'd from source against stubs (never load()s) ---
+if os.path.isfile(wb_A) and os.path.isfile(wb_B):
+    defs103 = {node.name: _ast103.get_source_segment(drv103, node)
+               for node in _ast103.parse(drv103).body
+               if isinstance(node, _ast103.FunctionDef)}
+    class _Captured103(Exception):
+        pass
+    eng103, loads103, plots103 = [], [], {}
+    mode103 = {'return': None}
+    def _engine103(**kw):
+        eng103.append(kw)
+        if mode103['return'] is None:
+            raise _Captured103()
+        return mode103['return']
+    def _load103(scenario, burden=True):
+        loads103.append((scenario, burden))
+        return {'burden_model': SimpleNamespace(
+            reference={}, describe_point=lambda point, label='': f'<burden report: {label}>')}
+    def _plot103(name):
+        def _plot(df, *args, **kw):
+            plots103[name] = kw
+        return _plot
+    ko103 = SimpleNamespace(**{k: getattr(ko, k) for k in dir(ko) if not k.startswith('__')})
+    ko103.run_kinetic_optimization = _engine103
+    ko103.run_kinetic_dual_annealing = _engine103
+    for name103 in ('plot_optimization_trajectories', 'plot_parameter_trajectory',
+                    'plot_best_vs_baseline', 'plot_pca_projection'):
+        setattr(ko103, name103, _plot103(name103))
+    drvns103 = {'ko': ko103, 'scenarios': SimpleNamespace(load_scenario=_load103),
+                'os': os, 'datetime': _datetime103, '__name__': 'driver103'}
+    for fn103 in ('kinetic_bounds_from_scenario', 'run'):
+        exec(compile(defs103[fn103], DRV103_PATH, 'exec'), drvns103)
+    run103 = drvns103['run']
+    base103 = dict(objective='PI (log-tail)', study_target_products='ethanol_isobutanol',
+                   study_type='metabolic_split_12d', method='gp', n_trials=2000,
+                   seed=20260923, gp_kwargs={'deterministic_objective': True})
+    def _drive103(**kw):
+        buf = _io.StringIO()
+        with _contextlib.redirect_stdout(buf):
+            try:
+                out = run103(**{**base103, **kw})
+            except _Captured103:
+                out = None
+        return out, buf.getvalue()
+    # production relay: name parity with the supervisor, forwarded + resolved, summary line
+    _, out103 = _drive103(make_plots=False, relay_from=DONORS103, relay_kwargs=KW103)
+    e103 = eng103[-1]
+    assert e103['study_name'] == NAME103 == cli_name103, e103['study_name']
+    assert e103['relay_from'] == tuple(DONORS103) and e103['relay_kwargs'] == KWR103
+    assert e103['method'] == 'gp' and e103['gp_kwargs'] == {'deterministic_objective': True}
+    assert loads103 == [('A', True)], loads103
+    sum103 = [l for l in out103.splitlines() if l.startswith('Relay campaign')]
+    assert len(sum103) == 1, out103
+    assert f'(tag {TAG103})' in sum103[0] and sum103[0].endswith(ko.relay_spec_json(DONORS103, KW103))
+    # the path budget on its OWN line (2026-09-23 review fix), no warning here
+    assert (f'Longest output path: {len(plot103)} characters (run data {len(data103)}; '
+            f'Windows MAX_PATH 260 incl. the NUL): {plot103}') in out103, out103
+    assert 'exceed Windows MAX_PATH' not in out103
+    # a single donor string is one donor; knob forms resolve identically
+    _drive103(make_plots=False, relay_from=DONORS103[0], relay_kwargs={'max_rows': 1000.0})
+    assert eng103[-1]['relay_from'] == (DONORS103[0],)
+    assert eng103[-1]['relay_kwargs'] == ko.resolve_relay_kwargs(None)
+    assert eng103[-1]['study_name'] == _sup_name103(relay_from=DONORS103[0])
+    # non-relay: None / None forwarded under the untagged name, no relay print
+    _, out103n = _drive103(make_plots=False)
+    assert eng103[-1]['relay_from'] is None and eng103[-1]['relay_kwargs'] is None
+    assert eng103[-1]['study_name'] == PLAIN103 == _sup_name103()
+    assert 'Relay' not in out103n and 'Longest output path' not in out103n
+    # refusals: raised BEFORE the scenario load and the engine
+    n_loads103, n_eng103 = len(loads103), len(eng103)
+    for needle103, kw103 in (
+            ('GP-only', dict(relay_from=DONORS103, method='tpe', gp_kwargs=None)),
+            ('GP-only', dict(relay_from=DONORS103, method='dual_annealing', gp_kwargs=None)),
+            ('preset', dict(relay_from=DONORS103, study_target_products=None)),
+            ('REGISTRY objective', dict(relay_from=DONORS103, objective='TCI')),      # minimized
+            ('REGISTRY objective', dict(relay_from=DONORS103, objective='NPV')),      # untracked
+            ('REGISTRY objective', dict(relay_from=DONORS103, objective=lambda h: 0.0,
+                                        objective_name='custom103', direction='maximize')),
+            ('REGISTRY objective', dict(relay_from=DONORS103, direction='minimize')),
+            ('learned_constraints', dict(relay_from=DONORS103,
+                                         gp_kwargs={'learned_constraints': True})),
+            ('without relay_from', dict(relay_kwargs={'max_rows': 3})),
+            ('unknown relay_kwargs', dict(relay_from=DONORS103, relay_kwargs={'bogus': 1})),
+            ('more than once', dict(relay_from=[DONORS103[0], DONORS103[0]])),
+            # a run-data path over Windows MAX_PATH (2026-09-23 review fix)
+            ('MAX_PATH', dict(relay_from=DONORS103, relay_kwargs=KW103,
+                              study_name='x103' * 50))):
+        try:
+            _drive103(make_plots=False, **kw103)
+        except ValueError as err:
+            assert needle103 in str(err), (needle103, str(err))
+        else:
+            raise AssertionError(f'driver run() accepted {kw103}')
+        assert (len(loads103), len(eng103)) == (n_loads103, n_eng103), kw103
+    # end of run (A8): the PCA baseline marker is the trajectory's FIRST
+    # trial_number (N = 5 preloaded here), the best SIMULATED trial is printed
+    plotdir103 = tempfile.mkdtemp()
+    csv103 = os.path.join(plotdir103, 'relay103_trajectory.csv')
+    pd.DataFrame({'trial_number': [5, 6, 7], 'state': ['COMPLETE']*3,
+                  'k_3': [1.0, 2.0, 3.0], 'objective': [0.1, 0.3, 0.2]}).to_csv(csv103, index=False)
+    ko103.n_relay_trials = lambda study: 5
+    ko103.best_simulated_trial = lambda study: SimpleNamespace(number=6, value=0.3)
+    mode103['return'] = (SimpleNamespace(), csv103, {})
+    _, out103p = _drive103(make_plots=True, enqueue_baseline=True,
+                           relay_from=DONORS103, relay_kwargs=KW103)
+    assert plots103['plot_pca_projection']['baseline_trial'] == 5, plots103
+    assert 'Relay campaign: 5 preloaded trials; best SIMULATED trial #6 = 0.3' in out103p, out103p
+    assert 'Plots saved next to' in out103p
+    plots103.clear()
+    _drive103(make_plots=True, enqueue_baseline=False, relay_from=DONORS103, relay_kwargs=KW103)
+    assert plots103['plot_pca_projection']['baseline_trial'] is None
+    plots103.clear()
+    ko103.n_relay_trials = lambda study: 0                        # a plain GP study: no relay line
+    _, out103q = _drive103(make_plots=True, enqueue_baseline=True)
+    assert plots103['plot_pca_projection']['baseline_trial'] == 5    # first row, not a literal 0
+    assert 'preloaded' not in out103q
+else:
+    print("SKIP 103 (driver run() part): parameter-distribution workbooks not found")
+PASS('relay plumbing: supervisor name / child_code (relay kwargs only when set, appended) / '
+     'supervise() refusals / real CLI block with a stub supervise (two-flag --relay-from, '
+     'knobs, parser.error); driver run() exec\'d with stubs: production name == supervisor CLI '
+     'name, forwarding + summary, refusals before the scenario load, PCA marker at the first '
+     'trajectory trial, best SIMULATED trial printed; longest output path of the production '
+     f'relay name {len(plot103)} of {ko.WINDOWS_MAX_PATH} characters (run data {len(data103)}), '
+     'reported by the driver / supervisor, over-MAX_PATH refused')
+
 print(f'\nALL {n_pass} CHECKS PASSED')
