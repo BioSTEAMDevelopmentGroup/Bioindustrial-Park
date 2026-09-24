@@ -65,8 +65,8 @@ metabolic_split_12d campaign with >= 2000 trials and the most recent relay
   B  proteome allocation, one row per set, the relay campaign last;
   C  (only with a relay) panel A's grid for the relay campaign alone, on
      panel A's value axes. Its IRR cell's preload zone (trials 0..N-1) shows
-     the preloaded donor rows in their donor campaign's colour, grouped by
-     donor under a composition strip, and the seed (the best preloaded row,
+     the preloaded donor rows in their donor campaign's colour, in shuffled
+     order, and the seed (the best preloaded row,
      the relay's incumbent when its first simulated trial starts) joined to
      the incumbent line, which starts at N. The relay's legend line says
      what it was seeded with.
@@ -86,7 +86,6 @@ from matplotlib.lines import Line2D, TICKDOWN, TICKLEFT
 from matplotlib.ticker import (AutoMinorLocator, FixedLocator, FuncFormatter,
                                LogLocator, MultipleLocator, NullFormatter,
                                NullLocator, PercentFormatter)
-from matplotlib.transforms import blended_transform_factory
 
 # --- sim-safe module loads (by file path; never import the package) ----------
 PKG_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -416,6 +415,8 @@ BEST_MARK_LW = 1.4
 # panel c draws the relay's preloaded donor rows in their DONOR campaign's
 # colour; a donor that is not one of the plotted campaigns falls back to grey
 PRELOAD_FALLBACK_COLOR = '0.55'
+# ... in a fixed-seed shuffled order (relay_preload_layout)
+PRELOAD_SHUFFLE_SEED = 0
 
 FONTS = {'band': 12, 'cell': 10, 'tick': 9, 'callout': 9,
          'legend': 10, 'axis': 11, 'panel': 14}
@@ -1406,56 +1407,30 @@ def relay_legend_label(s, donor_sets):
 
 def relay_preload_layout(s, donor_sets, colors):
     """Panel-c layout of a relay's preloaded rows. Their store order is the
-    relay's selection order (keep set by value, then a space-filling fill),
-    which carries no meaning, so they are regrouped into one contiguous block
-    per donor campaign -- blocks in the plotted campaigns' set order (donors
-    that are not plotted last, by name), rows within a block by donor trial
-    number. Returns (x per preload row, colour per preload row, blocks), each
-    block (study name, first x, last x, colour)."""
+    relay's selection order (keep set sorted by value, then a space-filling
+    fill), which would read as a spurious descending trend, so they are
+    SHUFFLED onto x = 0..N-1 by a fixed-seed permutation
+    (PRELOAD_SHUFFLE_SEED, so the figure is reproducible): an unordered pool,
+    coloured by donor. Returns (x per preload row, colour per preload row)."""
     donors = list(s['preload_donor'])
-    trials = np.asarray(s['preload_donor_trial'])
     by_stem = _donor_set_map(donor_sets)
-    present = set(donors)
-    order = [st for st in by_stem if st in present]
-    order += sorted(present - set(order))
-    rank = {st: k for k, st in enumerate(order)}
-    perm = np.lexsort((trials, np.array([rank[d] for d in donors])))
-    x = np.empty(len(donors))
-    x[perm] = np.arange(len(donors))
-
-    def col_of(st):
-        return colors[id(by_stem[st])] if st in by_stem \
-            else PRELOAD_FALLBACK_COLOR
-    row_colors = [col_of(d) for d in donors]
-    donors_arr = np.array(donors)
-    blocks = [(st, float(x[donors_arr == st].min()),
-               float(x[donors_arr == st].max()), col_of(st)) for st in order]
-    return x, row_colors, blocks
+    x = np.random.default_rng(PRELOAD_SHUFFLE_SEED)         .permutation(len(donors)).astype(float)
+    row_colors = [colors[id(by_stem[d])] if d in by_stem
+                  else PRELOAD_FALLBACK_COLOR for d in donors]
+    return x, row_colors
 
 
 def _draw_relay_preload(ax, s, colors, donor_sets, sy_pre, lo, cap,
                         point_size):
     """Panel c's preload zone (x 0..N-1) of a relay's owned cell: the
-    preloaded donor rows as a trial cloud in their donor's colour (grouped by
-    donor, relay_preload_layout), a composition strip along the top edge, and
-    the seed -- the best preloaded row, which is the relay's incumbent when its
-    first simulated trial starts -- as an open circle joined by a thin line to
-    where the incumbent line begins (x = N)."""
+    preloaded donor rows as a trial cloud in their donor's colour (shuffled,
+    relay_preload_layout), and the seed -- the best preloaded row, which is
+    the relay's incumbent when its first simulated trial starts -- as an open
+    circle joined by a thin line to where the incumbent line begins (x = N)."""
     n_pre = s['n_preloaded']
-    px, pcols, blocks = relay_preload_layout(s, donor_sets, colors)
+    px, pcols = relay_preload_layout(s, donor_sets, colors)
     ax.scatter(px, sy_pre, s=point_size, c=pcols, alpha=0.35, linewidths=0,
                zorder=1)
-    # composition strip: one bar per donor block, x in data, y in axes units
-    trans = blended_transform_factory(ax.transData, ax.transAxes)
-    for _st, x0, x1, c in blocks:
-        ax.add_patch(plt.Rectangle((x0 - 0.5, 0.962), x1 - x0 + 1.0, 0.028,
-                                   transform=trans, facecolor=c,
-                                   edgecolor='none', zorder=3))
-    # one line, so it clears the seed label below it (the count is in the
-    # relay's legend line)
-    ax.text(n_pre / 2, 0.94, 'Preloaded trials, by source', transform=trans,
-            ha='center', va='top', fontsize=FONTS['callout'], color='0.25',
-            zorder=4)
     i = s.get('preload_seed')
     if i is None:
         return
@@ -1463,9 +1438,17 @@ def _draw_relay_preload(ax, s, colors, donor_sets, sy_pre, lo, cap,
     ax.plot([xs, n_pre], [ys, ys], color=colors[id(s)], lw=1.4, zorder=2)
     ax.scatter([xs], [ys], s=BEST_MARK_SIZE, facecolors='white',
                edgecolors=pcols[i], linewidths=BEST_MARK_LW, zorder=5)
-    ax.text(xs + 0.012 * n_pre, ys + 0.022 * (cap - lo),
-            'Seed (best preloaded)', ha='left', va='bottom',
-            fontsize=FONTS['callout'], color='0.25', zorder=4)
+    # the shuffle can put the seed anywhere in the zone: label it from above,
+    # centred on the seed but clamped so the ~0.7 N-wide label stays inside
+    # the preload zone (clear of the incumbent line rising at N), with a short
+    # arrow down to the circle
+    ax.annotate('Seed (best preloaded)', xy=(xs, ys),
+                xytext=(float(np.clip(xs, 0.37 * n_pre, 0.63 * n_pre)),
+                        ys + 0.09 * (cap - lo)),
+                ha='center', va='bottom', fontsize=FONTS['callout'],
+                color='0.25', zorder=4,
+                arrowprops=dict(arrowstyle='-|>', color='0.25', lw=0.8,
+                                shrinkA=1, shrinkB=5, mutation_scale=8))
 
 
 def _draw_best_irr_marks(ax, sets, colors, xmax, lo, cap, seed_ref):
@@ -1552,7 +1535,7 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9,
         sx, sy, cc = s['scatter_x'], _yv(s['scatter'][col]), colors[id(s)]
         # a relay's preloaded donor rows (x < N) are not its own search
         # progress: never drawn in the relay colour. In panel c (donor_sets
-        # given) they are drawn in their DONOR's colour, regrouped by donor
+        # given) they are drawn in their DONOR's colour, shuffled
         # (_draw_relay_preload, after the incumbent lines); elsewhere hidden.
         n_pre = (s.get('n_preloaded') or 0) if s.get('is_relay') else 0
         pre = sx < n_pre
