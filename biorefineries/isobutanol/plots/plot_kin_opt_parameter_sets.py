@@ -1410,7 +1410,7 @@ def relay_legend_label(s, donor_sets):
     k, process_level = relay_donor_summary(s, donor_sets)
     src = (f'the {_count_word(k)} process-level campaigns' if process_level
            else f'{_count_word(k)} donor campaign{"s" if k != 1 else ""}')
-    return f'{s["label"]}: seeded with {n:,} trials of {src}'
+    return f'{s["label"]}: seeded with {n} trials of {src}'
 
 
 def relay_preload_layout(s, donor_sets, colors):
