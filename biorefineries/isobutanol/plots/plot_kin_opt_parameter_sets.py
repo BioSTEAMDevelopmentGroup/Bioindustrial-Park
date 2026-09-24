@@ -141,7 +141,7 @@ DEFAULT_RELAY_CAMPAIGN = ('kin_opt_ethanol_isobutanol_metabolic_split_12d'
 # carries the '_rl<sha1-8>' tag (ko.relay_study_tag); relay studies are never
 # picked as one of the seven DEFAULT_OBJECTIVES campaigns.
 DEFAULT_RELAY_OBJECTIVE = 'PI (log-tail)'
-DEFAULT_RELAY_LABEL = 'Profitability (relay)'
+DEFAULT_RELAY_LABEL = 'Profitability (flagship)'   # figures call it "flagship"
 DEFAULT_RELAY_MIN_TRIALS = 1000
 _RELAY_TAG_RE = re.compile(r'_rl[0-9a-f]{8}(?=_|$)')
 
@@ -2145,7 +2145,7 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
                                          _panel_a_value_axes(a_sets, colors)):
                 ra.set_ylim(ylim)
                 ra.yaxis.set_major_locator(FixedLocator(ticks))
-            a_title = 'Optimization trajectories of the relay campaign'
+            a_title = 'Optimization trajectories of the flagship campaign'
         else:
             a_axes = draw_outcomes(fig, a_gs[0], a_sets, colors,
                                    mark_best=True)
