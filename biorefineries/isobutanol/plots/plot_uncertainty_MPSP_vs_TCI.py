@@ -21,7 +21,7 @@ written by analyses/full/uncertainties_IBO_EtOH.py):
   D  empty (a fourth distribution will be added)
 
 Every joint panel, in its own hue (A teal, B purple, C yellow): every Monte
-Carlo sample as a dot at 25 % opacity,
+Carlo sample as a dot at 35 % opacity,
 the baseline (the 'initial' row of the companion *_0_baseline.xlsx) as a
 white diamond (unlabelled: name it in the caption), contour lines of a
 Gaussian KDE enclosing 5 / 25 / 50 / 75 / 95 % of the samples (the
@@ -95,7 +95,7 @@ TEAL = '#0B6E7A'
 # figure's hue palette (HUE_COLORS[4], HUE_COLORS[5])
 PURPLE = '#a280b9'
 YELLOW = '#f3c354'
-SAMPLE_ALPHA = 0.25   # joint-panel samples: 75 % transparent
+SAMPLE_ALPHA = 0.35   # joint-panel samples: 65 % transparent
 SAMPLE_SIZE = 6 # pt^2
 
 
