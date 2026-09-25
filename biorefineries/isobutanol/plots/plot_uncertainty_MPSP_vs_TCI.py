@@ -36,7 +36,10 @@ outlying samples (minimum and maximum).
 Panel A also carries a light grey band for the ethanol market price range
 (ETHANOL_MARKET_RANGE) spanning the typical corn ethanol biorefinery TCI
 (TYPICAL_CORN_ETHANOL_TCI) and dark grey dashed lines at the ends of the
-gasoline price range (GASOLINE_PRICE_RANGE).
+gasoline price range (GASOLINE_PRICE_RANGE). Panel B carries a box in the
+same grey spanning a typical corn ethanol biorefinery's ethanol production
+(TYPICAL_CORN_ETHANOL_PRODUCTION) and TCI (TYPICAL_CORN_ETHANOL_TCI), also
+unlabelled.
 
 Every panel also carries the Pareto frontier of its samples as a solid red
 staircase, in the sense set by the panel's `pareto` entry: A lower-left (MPSP
@@ -168,6 +171,8 @@ TYPICAL_CORN_ETHANOL_TCI_SOURCE = ((83.95, 2019), # MM$, Kurambhatti et al.
 TYPICAL_CORN_ETHANOL_TCI = tuple(
     v * CEPCI_ANNUAL[TCI_COST_YEAR] / CEPCI_ANNUAL[year]
     for v, year in TYPICAL_CORN_ETHANOL_TCI_SOURCE) # MM$ (2023$): ~110.3, ~195.6
+# typical dry-grind corn ethanol biorefinery capacity, for panel B's box
+TYPICAL_CORN_ETHANOL_PRODUCTION = (40.0, 60.0) # MM gal/y
 # the ethanol range is a band in a light shade of the baseline grey of
 # plots/plot_kin_opt_parameter_sets.py (BASELINE_COLOR); the gasoline range,
 # which almost coincides with it, is two dashed lines in a dark shade of the
@@ -196,7 +201,8 @@ PANELS = (
     dict(x='EtOH production', y='TCI', color=GREEN, pareto=('max', 'min'),
          xlabel=r'Ethanol production [$\mathrm{MM\ gal·y}^{-1}$]',
          ylabel='Total capital investment [MM\\$]',
-         yticks=TCI_TICKS),
+         yticks=TCI_TICKS,
+         box=(TYPICAL_CORN_ETHANOL_PRODUCTION, TYPICAL_CORN_ETHANOL_TCI)),
     dict(x='EtOH yield', y='EtOH titer', color=PURPLE, pareto=('max', 'max'),
          xlabel=r'Ethanol yield [$\mathrm{g·g}^{-1}$ sugars]',
          ylabel=r'Ethanol titer [$\mathrm{g·L}^{-1}$]',
@@ -369,6 +375,9 @@ def draw_joint_panel(fig, cell, panel, samples, base, letter):
                         color=MARKET_BAND_COLOR, lw=0, zorder=0)
         for price in GASOLINE_PRICE_RANGE:
             ax.axhline(price, color=GASOLINE_LINE_COLOR, zorder=1, **GASOLINE_LINE_STYLE)
+    if panel.get('box'):
+        (x0, x1), (y0, y1) = panel['box']
+        ax.fill_between((x0, x1), y0, y1, color=MARKET_BAND_COLOR, lw=0, zorder=0)
     draw_density(ax, x, y, (xticks[0], xticks[-1]), (yticks[0], yticks[-1]),
                  panel['color'])
     if panel.get('pareto'):
