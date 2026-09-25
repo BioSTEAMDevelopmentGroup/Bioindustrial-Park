@@ -6,13 +6,23 @@
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
-"""Profitability index and isobutanol yield along 1-D sweeps of any
+"""Profitability index, IRR and ethanol yield along 1-D sweeps of any
 metabolic_split_12d decision variable through the flagship profitability
 campaign's optimum (trial #1912).
 
 Two modes:
 
-* --screen -- ranks the coarse slices of results/
+* --param NAME (default k_3) -- the figure: a single panel of a
+  full-resolution sweep (results/evaluate_axis_flagship_optimum_<NAME>.csv),
+  in the layout of plot_k13_flagship_sweep.py: PI on the left axis, the
+  ethanol yield on the right, the PI = 0 line drawn, any part beyond the
+  campaign band shaded, the onset of burden derating marked. A third,
+  outboard y axis carries the IRR (%) (--no-irr drops it), raised into the
+  upper part of the panel (IRR_BAND) so it does not sit on the PI curve it
+  tracks. Plain lines, no point or optimum markers; each y axis is coloured
+  like its curve; a legend appears only for the conditional reference items.
+  Output <NAME>_flagship_sweep_etoh_yield.png / .pdf.
+* --screen -- the slice-selection diagnostic: ranks the coarse slices of results/
   evaluate_axis_flagship_optimum_screen.csv (plus the in-band part of the
   full k_13 sweep, subsampled to the screen's density, as a reference) by how
   rough PI is against how smooth the isobutanol yield is, prints the table
@@ -21,17 +31,9 @@ Two modes:
   order: normalized total variation TV/(max-min) (1 = monotone, 2 = one clean
   peak; every extra up-and-down adds 2), strict interior local maxima, and
   the largest single step as a fraction of the range. Score = excess TV of
-  PI minus excess TV of the yield (excess = TV - 1).
-* --param NAME -- the single-panel publication figure of a full-resolution
-  sweep (results/evaluate_axis_flagship_optimum_<NAME>.csv), in the layout of
-  plot_k13_flagship_sweep.py: PI on the left axis, isobutanol yield on the
-  right, the PI = 0 line drawn, any part beyond the campaign band shaded,
-  the onset of burden derating marked. --yield ethanol puts the ethanol yield
-  on the right axis instead (stem suffix _etoh_yield). A third, outboard
-  y axis carries the IRR (%) (--no-irr drops it), raised into the upper part
-  of the panel (IRR_BAND) so it does not sit on the PI curve it tracks.
-  Plain lines, no point or optimum markers; each y axis is coloured like its
-  curve; a legend appears only for the conditional reference items.
+  PI minus excess TV of the yield (excess = TV - 1). Isobutanol yield here,
+  since the screen picked the slice for the PI-rough / isobutanol-smooth
+  contrast.
 
 Data: written by analyses/evaluate_axis_flagship_optimum.py (the simulation
 stage, ask-first). Sim-safe: reads CSV / JSON only; reuses the typeface and
@@ -39,9 +41,8 @@ tick helpers of plot_k13_flagship_sweep.py by file path; never imports the
 biorefineries package.
 
 Usage:
+    python plot_axis_flagship_sweep.py [--param k_3] [--no-irr] [--dpi 300]
     python plot_axis_flagship_sweep.py --screen [--dpi 300]
-    python plot_axis_flagship_sweep.py --param threshold_conc [--dpi 300]
-    python plot_axis_flagship_sweep.py --param k_3 --yield ethanol
 """
 import os
 import json
@@ -173,11 +174,9 @@ def place_irr_axis(ax_irr, IRR):
     ax_irr.yaxis.set_minor_locator(MultipleLocator(step/2))
 
 
-#: --yield choice -> (sweep CSV column, axis / legend label, output-stem suffix)
-YIELD_METRICS = {
-    'isobutanol': ('IBO yield', 'Isobutanol yield', ''),
-    'ethanol': ('EtOH yield', 'Ethanol yield', '_etoh_yield'),
-}
+#: the --param figure's right-axis yield: (sweep CSV column, axis title,
+#: output-stem suffix)
+FIGURE_YIELD = ('EtOH yield', 'Ethanol yield', '_etoh_yield')
 
 
 def ok_series(frame, yield_column='IBO yield'):
@@ -294,8 +293,8 @@ def screen(dpi):
 # -----------------------------------------------------------------------------
 # --param: the publication figure of one full-resolution slice
 # -----------------------------------------------------------------------------
-def plot_param(param, dpi, stem=None, product='isobutanol', irr=True):
-    yield_column, yield_label, stem_suffix = YIELD_METRICS[product]
+def plot_param(param, dpi, stem=None, irr=True):
+    yield_column, yield_label, stem_suffix = FIGURE_YIELD
     path = os.path.join(RESULTS_DIR, f'{SWEEP_STEM}_{param}.csv')
     with open(path[:-len('.csv')] + '_anchor.json') as fh:
         anchor = json.load(fh)
@@ -444,12 +443,10 @@ def plot_param(param, dpi, stem=None, product='isobutanol', irr=True):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
-    mode = ap.add_mutually_exclusive_group(required=True)
-    mode.add_argument('--screen', action='store_true')
-    mode.add_argument('--param')
-    ap.add_argument('--yield', dest='product', choices=tuple(YIELD_METRICS),
-                    default='isobutanol',
-                    help='yield on the right axis of a --param figure')
+    mode = ap.add_mutually_exclusive_group()
+    mode.add_argument('--screen', action='store_true',
+                      help='the slice-ranking diagnostic instead of the figure')
+    mode.add_argument('--param', default='k_3')
     ap.add_argument('--no-irr', dest='irr', action='store_false',
                     help='drop the third (IRR) axis of a --param figure')
     ap.add_argument('--stem', default=None)
@@ -458,7 +455,7 @@ def main(argv=None):
     if args.screen:
         screen(args.dpi)
     else:
-        plot_param(args.param, args.dpi, args.stem, args.product, args.irr)
+        plot_param(args.param, args.dpi, args.stem, args.irr)
 
 
 if __name__ == '__main__':
