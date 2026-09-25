@@ -95,6 +95,8 @@ LW_BOX = 0.9             # box outline (pt)
 LW_STREAM = 0.8          # stream line (pt)
 LW_RULE = 0.45           # underline rule (pt)
 HEAD_L, HEAD_W = 1.6, 1.1   # arrowhead length / half-width (mm)
+LABEL_OFF = 1.3             # label offset from a bare stream line (mm)
+HEAD_OFF = HEAD_W + 0.9     # ... from a line beside an arrowhead (mm)
 DASH_BOX = (0, (3.0, 1.6))
 
 # Arial vertical metrics (fractions of the em) used to anchor underlined
@@ -300,7 +302,7 @@ def draw_panel_a(d):
     vs = d.box(147, y_aux, 18, 8, 'vent\nscrubbing', fill)
     x_vent = fe['r'] - 4.0
     d.stream([(x_vent, fe['t']), (x_vent, vs['cy']), (vs['l'], vs['cy'])])
-    d.label(x_vent + 1.2, (fe['t'] + vs['cy']) / 2 - 0.4, 'vented\ngases',
+    d.label(x_vent + LABEL_OFF, (fe['t'] + vs['cy']) / 2 - 0.4, 'vented\ngases',
             ha='left')
     d.stream([(vs['cx'], vs['t'] + 4.0), (vs['cx'], vs['t'])])
     d.boundary_label(vs['cx'], vs['t'] + 4.8, 'wash water', va='bottom')
@@ -313,8 +315,8 @@ def draw_panel_a(d):
     d.label((fe['r'] + vs['cx']) / 2, fe['cy'] - 5.0,
             'broth\n(crude ethanol\n& isobutanol)')
     d.stream([(vs['cx'], vs['b']), (vs['cx'], fe['cy'])])
-    d.label(vs['cx'] + 1.2, (vs['b'] + sep['t']) / 2, 'scrubber bottoms\n'
-            '(recovered\nalcohols)', ha='left')
+    d.label(vs['cx'] + LABEL_OFF, (vs['b'] + sep['t']) / 2 + 0.3,
+            'scrubber bottoms\n(recovered alcohols)', ha='left')
 
 
 # --------------------------------------------------------------------------
@@ -363,11 +365,12 @@ def draw_panel_b(d):
                dashed=True)
     x_rb = rc['cx'] - 4.0
     d.stream([(x_rb, rc['b']), (x_rb, st['t'])])
-    d.label(x_rb - 1.2, (rc['b'] + st['t']) / 2, 'isobutanol-\nrich bottoms',
+    d.label(x_rb - HEAD_OFF, (rc['b'] + st['t']) / 2, 'isobutanol-\nrich bottoms',
             ha='right', fs=FS_SMALL)
     d.stream([(st['r'], r2), (dc['l'], r2)])
     d.stream([(dc['r'], r2), (dr['l'], r2)])
-    d.label((dc['r'] + dr['l']) / 2, r2 + 1.9, 'organic', fs=FS_SMALL)
+    d.label((dc['r'] + dr['l'] - HEAD_L) / 2, r2 + 2.2, 'organic',
+            fs=FS_SMALL)
     to_product(dr, r2)
     d.product_label(x_prod, r2, 'isobutanol', '(>99.9 wt%)')
     # aqueous phase back to the rectifier
@@ -384,13 +387,13 @@ def draw_panel_b(d):
     d.label((dr['cx'] + dc['cx']) / 2, y_az - 1.7, 'azeotrope', fs=FS_SMALL)
     # stripper bottoms: water reused as process water
     d.stream([(st['cx'], st['b']), (st['cx'], st['b'] - 4.0)])
-    d.boundary_label(st['cx'], st['b'] - 4.8, 'water (to process water reuse)',
+    d.boundary_label(st['cx'], st['b'] - 4.8, 'water (reused as process water)',
                      va='top')
 
     # ---- rows 3-4: stillage to DDGS and corn oil ------------------------
     ce = d.box(x1, r3, 18, bh - 1, 'centrifugation', fill)
     d.stream([(bc['cx'], bc['b']), (bc['cx'], ce['t'])])
-    d.label(bc['cx'] - 1.2, (bc['b'] + ce['t']) / 2, 'whole\nstillage',
+    d.label(bc['cx'] - LABEL_OFF, (bc['b'] + ce['t']) / 2, 'whole\nstillage',
             ha='right')
     mx6 = d.box(x3, r3, 14, bh - 1, 'mixing', fill)
     dy = d.box(x4, r3, 16, bh - 1, 'drying', fill)
@@ -402,30 +405,31 @@ def draw_panel_b(d):
     # dryer: natural gas and air in, exhaust out
     x_ng, x_ex = dy['l'] + 4.0, dy['r'] - 4.0
     d.stream([(x_ng, dy['b'] - 6.5), (x_ng, dy['b'])])
-    d.boundary_label(x_ng - 1.4, dy['b'] - 3.6, 'natural gas\n& air',
+    d.boundary_label(x_ng - HEAD_OFF, dy['b'] - 3.6, 'natural gas\n& air',
                      ha='right')
     d.stream([(x_ex, dy['b']), (x_ex, dy['b'] - 6.5)])
-    d.boundary_label(x_ex + 1.4, dy['b'] - 3.6,
+    d.boundary_label(x_ex + HEAD_OFF, dy['b'] - 3.6,
                      'exhaust (to thermal\noxidation)', ha='left')
 
     ev = d.box(x2 - 2.0, r4, 22, bh - 1, 'multi-effect\nevaporation', fill)
     os_ = d.box(x3, r4, 18, bh - 1, 'oil\nseparation', fill)
     d.stream([(ce['cx'], ce['b']), (ce['cx'], r4), (ev['l'], r4)])
-    d.label(ce['cx'] + 1.2, (ce['b'] + r4) / 2 + 0.6, 'thin\nstillage',
+    d.label(ce['cx'] + LABEL_OFF, (ce['b'] + r4) / 2 + 0.6, 'thin\nstillage',
             ha='left')
     d.stream([(ev['r'], r4), (os_['l'], r4)])
-    d.label((ev['r'] + os_['l']) / 2, r4 + 1.9, 'syrup', fs=FS_SMALL)
+    d.label((ev['r'] + os_['l'] - HEAD_L) / 2, r4 + 2.2, 'syrup',
+            fs=FS_SMALL)
     d.stream([(os_['cx'], os_['t']), (os_['cx'], mx6['b'])])
-    d.label(os_['cx'] + 1.2, (os_['t'] + mx6['b']) / 2, 'de-oiled\nsyrup',
-            ha='left', fs=FS_SMALL)
-    d.stream([(os_['r'], r4), (os_['r'] + 6.0, r4)])
-    d.product_label(os_['r'] + 7.5, r4, 'corn oil')
+    d.label(os_['cx'] - HEAD_OFF, (os_['t'] + mx6['b']) / 2, 'de-oiled\nsyrup',
+            ha='right', fs=FS_SMALL)
+    to_product(os_, r4)
+    d.product_label(x_prod, r4, 'corn oil')
     # wastes to wastewater treatment
     d.stream([(ev['cx'], ev['b']), (ev['cx'], ev['b'] - 3.5)])
     d.boundary_label(ev['cx'], ev['b'] - 4.3, 'condensate (to WWT)',
                      va='top')
     d.stream([(ce['cx'], r4), (ce['cx'], r4 - 7.0)])
-    d.boundary_label(ce['cx'] - 1.4, r4 - 4.8, 'thin-stillage\npurge (to WWT)',
+    d.boundary_label(ce['cx'] - HEAD_OFF, r4 - 4.8, 'thin-stillage\npurge (to WWT)',
                      ha='right')
 
 
@@ -442,20 +446,20 @@ def draw_legend(d):
     ax.text(4.5, yc, 'Legend', fontsize=FS_PANEL, fontweight='bold',
             va='center')
     # two-tone process swatch
-    x, w, h = 20.0, 24.0, 7.0
+    x, w, h = 19.0, 11.0, 6.0
     ax.add_patch(Rectangle((x, yc - h / 2), w / 2, h, facecolor=C_FERM_BOX,
                            edgecolor='none', zorder=3))
     ax.add_patch(Rectangle((x + w / 2, yc - h / 2), w / 2, h,
                            facecolor=C_SEP_BOX, edgecolor='none', zorder=3))
     ax.add_patch(Rectangle((x, yc - h / 2), w, h, facecolor='none',
                            edgecolor=C_INK, lw=LW_BOX, zorder=4))
-    ax.text(x + w / 2, yc, 'process or unit', ha='center', va='center',
+    ax.text(x + w + 1.5, yc, 'process or unit', ha='left', va='center',
             fontsize=FS_STREAM, zorder=5)
     # intermediate stream
-    d.stream([(49.0, yc - 1.6), (69.0, yc - 1.6)])
-    d.label(59.0, yc + 1.4, 'intermediate stream')
+    d.stream([(53.0, yc - 1.6), (71.0, yc - 1.6)])
+    d.label(62.0, yc + 1.4, 'intermediate stream')
     # boundary stream
-    d.boundary_label(83.0, yc, 'input or\noutlet stream')
+    d.boundary_label(84.5, yc, 'input or\noutlet stream')
     # product
     ax.text(100.5, yc, 'product', fontsize=FS_PRODUCT, fontweight='bold',
             va='center', ha='center')
