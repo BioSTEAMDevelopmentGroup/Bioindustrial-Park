@@ -8,10 +8,12 @@
 # for license details.
 """Two-panel feeding-strategy figure for scenario A.
 
-A  Ethanol MPSP (purity-adjusted, 15 % IRR) over the threshold x target
+A  Minimum ethanol selling price (MESP = the sweep's purity-adjusted ethanol
+   MPSP at a 15 % IRR, converted from $/kg to $/GGE exactly as in
+   plots/plot_uncertainty_MPSP_vs_TCI.py) over the threshold x target
    glucose-concentration sweep of analyses/evaluate_feeding_strategies.py
    (spike cap optimized for MPSP at every grid point), with the grid optimum
-   of cell density, ethanol titer, productivity, yield, TCI and MPSP marked
+   of cell density, ethanol titer, productivity, yield, TCI and MESP marked
    and annotated, and the white line = lowest target at which the optimized
    spike cap is zero (batch above, fed-batch below).
 B  Concentration vs time of the scenario-A baseline fermentation
@@ -65,9 +67,20 @@ SWEEP_CSV = os.path.join(
     RESULTS_DIR,
     f'ibo_{SWEEP_STEPS}_Thres_Targe_Max n_{SCENARIO}__{{metric}}.csv')
 
-# Panel A colour scale (ethanol MPSP, $/kg): the sweep spans 0.858-1.129
-MPSP_LEVELS = np.arange(0.85, 1.15001, 0.005)
-MPSP_CBAR_TICKS = np.arange(0.85, 1.15001, 0.05)
+# MESP in $ per gasoline gallon equivalent, with the conversion of
+# plots/plot_uncertainty_MPSP_vs_TCI.py: $/GGE = $/kg x KG_PER_GAL /
+# GGE_PER_GAL; ethanol at 0.789 kg/L (20 C) x 3.785411784 L/gal = 2.987 kg/gal,
+# 1 gal ethanol = 0.67 GGE (AFDC), so ~4.458 ($/GGE)/($/kg)
+ETHANOL_DENSITY_KG_PER_L = 0.789
+L_PER_GAL = 3.785411784
+KG_PER_GAL = ETHANOL_DENSITY_KG_PER_L * L_PER_GAL
+GGE_PER_GAL = 0.67
+USD_PER_KG_TO_USD_PER_GGE = KG_PER_GAL / GGE_PER_GAL
+
+# Panel A colour scale (MESP, $/GGE): the sweep spans 3.82-5.03
+MESP_LEVELS = np.arange(3.75, 5.25001, 0.025)
+MESP_CBAR_TICKS = np.arange(3.75, 5.25001, 0.25)
+MESP_CBAR_MINOR_STEP = 0.05
 
 # Optimum markers: (sweep metric, 'min'/'max', label, marker, face colour,
 # size [pt], label offset from the marker [pt], arrow curvature). Offsets are
@@ -80,13 +93,13 @@ OPTIMA = [
     ('EtOH Productivity', 'max', 'productivity', 's', 'white',    9, (8, 17),   -0.2),
     ('EtOH Yield',        'max', 'yield',        'p', 'white',   10, (12, -14),  0.3),
     ('TCI',               'min', 'TCI',          'p', '#33ccff', 10, (0, -22),   0.3),
-    ('MPSP',              'min', 'MPSP',         '*', '#33ccff', 14, (12, -14),  0.3),
+    ('MPSP',              'min', 'MESP',         '*', '#33ccff', 14, (12, -14),  0.3),
 ]
 # productivity: centred above its optimum, clear of the batch label to its
 # right; TCI: right-aligned just right of its optimum, so the label sits
 # wholly in the white (threshold > target) region
 LABEL_HA = {'productivity': 'center', 'TCI': 'right'}
-# label text colour (default black); titer sits on the dark high-MPSP band
+# label text colour (default black); titer sits on the dark high-MESP band
 LABEL_COLOR = {'titer': 'white'}
 
 # Both batch / fed-batch labels: anchored on the boundary line at threshold
@@ -112,7 +125,7 @@ FONTS = {'tick': 12, 'axis_title': 13, 'annotation': 12, 'legend': 12,
          'panel_letter': 20}
 TICK_LEN = {'major': 4.0, 'minor': 2.0}  # pt, each way for left/bottom
 G_PER_L = r'$\mathrm{g·L}^{-1}$'
-USD_PER_KG = r'$\mathrm{\$·kg}^{-1}$'
+USD_PER_GGE = r'$\mathrm{\$·GGE}^{-1}$'
 
 
 def apply_font_rcparams():
@@ -260,14 +273,14 @@ def batch_boundary(n_spikes):
 #%% Figure
 
 def draw_panel_A(fig, ax, cax):
-    mpsp = load_sweep_metric('MPSP')
-    filled = fill_past_diagonal(mpsp)
+    mesp = load_sweep_metric('MPSP') * USD_PER_KG_TO_USD_PER_GGE
+    filled = fill_past_diagonal(mesp)
     # pad a threshold = 0 column so the fill reaches the y axis
     x = np.concatenate([[0.], SPEC_1])
     z = np.column_stack([filled[:, 0], filled])
     cmap = JBEI_UCB_colormap()
-    norm = BoundaryNorm(MPSP_LEVELS, cmap.N)
-    cs = ax.contourf(x, SPEC_2, z, levels=MPSP_LEVELS, cmap=cmap, norm=norm,
+    norm = BoundaryNorm(MESP_LEVELS, cmap.N)
+    cs = ax.contourf(x, SPEC_2, z, levels=MESP_LEVELS, cmap=cmap, norm=norm,
                      zorder=1)
     cs.set_edgecolor('face')  # no hairline seams between bands in the PDF
     domain = Polygon([(0., SPEC_2[0]), (0., 400.), (400., 400.),
@@ -303,6 +316,8 @@ def draw_panel_A(fig, ax, cax):
     optima = {}
     for metric, sense, label, marker, color, size, offset, rad in OPTIMA:
         ox, oy, value = grid_optimum(load_sweep_metric(metric), sense)
+        if metric == 'MPSP':
+            value *= USD_PER_KG_TO_USD_PER_GGE  # MESP, $/GGE
         optima[label] = (ox, oy, value)
         ax.plot(ox, oy, linestyle='none', marker=marker, markersize=size,
                 markerfacecolor=color, markeredgecolor='black',
@@ -327,15 +342,16 @@ def draw_panel_A(fig, ax, cax):
 
     sm = ScalarMappable(norm=norm, cmap=cmap)
     cbar = fig.colorbar(sm, cax=cax, spacing='proportional')
-    cbar.set_ticks(MPSP_CBAR_TICKS)
-    cbar.set_ticklabels([f'{t:.2f}' for t in MPSP_CBAR_TICKS])
+    cbar.set_ticks(MESP_CBAR_TICKS)
+    cbar.set_ticklabels([f'{t:.2f}' for t in MESP_CBAR_TICKS])
     cbar.ax.yaxis.set_minor_locator(FixedLocator(
-        [v for v in np.arange(MPSP_LEVELS[0], MPSP_LEVELS[-1] + 1e-9, 0.01)
-         if not np.any(np.isclose(v, MPSP_CBAR_TICKS))]))
+        [v for v in np.arange(MESP_LEVELS[0], MESP_LEVELS[-1] + 1e-9,
+                              MESP_CBAR_MINOR_STEP)
+         if not np.any(np.isclose(v, MESP_CBAR_TICKS))]))
     cbar.ax.tick_params(which='major', labelsize=FONTS['tick'],
                         length=TICK_LEN['major'])
     cbar.ax.tick_params(which='minor', length=TICK_LEN['minor'])
-    cbar.set_label(bold_title('MPSP', USD_PER_KG), fontsize=FONTS['axis_title'])
+    cbar.set_label(bold_title('MESP', USD_PER_GGE), fontsize=FONTS['axis_title'])
     return optima
 
 
@@ -408,8 +424,9 @@ def main():
     print(f"\nBaseline: feeding {meta['feeding_kwargs']}, "
           f"{meta['n_glu_spikes']:g} spikes, tau {meta['tau']:.2f} h, end of "
           f"aeration {meta['tau_stop_aeration']:.2f} h, ethanol titer "
-          f"{meta['EtOH_titer']:.1f} g/L, ethanol MPSP "
-          f"{meta['ethanol_MPSP']:.5f} $/kg, IRR {meta['IRR']:.4f}")
+          f"{meta['EtOH_titer']:.1f} g/L, MESP "
+          f"{meta['ethanol_MPSP'] * USD_PER_KG_TO_USD_PER_GGE:.4f} $/GGE "
+          f"({meta['ethanol_MPSP']:.5f} $/kg), IRR {meta['IRR']:.4f}")
 
 
 if __name__ == '__main__':
