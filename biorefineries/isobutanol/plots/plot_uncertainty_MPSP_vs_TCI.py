@@ -35,9 +35,13 @@ percentiles.
 
 Panel A also carries a light grey band for the ethanol market price range
 (ETHANOL_MARKET_RANGE) spanning the typical corn ethanol biorefinery TCI
-(TYPICAL_CORN_ETHANOL_TCI), the MPSP-TCI Pareto frontier of the samples
-(lower-left, both minimized) as a red dashed staircase, and dark grey dashed
-lines at the ends of the gasoline price range (GASOLINE_PRICE_RANGE).
+(TYPICAL_CORN_ETHANOL_TCI) and dark grey dashed lines at the ends of the
+gasoline price range (GASOLINE_PRICE_RANGE).
+
+Every panel also carries the Pareto frontier of its samples as a solid red
+staircase, in the sense set by the panel's `pareto` entry: A lower-left (MPSP
+and TCI minimized), B and C upper-right (titer and yield, and both revenues,
+maximized).
 
 Sim-safe: pure pandas/matplotlib/scipy, never imports biorefineries.
 
@@ -85,11 +89,11 @@ FONT_FAMILY = 'Arial'
 FONTS = {'tick': 12, 'axis_title': 12, 'panel_letter': 14}
 TICK_LEN = {'major': 4.0, 'minor': 2.0} # pt; left/bottom ticks extend this far in AND out
 
-# the MPSP-TCI Pareto frontier: dashed, in the red of the hue palette of
+# the Pareto frontiers: solid, in the red of the hue palette of
 # plots/plot_kin_opt_parameter_sets.py (HUE_COLORS[3])
 PARETO_COLOR = '#ED586F'
 PARETO_LW = 1.5
-PARETO_LS = (0, (4, 2))
+PARETO_LS = '-'
 # the TRY-informed profitability campaign's teal (RELAY_COLOR in
 # plots/plot_kin_opt_parameter_sets.py)
 TEAL = '#0B6E7A'
@@ -177,7 +181,8 @@ BOX_PERCENTILES = {'whis': (5, 95), 'dots': (1, 99)}
 
 # the joint panels of the 2 x 2 grid, row-major (the fourth cell is left empty
 # for now): (x outcome, y outcome) keyed by _outcomes' names, axis titles, and
-# panel hue, fixed axis ticks / limits (neither = 'nice' ticks enclosing the samples and
+# panel hue, Pareto sense per axis ('min' / 'max', x then y), fixed axis
+# ticks / limits (neither = 'nice' ticks enclosing the samples and
 # the baseline)
 PANELS = (
     dict(x='TCI', y='MPSP',
@@ -185,11 +190,11 @@ PANELS = (
          ylabel=r'Minimum ethanol selling price [$\mathrm{\$·GGE}^{-1}$]',
          xticks=np.arange(TCI_AXIS_LIMITS[0], TCI_AXIS_LIMITS[1] + TCI_TICK_STEP/2,
                           TCI_TICK_STEP),
-         ylim=MPSP_AXIS_LIMITS, market=True, pareto=True, color=TEAL),
-    dict(x='EtOH yield', y='EtOH titer', color=PURPLE,
+         ylim=MPSP_AXIS_LIMITS, market=True, pareto=('min', 'min'), color=TEAL),
+    dict(x='EtOH yield', y='EtOH titer', color=PURPLE, pareto=('max', 'max'),
          xlabel=r'Ethanol yield [$\mathrm{g·g}^{-1}$ sugars]',
          ylabel=r'Ethanol titer [$\mathrm{g·L}^{-1}$]'),
-    dict(x='DDGS revenue', y='EtOH revenue', color=YELLOW,
+    dict(x='DDGS revenue', y='EtOH revenue', color=YELLOW, pareto=('max', 'max'),
          xlabel=r'DDGS sale revenue [$\mathrm{MM\$·yr}^{-1}$]',
          ylabel=r'Ethanol sale revenue [$\mathrm{MM\$·yr}^{-1}$]'),
 )
@@ -282,23 +287,25 @@ def draw_density(ax, x, y, xlim, ylim, color, n_grid=300):
     ax.contourf(GX, GY, Z, levels=levels, colors=colors, antialiased=True, zorder=2)
 
 
-def pareto_frontier(x, y):
-    """The non-dominated samples when minimizing both x and y, sorted by
-    ascending x (so descending y)."""
-    order = np.lexsort((y, x)) # by x, ties by y
+def pareto_frontier(x, y, sense=('min', 'min')):
+    """The non-dominated samples under `sense` ('min' / 'max' for x, then y),
+    ordered from the best x to the best y."""
+    sx, sy = (1 if s == 'min' else -1 for s in sense)
+    x_, y_ = sx*x, sy*y # both minimized
+    order = np.lexsort((y_, x_)) # by x, ties by y
     front, best = [], np.inf
     for i in order:
-        if y[i] < best:
+        if y_[i] < best:
             front.append(i)
-            best = y[i]
+            best = y_[i]
     front = np.array(front)
     return x[front], y[front]
 
 
-def draw_pareto_frontier(ax, x, y):
-    # staircase: between two frontier samples the lowest attainable MPSP is
-    # the left one's, so step horizontally, then down
-    fx, fy = pareto_frontier(x, y)
+def draw_pareto_frontier(ax, x, y, sense):
+    # staircase: between two consecutive frontier samples the best attainable
+    # y is the first one's, so step along x first, then along y
+    fx, fy = pareto_frontier(x, y, sense)
     ax.step(fx, fy, where='post', color=PARETO_COLOR, lw=PARETO_LW, ls=PARETO_LS,
             zorder=4)
     return fx, fy
@@ -373,7 +380,7 @@ def draw_joint_panel(fig, cell, panel, samples, base, letter):
                  panel['color'])
     draw_hdr_contours(ax, x, y, panel['color'])
     if panel.get('pareto'):
-        fx, fy = draw_pareto_frontier(ax, x, y)
+        fx, fy = draw_pareto_frontier(ax, x, y, panel['pareto'])
         print(f'  Pareto frontier: {fx.size} non-dominated samples, '
               f"{panel['x']} {fx[0]:.4g}-{fx[-1]:.4g}, {panel['y']} {fy[0]:.4g}-{fy[-1]:.4g}")
     if base:
