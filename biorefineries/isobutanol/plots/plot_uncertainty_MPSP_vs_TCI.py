@@ -60,7 +60,7 @@ MPSP_COL = ('Biorefinery', 'Purity-adjusted ethanol MPSP [$/kg]')
 TCI_COL = ('Biorefinery', 'Total capital investment [10^6 $]')
 
 FONT_FAMILY = 'Arial'
-FONTS = {'tick': 12, 'axis_title': 12, 'clabel': 10}
+FONTS = {'tick': 12, 'axis_title': 12}
 TICK_LEN = {'major': 4.0, 'minor': 2.0} # pt; left/bottom ticks extend this far in AND out
 
 # the TRY-informed profitability campaign's teal (RELAY_COLOR in
@@ -83,14 +83,6 @@ BOX_MEDIAN = 'black'
 CONTOUR_SHARES = (0.05, 0.25, 0.50, 0.75, 0.95)
 CONTOUR_COLOR = BOX_EDGE
 CONTOUR_LW = 1.0
-# contour labels sit OUTSIDE the cloud, stacked in a column to its right
-# (innermost share on top), each tied by a thin leader line to where its
-# contour crosses the horizontal through the density peak on the right; the
-# contours are too close together to label inline at this axis scale.
-# Leaders cannot cross: anchors run left -> right as labels run top -> bottom.
-CONTOUR_LABEL_X_OFFSET = 10.0   # MM$ right of the outermost anchor
-CONTOUR_LABEL_DY = 0.28         # $/GGE between stacked labels
-CONTOUR_LEADER_LW = 0.6
 INK = '#0b0b0b'
 
 # MPSP is plotted per gasoline gallon equivalent: $/GGE = $/kg * KG_PER_GAL
@@ -196,10 +188,9 @@ def draw_samples(ax, x, y):
                rasterized=True, zorder=2)
 
 
-def draw_hdr_contours(ax, x, y, xlim, ylim, n_grid=300, pad=0.15):
-    """KDE contour lines enclosing CONTOUR_SHARES of the samples, labelled
-    with the share in a column right of the cloud, joined to each contour by
-    a leader line."""
+def draw_hdr_contours(ax, x, y, n_grid=300, pad=0.15):
+    """KDE contour lines enclosing CONTOUR_SHARES of the samples (unlabelled:
+    name the shares in the caption)."""
     kde = stats.gaussian_kde(np.vstack([x, y]))
     dx, dy = np.ptp(x), np.ptp(y)
     GX, GY = np.meshgrid(np.linspace(x.min() - pad*dx, x.max() + pad*dx, n_grid),
@@ -209,37 +200,8 @@ def draw_hdr_contours(ax, x, y, xlim, ylim, n_grid=300, pad=0.15):
     # the region holding share p is {density >= the (1 - p) quantile of the
     # density at the samples}; larger share -> lower level
     levels = {np.quantile(at_samples, 1 - p): p for p in CONTOUR_SHARES}
-    cs = ax.contour(GX, GY, Z, levels=sorted(levels), colors=CONTOUR_COLOR,
+    ax.contour(GX, GY, Z, levels=sorted(levels), colors=CONTOUR_COLOR,
                     linewidths=CONTOUR_LW, zorder=3)
-
-    # anchors: per level, the rightmost crossing of the horizontal through
-    # the density peak (the contour vertex right of the peak nearest that
-    # horizontal, measured on screen)
-    i_peak = np.unravel_index(np.argmax(Z), Z.shape)
-    px, py = GX[i_peak], GY[i_peak]
-    fig_w, fig_h = ax.figure.get_size_inches()
-    box = ax.get_position()
-    sx = box.width*fig_w/(xlim[1] - xlim[0])
-    sy = box.height*fig_h/(ylim[1] - ylim[0])
-    anchors = []
-    for segs in cs.allsegs:
-        verts = np.concatenate([seg for seg in segs if len(seg)])
-        bearing = np.arctan2((verts[:, 1] - py)*sy, (verts[:, 0] - px)*sx)
-        k = np.argmin(np.abs(bearing))
-        anchors.append(tuple(verts[k]))
-    # cs.levels ascend in density = descend in share, so reverse to go from
-    # the innermost (smallest share) contour outwards
-    order = list(range(len(anchors)))[::-1]
-    label_x = max(a[0] for a in anchors) + CONTOUR_LABEL_X_OFFSET
-    n = len(order)
-    for rank, i in enumerate(order):
-        share = levels[cs.levels[i]]
-        label_y = py + (n - 1)/2*CONTOUR_LABEL_DY - rank*CONTOUR_LABEL_DY
-        ax.annotate(f'{round(100*share)}%', xy=anchors[i], xytext=(label_x, label_y),
-                    ha='left', va='center', fontsize=FONTS['clabel'], color=INK,
-                    zorder=6,
-                    arrowprops=dict(arrowstyle='-', color=CONTOUR_COLOR,
-                                    lw=CONTOUR_LEADER_LW, shrinkA=2, shrinkB=0))
 
 
 def draw_box(ax, values, orientation):
@@ -308,7 +270,7 @@ def plot_uncertainty_MPSP_vs_TCI(results_file=None, baseline_file=None,
     for price in GASOLINE_PRICE_RANGE:
         ax.axhline(price, color=GASOLINE_LINE_COLOR, zorder=1, **GASOLINE_LINE_STYLE)
     draw_samples(ax, tci, mpsp)
-    draw_hdr_contours(ax, tci, mpsp, xlim, ylim)
+    draw_hdr_contours(ax, tci, mpsp)
     if base:
         ax.plot(*base, 'D', ms=8, mfc='w', mec=INK, mew=1.2, zorder=5)
     ax.set_xticks(xticks)
