@@ -11,7 +11,8 @@
 on a synthetic stage-1 document. Checks: (1) positive shares sum to 100 and
 credits stay negative; (2) the net total is the plain sum and operating cost
 converts USD/hr -> MM$/y; (3) an all-zero metric gives zero shares, not NaN;
-(4) format_total's plain 3-significant-figure notation; (5) panel subtitles;
+(4) format_total's plain 3-significant-figure notation; (5) panel titles
+('<label> optimum' except the baseline) and subtitles (the IRR only);
 (6) the shared y floor (revenue stacks + their label room) and the legend
 omission of an invisible category; (7) legend columns keep each family in
 its own padded columns; (8) load_breakdowns refuses wrong units / an
@@ -144,12 +145,19 @@ CHECK('format_total: plain 3-sig-fig notation, typographic minus', check_4)
 
 def check_5():
     s = doc['scenarios']
-    assert ptb.panel_subtitle(s['baseline']).startswith('Scenario A · IRR ')
-    assert ptb.panel_subtitle(s['ibo_titer']) == '#104 · IRR —', \
+    assert ptb.panel_subtitle(s['baseline']) == 'IRR 10.0 %', \
+        ptb.panel_subtitle(s['baseline'])
+    assert ptb.panel_subtitle(s['ibo_titer']) == 'IRR —', \
         ptb.panel_subtitle(s['ibo_titer'])
     got = ptb.panel_subtitle(dict(trial_number=7, IRR=-0.052))
-    assert got == '#7 · IRR −5.2 %', got
-CHECK('panel subtitles (baseline, -inf IRR, negative IRR)', check_5)
+    assert got == 'IRR −5.2 %', got
+    # titles: ' optimum' on every campaign panel, never on the baseline
+    assert ptb.panel_title(s['baseline']) == 'baseline'
+    assert ptb.panel_title(s['ibo_yield']) == 'ibo yield optimum'
+    got = ptb.panel_title(dict(label='Isobutanol yield', trial_number=841))
+    assert got == 'Isobutanol yield optimum', got
+CHECK('panel titles (+ optimum except the baseline) and subtitles (IRR only; '
+      'baseline, -inf IRR, negative IRR)', check_5)
 
 
 def check_6():

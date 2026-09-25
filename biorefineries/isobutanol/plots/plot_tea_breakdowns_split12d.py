@@ -310,15 +310,21 @@ def format_total(x, sig=TOTAL_SIG_FIGS):
     return f'{r:.{max(digits, 0)}f}'.replace('-', '−')
 
 
+def panel_title(record):
+    """The record's label, + ' optimum' for a campaign's objective-optimum
+    trial ('Isobutanol yield optimum'; the baseline stays 'Baseline')."""
+    if record['trial_number'] is None:
+        return record['label']
+    return f'{record["label"]} optimum'
+
+
 def panel_subtitle(record):
-    """'#1912 · IRR 27.3 %' ('Scenario A' for the baseline; 'IRR —' when the
-    IRR is not finite, e.g. -inf for an outright money-loser)."""
+    """'IRR 27.3 %' ('IRR —' when the IRR is not finite, e.g. -inf for an
+    outright money-loser); no trial number or scenario name (the console
+    summary and CSV names carry the trial)."""
     irr = record['IRR']
-    irr_text = (f'IRR {100*irr:.1f} %'.replace('-', '−')
-                if irr is not None and math.isfinite(irr) else 'IRR —')
-    head = ('Scenario A' if record['trial_number'] is None
-            else f'#{record["trial_number"]}')
-    return f'{head} · {irr_text}'
+    return (f'IRR {100*irr:.1f} %'.replace('-', '−')
+            if irr is not None and math.isfinite(irr) else 'IRR —')
 
 
 def y_bottom(doc):
@@ -429,7 +435,7 @@ def draw_panel(ax, record, groups, metrics, operating_hours):
                                                operating_hours)),
                     ha='center', va='top', fontsize=FONTS['total'])
     ax.axhline(0.0, color='k', linewidth=0.8, zorder=3)
-    ax.set_title(record['label'], fontsize=FONTS['title'], fontweight='bold',
+    ax.set_title(panel_title(record), fontsize=FONTS['title'], fontweight='bold',
                  pad=18)
     ax.annotate(panel_subtitle(record), xy=(0.5, 1.0), xycoords='axes fraction',
                 xytext=(0, 4), textcoords='offset points', ha='center',
@@ -562,7 +568,10 @@ def print_summary(doc):
         for m in metrics:
             _, _, net = breakdown_shares(r['breakdown'], groups, m)
             cells.append(f'{format_total(display_total(net, m, hours)):>13}')
-        print(f'{r["label"] + " (" + panel_subtitle(r) + ")":<34}'[:34]
+        trial = r['trial_number']
+        detail = (panel_subtitle(r) if trial is None
+                  else f'#{trial} · {panel_subtitle(r)}')
+        print(f'{r["label"] + " (" + detail + ")":<34}'[:34]
               + ''.join(cells))
     products = list(REVENUE_STYLES)
     print(f'\n{"revenue [MM$/y], % of it":<34}{"total":>13}'
