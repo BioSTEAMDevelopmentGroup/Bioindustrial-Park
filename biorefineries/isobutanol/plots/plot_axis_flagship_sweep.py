@@ -25,13 +25,13 @@ Two modes:
 * --param NAME -- the single-panel publication figure of a full-resolution
   sweep (results/evaluate_axis_flagship_optimum_<NAME>.csv), in the layout of
   plot_k13_flagship_sweep.py: PI on the left axis, isobutanol yield on the
-  right, the trial marked, PI = 0, any part beyond the campaign band shaded,
+  right, the PI = 0 line drawn, any part beyond the campaign band shaded,
   the onset of burden derating marked. --yield ethanol puts the ethanol yield
   on the right axis instead (stem suffix _etoh_yield). A third, outboard
-  y axis carries the IRR (%) (--no-irr drops it), scaled so that the 15 %
-  hurdle rate sits on the PI = 0 line (NPV at 15 % = 0 <=> IRR = 15 %).
-  Each y axis is coloured like its curve; the legend lists only markers and
-  reference lines.
+  y axis carries the IRR (%) (--no-irr drops it), raised into the upper part
+  of the panel (IRR_BAND) so it does not sit on the PI curve it tracks.
+  Plain lines, no point or optimum markers; each y axis is coloured like its
+  curve; a legend appears only for the conditional reference items.
 
 Data: written by analyses/evaluate_axis_flagship_optimum.py (the simulation
 stage, ask-first). Sim-safe: reads CSV / JSON only; reuses the typeface and
@@ -55,7 +55,7 @@ matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
-from matplotlib.ticker import (FuncFormatter, LogLocator, MultipleLocator,
+from matplotlib.ticker import (FixedLocator, FuncFormatter, LogLocator,
                                NullFormatter, NullLocator)
 
 _here = os.path.dirname(os.path.abspath(__file__))
@@ -144,35 +144,37 @@ def slice_summary(param, x, PI, Y, n_total):
 
 
 #: the third (IRR) axis: colour, curve style, spine offset beyond the yield
-#: spine, and the hurdle rate the PI is computed at (NPV at 15 % = 0 <=> IRR =
-#: 15 %, so the IRR axis is scaled to put 15 % on the PI = 0 line)
+#: spine, and the band of the axes height (fractions) its tick range fills --
+#: raised clear of the PI curve, which IRR otherwise tracks almost exactly
+#: (NPV at 15 % = 0 <=> IRR = 15 %; rank correlation ~1 along a slice)
 IRR_COLOR = '#6A3D9A'
 IRR_KW = dict(color=IRR_COLOR, lw=1.2, zorder=3)
-#: the --param figure's curves are plain lines (only the optimum is marked)
+IRR_BAND = (0.30, 0.98)
+#: the --param figure's curves are plain lines, no markers
 PI_LINE_KW = {**k13p.PI_KW, 'marker': None}
 YIELD_LINE_KW = {**k13p.YIELD_KW, 'marker': None}
 IRR_AXIS_GAP_IN = 0.82
-HURDLE_PCT = 15.0
 
 
-def align_irr_axis(ax, ax_irr, IRR):
-    """Scale the IRR axis (%) so HURDLE_PCT sits at PI = 0 on `ax` and every
-    finite IRR fits; returns False (independent limits) when PI = 0 is not
-    inside the PI axis or no IRR is finite."""
-    lo, hi = ax.get_ylim()
-    f0 = -lo/(hi - lo)   # axes fraction of PI = 0
+def place_irr_axis(ax_irr, IRR):
+    """Scale the IRR axis (%) so its tick range -- the finite IRRs rounded
+    out to a 10 % (or, under a 20 % spread, 5 %) step -- fills IRR_BAND of
+    the axes height; the spine and the ticks cover only that range."""
     finite = IRR[np.isfinite(IRR)]
     if not finite.size:
-        return False
-    if not 0 < f0 < 1:
-        pad = 0.08*max(np.ptp(finite), 1.0)
-        ax_irr.set_ylim(finite.min() - pad, finite.max() + pad)
-        return False
-    up = max(finite.max() - HURDLE_PCT, 0.0)/(1 - f0)
-    down = max(HURDLE_PCT - finite.min(), 0.0)/f0
-    span = 1.06*max(up, down, 1e-9)   # % per unit axes fraction
-    ax_irr.set_ylim(HURDLE_PCT - span*f0, HURDLE_PCT + span*(1 - f0))
-    return True
+        return
+    step = 10.0 if np.ptp(finite) >= 20 else 5.0
+    lo = np.floor(finite.min()/step)*step
+    hi = max(np.ceil(finite.max()/step)*step, lo + step)
+    f_lo, f_hi = IRR_BAND
+    scale = (hi - lo)/(f_hi - f_lo)   # % per unit axes fraction
+    ax_irr.set_ylim(lo - f_lo*scale, lo + (1 - f_lo)*scale)
+    ax_irr.spines['right'].set_bounds(lo, hi)
+    ax_irr.yaxis.set_major_locator(FixedLocator(np.arange(lo, hi + step/2,
+                                                          step)))
+    ax_irr.yaxis.set_minor_locator(FixedLocator(np.arange(lo, hi + step/4,
+                                                          step/2)))
+    ax_irr.yaxis.label.set_y((f_lo + f_hi)/2)   # title centred on the spine
 
 
 #: --yield choice -> (sweep CSV column, axis / legend label, output-stem suffix)
@@ -313,22 +315,25 @@ def plot_param(param, dpi, stem=None, product='isobutanol', irr=True):
     log = band['log']
     derated = np.flatnonzero(np.isfinite(dfac) & (dfac < 1 - 1e-9))
 
-    # the legend lists only the markers / reference lines; the two curves are
-    # identified by their colour-matched axes. Legend entries are known before
-    # drawing, so the figure is sized to them (axes box fixed in inches).
+    # the curves are identified by their colour-matched axes; the legend lists
+    # only the conditional reference items (out-of-band shading, burden
+    # derating, unsimulated points) and is omitted when there are none.
+    # Entries are known before drawing, so the figure is sized to them (axes
+    # box fixed in inches).
     beyond = []
     if x.max() > band['high']*(1 + 1e-9):
         beyond.append('high')
     if x.min() < band['low']*(1 - 1e-9) - 1e-12:
         beyond.append('low')
     x_derate = (x[derated[0]] if derated.size and derated[0] > 0 else None)
-    n_legend = (2 + bool(beyond) + (x_derate is not None)
+    n_legend = (bool(beyond) + (x_derate is not None)
                 + bool((frame['state'] != 'OK').any()))
-    axes_h, top_in, xlabel_in, entry_in = 2.59, 0.19, 0.72, 0.22
+    axes_h, top_in, xlabel_in, entry_in = 2.59, 0.19, 0.62, 0.22
     axes_w, left_in, right_in = 3.234, 0.833, 0.833
     irr_gap_in = IRR_AXIS_GAP_IN if irr else 0.0   # yield spine -> IRR spine
     fig_w = left_in + axes_w + irr_gap_in + right_in
-    fig_h = top_in + axes_h + xlabel_in + entry_in*n_legend + 0.1
+    fig_h = (top_in + axes_h + xlabel_in
+             + (entry_in*n_legend + 0.2 if n_legend else 0.0))
     k13p.apply_font_rcparams()
     fig, ax = plt.subplots(figsize=(fig_w, fig_h))
     fig.subplots_adjust(left=left_in/fig_w, right=(left_in + axes_w)/fig_w,
@@ -359,11 +364,9 @@ def plot_param(param, dpi, stem=None, product='isobutanol', irr=True):
     ax.axhline(0.0, **k13p.BREAKEVEN_KW)
 
     ax_r.plot(x, Y, **YIELD_LINE_KW)
-    ax_r.plot([x_opt], [Y[i_opt]], **k13p.RING_KW)
-    if irr:   # no ring at the optimum: it would sit on the yield ring
+    if irr:
         ax_irr.plot(x, IRR, **IRR_KW)
     ax.plot(x, PI, **PI_LINE_KW)
-    ax.plot([x_opt], [PI[i_opt]], **k13p.STAR_KW)
 
     if log:
         ax.set_xscale('log')
@@ -379,15 +382,11 @@ def plot_param(param, dpi, stem=None, product='isobutanol', irr=True):
     pi_lo, pi_hi = np.nanmin(PI), np.nanmax(PI)
     pad = 0.08*(pi_hi - pi_lo)
     ax.set_ylim(min(pi_lo - pad, -pad), pi_hi + 1.5*pad)
-    aligned = False
     if irr:
         ax_irr.set_ylabel('IRR [%]',
                           fontsize=FONTS['axis_title'], rotation=270,
                           labelpad=16, color=IRR_COLOR)
-        aligned = align_irr_axis(ax, ax_irr, IRR)
-        if aligned:   # ticks through the hurdle rate: 0, 15, 30 %
-            ax_irr.yaxis.set_major_locator(MultipleLocator(HURDLE_PCT))
-            ax_irr.yaxis.set_minor_locator(MultipleLocator(HURDLE_PCT/3))
+        place_irr_axis(ax_irr, IRR)
     ax.spines['left'].set_color(PI_COLOR)
     ax_r.spines['left'].set_visible(False)
     ax.spines['right'].set_visible(False)
@@ -408,17 +407,7 @@ def plot_param(param, dpi, stem=None, product='isobutanol', irr=True):
     for label in ax.get_yticklabels() + ax_r.get_yticklabels():
         label.set_text(k13p.minus(label.get_text()))
 
-    def line(kw, label):
-        return Line2D([], [], **{k: v for k, v in kw.items() if k != 'zorder'},
-                      label=label)
-    handles = [
-        line(k13p.STAR_KW, f"Flagship optimum (#{anchor['trial_number']}, "
-                           f"PI {PI[i_opt]:.2f})"),
-        Line2D([], [], **k13p.BREAKEVEN_KW,
-               label=('PI = 0 and IRR = 15 % (break-even at the hurdle rate)'
-                      if aligned else
-                      'PI = 0 (break-even at a 15 % hurdle rate)')),
-    ]
+    handles = []   # the PI = 0 line is drawn but not listed
     if beyond:
         handles.append(Patch(**k13p.BAND_KW, label='Beyond the campaign band'))
     if x_derate is not None:
@@ -431,9 +420,10 @@ def plot_param(param, dpi, stem=None, product='isobutanol', irr=True):
         handles.append(Line2D([], [], color='none', label='Not simulated: ' +
                               ', '.join(f'{v} {s.lower()}'
                                         for s, v in states.items())))
-    fig.legend(handles=handles, loc='lower center', ncol=1, frameon=False,
-               fontsize=FONTS['legend'], handlelength=2.2,
-               bbox_to_anchor=((left_in + axes_w/2)/fig_w, 0.0))  # under the axes
+    if handles:
+        fig.legend(handles=handles, loc='lower center', ncol=1, frameon=False,
+                   fontsize=FONTS['legend'], handlelength=2.2,
+                   bbox_to_anchor=((left_in + axes_w/2)/fig_w, 0.0))  # under the axes
 
     out = os.path.join(OUT_DIR, stem or f'{param}_flagship_sweep{stem_suffix}')
     os.makedirs(OUT_DIR, exist_ok=True)
@@ -452,8 +442,7 @@ def plot_param(param, dpi, stem=None, product='isobutanol', irr=True):
           f"{s['Y_maxima']} maxima, largest step {s['Y_jump']:.2f} of range")
     if irr:
         print(f'IRR {np.nanmin(IRR):.2f}..{np.nanmax(IRR):.2f} %; '
-              f'{int(np.isnan(IRR).sum())} points without an IRR; axis '
-              f"{'aligned (15 % at PI = 0)' if aligned else 'NOT aligned'}")
+              f'{int(np.isnan(IRR).sum())} points without an IRR')
     print(f'wrote {out}.png / .pdf')
 
 
