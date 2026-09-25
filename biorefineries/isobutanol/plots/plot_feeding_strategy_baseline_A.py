@@ -75,7 +75,7 @@ MPSP_CBAR_TICKS = np.arange(0.85, 1.15001, 0.05)
 # left-/right-aligned by the sign of its x offset unless LABEL_HA overrides it.
 # Aeration, AOC and slurry evaporation duty are deliberately not marked.
 OPTIMA = [
-    ('EtOH Titer',        'max', 'titer',        '^', 'white',   10, (12, 14),  -0.3),
+    ('EtOH Titer',        'max', 'titer',        '^', 'white',   10, (11, -15),  0.3),
     ('Cell loading',      'max', 'cell density', 'o', 'white',   10, (-6, 16),  -0.3),
     ('EtOH Productivity', 'max', 'productivity', 's', 'white',    9, (8, 17),   -0.2),
     ('EtOH Yield',        'max', 'yield',        'p', 'white',   10, (12, -14),  0.3),
