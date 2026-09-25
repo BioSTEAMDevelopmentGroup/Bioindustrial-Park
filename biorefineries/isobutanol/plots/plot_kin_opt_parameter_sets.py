@@ -99,9 +99,9 @@ PKG_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RESULTS_DIR = os.path.join(PKG_DIR, 'analyses', 'results')
 # The no-argument default plots seven metabolic_split_12d campaigns -- one per
 # objective below, in this order (which also fixes the HUE_COLORS assignment:
-# cyan financial, then the three isobutanol campaigns, then the three ethanol
-# campaigns). Each is the MOST RECENT metabolic_split_12d campaign for that
-# objective with at least DEFAULT_MIN_TRIALS logged trials (see
+# deep-teal financial, then the three isobutanol campaigns, then the three
+# ethanol campaigns). Each is the MOST RECENT metabolic_split_12d campaign for
+# that objective with at least DEFAULT_MIN_TRIALS logged trials (see
 # default_split_12d_specs). The financial set optimizes PI (log-tail) but is
 # drawn on the IRR axis (OUTCOME_OWN_OBJECTIVES), hence the
 # "Profitability" label.
@@ -390,18 +390,18 @@ def _owns_outcome(objective, col):
     return objective in OUTCOME_OWN_OBJECTIVES.get(col, frozenset({col}))
 
 # one color per set: baseline grey, campaigns from the hue palette. The seven
-# campaign hues are grouped to match panel A's outcome columns: cyan for the
-# financial campaign, then the three isobutanol campaigns (orange yield / green
-# titer / red productivity) and the three ethanol campaigns (purple yield /
-# yellow titer / blue productivity), assigned to the sets in that order.
+# campaign hues are grouped to match panel A's outcome columns: deep teal for
+# the financial campaign, then the three isobutanol campaigns (orange yield /
+# green titer / red productivity) and the three ethanol campaigns (purple yield
+# / yellow titer / blue productivity), assigned to the sets in that order.
 BASELINE_COLOR = '#90918e'
-HUE_COLORS = ['#18C4DC', '#f98f60', '#79bf82', '#ED586F',
+HUE_COLORS = ['#0B6E7A', '#f98f60', '#79bf82', '#ED586F',
               '#a280b9', '#f3c354', '#5a6bcc']
 MAX_SETS = 1 + len(HUE_COLORS)   # 8, not counting a relay overlay
-# a relay campaign (is_relay) is an overlay on top of the hue palette: a deep
-# teal, the darker sibling of the financial campaign's cyan, so it reads as the
+# a relay campaign (is_relay) is an overlay on top of the hue palette: a cyan,
+# the lighter sibling of the financial campaign's deep teal, so it reads as the
 # same (PI) family without consuming one of the seven objective hues
-RELAY_COLOR = '#0B6E7A'
+RELAY_COLOR = '#18C4DC'
 # two-panel layout: figure-fraction height of one campaign-legend row (at the
 # legend's font / labelspacing on the 9.856-in canvas)
 LEGEND_ROW_H = 0.0245
