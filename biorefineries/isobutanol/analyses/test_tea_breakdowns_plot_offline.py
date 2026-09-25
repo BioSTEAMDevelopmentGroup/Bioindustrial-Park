@@ -147,17 +147,20 @@ def check_5():
     s = doc['scenarios']
     assert ptb.panel_subtitle(s['baseline']) == 'IRR 10.0 %', \
         ptb.panel_subtitle(s['baseline'])
-    assert ptb.panel_subtitle(s['ibo_titer']) == 'IRR —', \
-        ptb.panel_subtitle(s['ibo_titer'])
+    assert ptb.panel_subtitle(s['ibo_titer']) == 'IRR < 0 %', \
+        ptb.panel_subtitle(s['ibo_titer'])            # IRR = -inf
     got = ptb.panel_subtitle(dict(trial_number=7, IRR=-0.052))
     assert got == 'IRR −5.2 %', got
+    for unsolved in (math.nan, None, math.inf):
+        got = ptb.panel_subtitle(dict(trial_number=7, IRR=unsolved))
+        assert got == 'IRR —', (unsolved, got)
     # titles: ' optimum' on every campaign panel, never on the baseline
     assert ptb.panel_title(s['baseline']) == 'baseline'
     assert ptb.panel_title(s['ibo_yield']) == 'ibo yield optimum'
     got = ptb.panel_title(dict(label='Isobutanol yield', trial_number=841))
     assert got == 'Isobutanol yield optimum', got
 CHECK('panel titles (+ optimum except the baseline) and subtitles (IRR only; '
-      'baseline, -inf IRR, negative IRR)', check_5)
+      'baseline, -inf -> < 0 %, negative, unsolved -> —)', check_5)
 
 
 def check_6():

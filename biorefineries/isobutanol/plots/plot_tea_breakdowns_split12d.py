@@ -319,12 +319,16 @@ def panel_title(record):
 
 
 def panel_subtitle(record):
-    """'IRR 27.3 %' ('IRR —' when the IRR is not finite, e.g. -inf for an
-    outright money-loser); no trial number or scenario name (the console
-    summary and CSV names carry the trial)."""
+    """'IRR 27.3 %'; 'IRR < 0 %' at -inf (solve_TEA's outright money-loser:
+    no root on IRR > -1 and a negative undiscounted NPV); 'IRR —' when it is
+    not solved (NaN / None) or +inf. No trial number or scenario name (the
+    console summary and CSV names carry the trial)."""
     irr = record['IRR']
-    return (f'IRR {100*irr:.1f} %'.replace('-', '−')
-            if irr is not None and math.isfinite(irr) else 'IRR —')
+    if irr is None or math.isnan(irr) or irr == math.inf:
+        return 'IRR —'
+    if irr == -math.inf:
+        return 'IRR < 0 %'
+    return f'IRR {100*irr:.1f} %'.replace('-', '−')
 
 
 def y_bottom(doc):
