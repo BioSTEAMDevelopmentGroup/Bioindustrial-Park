@@ -7,7 +7,8 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 """
-Bivariate uncertainty plot of the purity-adjusted ethanol MPSP (y) against
+Bivariate uncertainty plot of the purity-adjusted ethanol MPSP (y, converted
+from the workbook's $/kg to $/GGE, see USD_PER_KG_TO_USD_PER_GGE) against
 the total capital investment (x), from an uncertainty-analysis results
 workbook (*_1_full_evaluation.xlsx as written by
 analyses/full/uncertainties_IBO_EtOH.py).
@@ -86,12 +87,24 @@ CONTOUR_LW = 1.0
 CONTOUR_LABEL_BEARINGS = {0.05: 0, 0.25: 180, 0.50: 0, 0.75: 180, 0.95: 0}
 INK = '#0b0b0b'
 
-# ethanol market price range, the same one analyses/full/uncertainties_IBO_EtOH.py
-# draws on its MPSP box plot: Jan 2021 - Dec 2025 five-year low and high,
-# 1.5475 and 3.4500 $/gal / (3.7854 L/gal * 0.789 kg/L), from
-# https://tradingeconomics.com/commodity/ethanol
-ETHANOL_MARKET_RANGE = (0.52, 1.15) # $/kg
-MPSP_AXIS_LIMITS = (0.0, 1.2) # $/kg
+# MPSP is plotted per gasoline gallon equivalent: $/GGE = $/kg * KG_PER_GAL
+# / GGE_PER_GAL. kg per gal from ethanol's density at 20 C, 0.789 kg/L (the
+# value analyses/full/uncertainties_IBO_EtOH.py uses to put the market range
+# in $/kg) x 3.785411784 L/gal = 2.987 kg/gal; 1 gal ethanol = 0.67 GGE from
+# the AFDC fuel properties comparison, https://afdc.energy.gov/fuels/properties
+ETHANOL_DENSITY_KG_PER_L = 0.789
+L_PER_GAL = 3.785411784
+KG_PER_GAL = ETHANOL_DENSITY_KG_PER_L * L_PER_GAL
+GGE_PER_GAL = 0.67
+USD_PER_KG_TO_USD_PER_GGE = KG_PER_GAL / GGE_PER_GAL # ~4.458
+
+# ethanol market price range, the same one uncertainties_IBO_EtOH.py draws on
+# its MPSP box plot: Jan 2021 - Dec 2025 five-year low and high, 1.5475 and
+# 3.4500 $/gal, from https://tradingeconomics.com/commodity/ethanol; converted
+# from $/gal directly (not via its rounded $/kg values)
+ETHANOL_MARKET_RANGE_PER_GAL = (1.5475, 3.4500) # $/gal
+ETHANOL_MARKET_RANGE = tuple(v / GGE_PER_GAL for v in ETHANOL_MARKET_RANGE_PER_GAL) # $/GGE
+MPSP_AXIS_LIMITS = (0.0, 6.0) # $/GGE
 # a light shade of the baseline grey of plots/plot_kin_opt_parameter_sets.py
 # (BASELINE_COLOR); the band is unlabelled, named in the caption
 BASELINE_GRAY = '#90918e'
@@ -230,17 +243,23 @@ def plot_uncertainty_MPSP_vs_TCI(results_file=None, baseline_file=None,
     print(f'Results:  {results_file}')
     print(f'Baseline: {baseline_file}')
 
-    tci, mpsp, n_dropped = load_samples(results_file)
+    tci, mpsp_kg, n_dropped = load_samples(results_file)
+    mpsp = mpsp_kg * USD_PER_KG_TO_USD_PER_GGE
     rho, p = stats.spearmanr(tci, mpsp)
     base = load_baseline(baseline_file) if baseline_file else None
+    if base:
+        base = (base[0], base[1] * USD_PER_KG_TO_USD_PER_GGE)
     print(f'{tci.size} samples ({n_dropped} non-finite dropped); '
           f'Spearman rho = {rho:.3f} (p = {p:.1e})')
-    for name, v in (('TCI [MM$]', tci), ('MPSP [$/kg]', mpsp)):
+    print(f'MPSP conversion: {KG_PER_GAL:.4f} kg/gal / {GGE_PER_GAL} GGE/gal = '
+          f'{USD_PER_KG_TO_USD_PER_GGE:.4f} ($/GGE)/($/kg); market range '
+          + ' - '.join(f'{v:.3f}' for v in ETHANOL_MARKET_RANGE) + ' $/GGE')
+    for name, v in (('TCI [MM$]', tci), ('MPSP [$/GGE]', mpsp)):
         q = np.percentile(v, [1, 5, 25, 50, 75, 95, 99])
         print(f'  {name}: percentiles 1/5/25/50/75/95/99 = '
               + ' / '.join(f'{i:.4g}' for i in q))
     if base:
-        print(f'  baseline: TCI {base[0]:.4g} MM$, MPSP {base[1]:.5g} $/kg')
+        print(f'  baseline: TCI {base[0]:.4g} MM$, MPSP {base[1]:.5g} $/GGE')
 
     apply_font_rcparams()
     fig = plt.figure(figsize=(5.6, 5.4))
@@ -256,7 +275,7 @@ def plot_uncertainty_MPSP_vs_TCI(results_file=None, baseline_file=None,
     yticks = nice_ticks(np.array(MPSP_AXIS_LIMITS))
     if not (yticks[0] <= mpsp.min() and mpsp.max() <= yticks[-1]):
         raise ValueError(f'MPSP_AXIS_LIMITS {MPSP_AXIS_LIMITS} clip samples '
-                         f'({mpsp.min():.3g}-{mpsp.max():.3g} $/kg)')
+                         f'({mpsp.min():.3g}-{mpsp.max():.3g} $/GGE)')
     xlim, ylim = (xticks[0], xticks[-1]), (yticks[0], yticks[-1])
     ax.axhspan(*ETHANOL_MARKET_RANGE, color=MARKET_BAND_COLOR, lw=0, zorder=0)
     draw_samples(ax, tci, mpsp)
@@ -270,7 +289,7 @@ def plot_uncertainty_MPSP_vs_TCI(results_file=None, baseline_file=None,
     ax.set_xlabel('Total capital investment [MM\\$]',
                   fontsize=FONTS['axis_title'])
     ax.set_ylabel('Minimum ethanol selling price '
-                  r'[$\mathrm{\$·kg}^{-1}$]', fontsize=FONTS['axis_title'])
+                  r'[$\mathrm{\$·GGE}^{-1}$]', fontsize=FONTS['axis_title'])
     ax.xaxis.set_minor_locator(AutoMinorLocator(2))
     ax.yaxis.set_minor_locator(AutoMinorLocator(2))
 
