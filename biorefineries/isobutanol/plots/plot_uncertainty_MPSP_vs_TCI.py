@@ -14,7 +14,7 @@ written by analyses/full/uncertainties_IBO_EtOH.py):
   A  purity-adjusted ethanol MPSP (y, converted from the workbook's $/kg to
      $/GGE, see USD_PER_KG_TO_USD_PER_GGE) vs total capital investment (x)
   B  ethanol titer (y, g/L-water) vs ethanol yield (x, g/g sugars added)
-  C  ethanol sale revenue (y) vs DDGS sale revenue (x), MM$/yr at the default
+  C  ethanol sale revenue (y) vs DDGS sale revenue (x), MM$/y at the default
      product prices; ethanol revenue is not a workbook column and is derived
      as the annual product sale minus the DDGS, crude-oil and isobutanol sale
      revenues (exact: the model's tea.sales is the sum of those four)
@@ -179,6 +179,7 @@ BOX_PERCENTILES = {'whis': (5, 95), 'dots': (0, 100)} # dots: min and max
 # panel hue, Pareto sense per axis ('min' / 'max', x then y), fixed axis
 # ticks / limits (neither = 'nice' ticks enclosing the samples and
 # the baseline)
+REVENUE_TICKS = np.arange(0.0, 181.0, 30.0) # MM$/y, panel C (both axes 0-180)
 PANELS = (
     dict(x='TCI', y='MPSP',
          xlabel='Total capital investment [MM\\$]',
@@ -191,8 +192,9 @@ PANELS = (
          ylabel=r'Ethanol titer [$\mathrm{g·L}^{-1}$]',
          xlim=(0.40, 0.50), ylim=(80.0, 140.0)),
     dict(x='DDGS revenue', y='EtOH revenue', color=YELLOW, pareto=('max', 'max'),
-         xlabel=r'DDGS sale revenue [$\mathrm{MM\$·yr}^{-1}$]',
-         ylabel=r'Ethanol sale revenue [$\mathrm{MM\$·yr}^{-1}$]'),
+         xlabel=r'DDGS sale revenue [$\mathrm{MM\$·y}^{-1}$]',
+         ylabel=r'Ethanol sale revenue [$\mathrm{MM\$·y}^{-1}$]',
+         xticks=REVENUE_TICKS, yticks=REVENUE_TICKS),
 )
 GRID_SHAPE = (2, 2)
 
