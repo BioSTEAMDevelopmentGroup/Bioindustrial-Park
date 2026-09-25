@@ -185,8 +185,11 @@ TYPICAL_CORN_ETHANOL_PRODUCTION = (40.0, 60.0) # MM gal/y
 # - Tsegaye, K. N., Alemnew, M. & Berhane, N. Saccharomyces cerevisiae for
 #   lignocellulosic ethanol production: a look at key attributes and genome
 #   shuffling. Front. Bioeng. Biotechnol. 12, 1466644 (2024).
+# - Devantier, R. et al. Metabolite profiling for analysis of yeast stress
+#   response during very high gravity ethanol fermentations. Appl. Microbiol.
+#   Biotechnol. 68, 622-629 (2005). https://doi.org/10.1007/s00253-005-1902-9
 VHG_ETHANOL_YIELD = (0.42, 0.48) # g/g
-VHG_ETHANOL_TITER = (126.0, 142.0) # g/L
+VHG_ETHANOL_TITER = (100.0, 142.0) # g/L
 # the ethanol range is a band in a light shade of the baseline grey of
 # plots/plot_kin_opt_parameter_sets.py (BASELINE_COLOR); the gasoline range,
 # which almost coincides with it, is two dashed lines in a dark shade of the
