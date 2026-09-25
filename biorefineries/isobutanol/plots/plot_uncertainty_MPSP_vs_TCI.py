@@ -212,9 +212,9 @@ def plot_uncertainty_MPSP_vs_TCI(results_file=None, baseline_file=None,
     ax.set_yticks(yticks)
     ax.set_xlim(*xlim)
     ax.set_ylim(*ylim)
-    ax.set_xlabel('Total capital investment, TCI [MM\\$]',
+    ax.set_xlabel('Total capital investment [MM\\$]',
                   fontsize=FONTS['axis_title'])
-    ax.set_ylabel('Minimum ethanol selling price, MPSP\n'
+    ax.set_ylabel('Minimum ethanol selling price\n'
                   r'[$\mathrm{\$·kg}^{-1}$]', fontsize=FONTS['axis_title'])
     ax.xaxis.set_minor_locator(AutoMinorLocator(2))
     ax.yaxis.set_minor_locator(AutoMinorLocator(2))
