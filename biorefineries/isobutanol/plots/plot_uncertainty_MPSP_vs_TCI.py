@@ -25,10 +25,8 @@ Gaussian-KDE density of the Monte Carlo samples as filled contours (one
 sequential ramp of the hue, light = sparse to dark = dense; the lowest band is
 left unfilled, so the panel background stays white),
 the baseline (the 'initial' row of the companion *_0_baseline.xlsx) as a
-white diamond (unlabelled: name it in the caption), contour lines of a
-Gaussian KDE enclosing 5 / 25 / 50 / 75 / 95 % of the samples (the
-highest-density regions; each line is the density quantile AT the samples,
-so it holds that share of them), and marginal box plots outside the panel:
+white diamond (unlabelled: name it in the caption), and marginal box plots
+outside the panel:
 box = 25th-75th percentile, line = median, whiskers = 5th-95th percentile
 (the whis=[5, 95] of contourplots.box_and_whiskers_plot), dots = 1st and 99th
 percentiles.
@@ -109,8 +107,8 @@ def _mix(color, other, t):
     return to_hex((1 - t)*a + t*b)
 
 
-# each panel has one hue: samples and box faces in it, box edges / whiskers
-# and the KDE contour lines in a dark shade of it (dark_shade)
+# each panel has one hue: box faces in it, box edges / whiskers in a dark
+# shade of it (dark_shade), the filled KDE on a ramp of it (density_ramp)
 dark_shade = lambda color: _mix(color, 'black', 0.5)
 BOX_MEDIAN = 'black'
 # filled KDE: N_DENSITY_LEVELS equal steps from 0 to the peak density, coloured
@@ -120,9 +118,6 @@ density_ramp = lambda color: tuple(
     [_mix(color, 'white', t) for t in (0.94, 0.78, 0.58, 0.36, 0.16)]
     + [color] + [_mix(color, 'black', t) for t in (0.35, 0.65)])
 N_DENSITY_LEVELS = 10
-# KDE contour lines: share of samples each encloses
-CONTOUR_SHARES = (0.05, 0.25, 0.50, 0.75, 0.95)
-CONTOUR_LW = 1.0
 INK = '#0b0b0b'
 
 # MPSP is plotted per gasoline gallon equivalent: $/GGE = $/kg * KG_PER_GAL
@@ -311,22 +306,6 @@ def draw_pareto_frontier(ax, x, y, sense):
     return fx, fy
 
 
-def draw_hdr_contours(ax, x, y, color, n_grid=300, pad=0.15):
-    """KDE contour lines enclosing CONTOUR_SHARES of the samples (unlabelled:
-    name the shares in the caption)."""
-    kde = stats.gaussian_kde(np.vstack([x, y]))
-    dx, dy = np.ptp(x), np.ptp(y)
-    GX, GY = np.meshgrid(np.linspace(x.min() - pad*dx, x.max() + pad*dx, n_grid),
-                         np.linspace(y.min() - pad*dy, y.max() + pad*dy, n_grid))
-    Z = kde(np.vstack([GX.ravel(), GY.ravel()])).reshape(GX.shape)
-    at_samples = kde(np.vstack([x, y]))
-    # the region holding share p is {density >= the (1 - p) quantile of the
-    # density at the samples}; larger share -> lower level
-    levels = {np.quantile(at_samples, 1 - p): p for p in CONTOUR_SHARES}
-    ax.contour(GX, GY, Z, levels=sorted(levels), colors=dark_shade(color),
-                    linewidths=CONTOUR_LW, zorder=3)
-
-
 def draw_box(ax, values, orientation, color):
     edge = dark_shade(color)
     lo_w, hi_w = BOX_PERCENTILES['whis']
@@ -378,7 +357,6 @@ def draw_joint_panel(fig, cell, panel, samples, base, letter):
             ax.axhline(price, color=GASOLINE_LINE_COLOR, zorder=1, **GASOLINE_LINE_STYLE)
     draw_density(ax, x, y, (xticks[0], xticks[-1]), (yticks[0], yticks[-1]),
                  panel['color'])
-    draw_hdr_contours(ax, x, y, panel['color'])
     if panel.get('pareto'):
         fx, fy = draw_pareto_frontier(ax, x, y, panel['pareto'])
         print(f'  Pareto frontier: {fx.size} non-dominated samples, '
