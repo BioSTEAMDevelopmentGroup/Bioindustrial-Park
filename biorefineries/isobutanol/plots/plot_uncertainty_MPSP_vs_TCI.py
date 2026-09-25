@@ -15,7 +15,8 @@ analyses/full/uncertainties_IBO_EtOH.py).
 Joint panel: the Gaussian-KDE density of the Monte Carlo samples as filled
 contours (one teal ramp, light = sparse to dark = dense; the lowest band is
 left unfilled, so the panel background stays white) and the baseline (the 'initial' row of the companion
-*_0_baseline.xlsx) as a white diamond with an arrow callout. Marginal box plots outside the
+*_0_baseline.xlsx) as a white diamond (unlabelled: name it in the caption), over a light
+grey band showing the ethanol market price range (ETHANOL_MARKET_RANGE). Marginal box plots outside the
 panel: box = 25th-75th percentile, line = median, whiskers = 5th-95th
 percentile (the whis=[5, 95] of contourplots.box_and_whiskers_plot), dots =
 1st and 99th percentiles.
@@ -54,8 +55,7 @@ MPSP_COL = ('Biorefinery', 'Purity-adjusted ethanol MPSP [$/kg]')
 TCI_COL = ('Biorefinery', 'Total capital investment [10^6 $]')
 
 FONT_FAMILY = 'Arial'
-FONTS = {'tick': 12, 'axis_title': 12, 'callout': 10}
-BASELINE_CALLOUT_OFFSET = (-55, 70) # pt from the baseline marker to the label's lower-right corner
+FONTS = {'tick': 12, 'axis_title': 12, 'band_label': 10}
 TICK_LEN = {'major': 4.0, 'minor': 2.0} # pt; left/bottom ticks extend this far in AND out
 
 # the TRY-informed profitability campaign's teal (RELAY_COLOR in
@@ -78,6 +78,14 @@ BOX_FACE = TEAL
 BOX_EDGE = _mix(TEAL, 'black', 0.5)
 BOX_MEDIAN = 'black'
 INK = '#0b0b0b'
+INK_SECONDARY = '#52514e'
+
+# ethanol market price range, the same one analyses/full/uncertainties_IBO_EtOH.py
+# draws on its MPSP box plot: Jan 2021 - Dec 2025 five-year low and high,
+# 1.5475 and 3.4500 $/gal / (3.7854 L/gal * 0.789 kg/L), from
+# https://tradingeconomics.com/commodity/ethanol
+ETHANOL_MARKET_RANGE = (0.52, 1.15) # $/kg
+MARKET_BAND_COLOR = '#e4e4e2'
 BOX_PERCENTILES = {'whis': (5, 95), 'dots': (1, 99)}
 
 
@@ -201,17 +209,17 @@ def plot_uncertainty_MPSP_vs_TCI(results_file=None, baseline_file=None,
     ax_top = fig.add_subplot(gs[0, 0], sharex=ax)
     ax_right = fig.add_subplot(gs[1, 1], sharey=ax)
 
-    xticks, yticks = nice_ticks(tci), nice_ticks(mpsp)
+    # the y axis spans the market range too, so the band's edges are visible
+    xticks = nice_ticks(tci)
+    yticks = nice_ticks(np.concatenate([mpsp, ETHANOL_MARKET_RANGE]))
     xlim, ylim = (xticks[0], xticks[-1]), (yticks[0], yticks[-1])
+    ax.axhspan(*ETHANOL_MARKET_RANGE, color=MARKET_BAND_COLOR, lw=0, zorder=0)
+    ax.text(0.03, ETHANOL_MARKET_RANGE[1], 'Market price range',
+            transform=ax.get_yaxis_transform(), ha='left', va='top',
+            fontsize=FONTS['band_label'], color=INK_SECONDARY, zorder=6)
     draw_density(ax, tci, mpsp, xlim, ylim)
     if base:
         ax.plot(*base, 'D', ms=8, mfc='w', mec=INK, mew=1.2, zorder=5)
-        # arrow callout from the sparse upper left, clear of the dense core
-        ax.annotate('Baseline', xy=base, xytext=BASELINE_CALLOUT_OFFSET,
-                    textcoords='offset points', ha='right', va='bottom',
-                    fontsize=FONTS['callout'], color=INK, zorder=6,
-                    arrowprops=dict(arrowstyle='-|>', color=INK, lw=1.0,
-                                    mutation_scale=10, shrinkA=2, shrinkB=7))
     ax.set_xticks(xticks)
     ax.set_yticks(yticks)
     ax.set_xlim(*xlim)
