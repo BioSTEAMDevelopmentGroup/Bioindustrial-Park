@@ -1615,8 +1615,8 @@ def draw_irr_pair(fig, gs_cell, cells, colors, xmax, donor_sets):
     """Panel a of the profitability variant: one IRR cell per (title, sets)
     entry of `cells`, side by side on a SHARED value axis. A relay set's cell
     draws its preloaded donor rows in their donor's colour (donor_sets); every
-    cell circles its own campaign's highest-IRR trial (and, for a relay, the
-    preloaded seed / donor best-IRR trials)."""
+    cell circles the highest-IRR trial of each campaign it draws (and, for a
+    relay, the preloaded seed / donor best-IRR trials)."""
     col, label, yl = OUTCOMES[0]
     sub_gs = gs_cell.subgridspec(1, max(len(cells), 2),
                                  wspace=IRR_PAIR_WSPACE)
@@ -2052,11 +2052,13 @@ def plot(sets, band, out_stem, dpi=300, params_only=False,
     allocation of EVERY set (the regular campaigns in order, the relay
     campaign(s) last). view picks panel A:
 
-      'profitability'  two IRR cells side by side on one value axis: the
-                       financial campaign(s) (the regular sets owning the IRR
-                       cell) and the relay (flagship) campaign(s), each with
-                       the baseline reference line and its highest-IRR trial
-                       circled; the relay cell shows its preloaded donor rows
+      'profitability'  two IRR cells side by side on one value axis, each
+                       with the baseline reference line: the financial
+                       campaign(s) (the regular sets owning the IRR cell),
+                       solid, with the process-level campaigns' incumbents
+                       dashed and every campaign's highest-IRR trial circled;
+                       and the relay (flagship) campaign(s) alone, its
+                       highest-IRR trial circled and its preloaded donor rows
                        in their donor's colour. No other outcome.
       'process'        the six process-level outcomes (2x3: isobutanol row,
                        ethanol row), every campaign's incumbent in every cell
@@ -2080,19 +2082,21 @@ def plot(sets, band, out_stem, dpi=300, params_only=False,
     fin_sets = [s for s in a_sets if not s.get('is_baseline')
                 and _owns_outcome(s.get('objective'), 'IRR')]
     if view == 'profitability':
+        # the financial cell draws every regular set: the financial incumbent
+        # solid with its trial cloud, the process-level campaigns' incumbents
+        # dashed, and every campaign's highest-IRR trial circled; the flagship
+        # cell draws the relay alone (its preload zone holds the donor rows)
         cells = []
         if fin_sets:
-            cells.append((' + '.join(s['label'] for s in fin_sets),
-                          base_sets + fin_sets))
+            cells.append((' + '.join(s['label'] for s in fin_sets), a_sets))
         if relay_sets:
             cells.append((' + '.join(s['label'] for s in relay_sets),
                           base_sets + relay_sets))
         if not cells:
             return None
-        # every cell circles its own campaign's highest-IRR trial; only the
-        # owning campaign is drawn, so there are no dashed "other" lines
         has_best_marks = True
-        has_other = False
+        has_other = bool(fin_sets) and len(a_sets) > len(base_sets) \
+            + len(fin_sets)
     else:
         has_best_marks = False
         has_other = True
@@ -2111,14 +2115,21 @@ def plot(sets, band, out_stem, dpi=300, params_only=False,
     H0 = 9.856
     # the framed key in the a -> b gap = the campaign grid (<= 4 columns),
     # one full-width line per relay campaign (its long "seeded with ..."
-    # label would blow up a grid column), and the one-row mark key. Each row
-    # beyond the original 2 + 1 grows the key downward by one row height: the
-    # legend top stays put, the mark key and panel b move down by `extra`
-    # (into the spare canvas below panel b's x-axis title).
+    # label would blow up a grid column), and the mark key (one row of <= 3
+    # entries, or 2 x 2 when the highest-IRR circle and both incumbent styles
+    # make four). Each row beyond the original 2 + 1 grows the key downward
+    # by one row height: the legend top stays put, the mark key and panel b
+    # move down by `extra`. The campaign-legend rows spill into the spare
+    # canvas below panel b's x-axis title; the extra mark-key row grows the
+    # canvas.
+    style_handles = _style_handles(has_best_marks, has_other)
+    style_ncol = 2 if len(style_handles) > 3 else len(style_handles)
     n_grid_rows = -(-len(a_sets) // min(len(a_sets), 4))
     extra_grid = LEGEND_ROW_H * max(0, n_grid_rows - 2)
-    extra = LEGEND_ROW_H * max(0, n_grid_rows + len(relay_sets) - 2)
-    H = H0
+    extra_leg = LEGEND_ROW_H * max(0, n_grid_rows + len(relay_sets) - 2)
+    extra_style = LEGEND_ROW_H if style_ncol == 2 else 0.0
+    extra = extra_leg + extra_style
+    H = H0 + extra_style * H0
 
     def fy(y):
         return 1.0 - (1.0 - y) * H0 / H
@@ -2167,15 +2178,17 @@ def plot(sets, band, out_stem, dpi=300, params_only=False,
     # the campaign swatches sit a little high in the panel-a -> b gap so the
     # mark key can share the same framed box just below them
     legend_anchor = (0.527, fy(0.5394 - extra_grid / 2))   # top fixed
-    style_anchor = (0.527, fy(0.4904 - extra))
+    style_anchor = (0.527, fy(0.4904 - extra_leg - extra_style / 2))
     for y, letter, title in panels:
         fig.text(0.03, y, letter, fontsize=FONTS['panel'], fontweight='bold',
                  va='baseline')
         fig.text(0.055, y, title, fontsize=FONTS['panel'] - 1,
                  fontweight='bold', va='baseline')
-    # small colour-free key for the marks in panel a: what the points, open
-    # circles and lines mean (the campaign legend gives the colours), one row
-    style_handles = _style_handles(has_best_marks, has_other)
+    # small colour-free key for the marks in panel a (style_handles, above):
+    # what the points, open circles and lines mean (the campaign legend gives
+    # the colours); with four entries two rows x two columns, filled
+    # column-major (trials | own incumbent over best-IRR trial | other
+    # incumbent)
     handles = [plt.Rectangle((0, 0), 1, 1, fc=colors[id(s)], label=s['label'])
                for s in legend_sets]
     # both keys share ONE framed box in the panel-a -> b gap -- the campaign
@@ -2183,7 +2196,7 @@ def plot(sets, band, out_stem, dpi=300, params_only=False,
     # manual frame.
     style_leg = fig.legend(handles=style_handles, loc='center',
                            bbox_to_anchor=style_anchor,
-                           ncol=len(style_handles), frameon=False,
+                           ncol=style_ncol, frameon=False,
                            fontsize=FONTS['legend'], handlelength=2.2,
                            handletextpad=0.5, columnspacing=1.4)
     fig.add_artist(style_leg)
