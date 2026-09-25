@@ -83,10 +83,14 @@ BOX_MEDIAN = 'black'
 CONTOUR_SHARES = (0.05, 0.25, 0.50, 0.75, 0.95)
 CONTOUR_COLOR = BOX_EDGE
 CONTOUR_LW = 1.0
-# on-screen bearing [deg] from the density peak at which each contour is
-# labelled: the inner contours are too close together to label along one ray,
-# so the labels alternate sides (and keep clear of the baseline marker)
-CONTOUR_LABEL_BEARINGS = {0.05: 0, 0.25: 180, 0.50: 0, 0.75: 180, 0.95: 0}
+# contour labels sit OUTSIDE the cloud, stacked in a column to its right
+# (innermost share on top), each tied by a thin leader line to where its
+# contour crosses the horizontal through the density peak on the right; the
+# contours are too close together to label inline at this axis scale.
+# Leaders cannot cross: anchors run left -> right as labels run top -> bottom.
+CONTOUR_LABEL_X_OFFSET = 10.0   # MM$ right of the outermost anchor
+CONTOUR_LABEL_DY = 0.28         # $/GGE between stacked labels
+CONTOUR_LEADER_LW = 0.6
 INK = '#0b0b0b'
 
 # MPSP is plotted per gasoline gallon equivalent: $/GGE = $/kg * KG_PER_GAL
@@ -111,6 +115,8 @@ ETHANOL_MARKET_RANGE = tuple(v / GGE_PER_GAL for v in ETHANOL_MARKET_RANGE_PER_G
 # (a gallon of gasoline is 1 GGE by definition)
 GASOLINE_PRICE_RANGE = (2.16, 4.84) # $/GGE
 MPSP_AXIS_LIMITS = (0.0, 6.0) # $/GGE
+TCI_AXIS_LIMITS = (75.0, 200.0) # MM$
+TCI_TICK_STEP = 25.0 # MM$
 # the ethanol range is a band in a light shade of the baseline grey of
 # plots/plot_kin_opt_parameter_sets.py (BASELINE_COLOR); the gasoline range,
 # which almost coincides with it, is two dashed lines in a dark shade of the
@@ -192,8 +198,8 @@ def draw_samples(ax, x, y):
 
 def draw_hdr_contours(ax, x, y, xlim, ylim, n_grid=300, pad=0.15):
     """KDE contour lines enclosing CONTOUR_SHARES of the samples, labelled
-    inline with the share, each where its contour crosses the ray from the
-    density peak at that share's CONTOUR_LABEL_BEARINGS angle (on screen)."""
+    with the share in a column right of the cloud, joined to each contour by
+    a leader line."""
     kde = stats.gaussian_kde(np.vstack([x, y]))
     dx, dy = np.ptp(x), np.ptp(y)
     GX, GY = np.meshgrid(np.linspace(x.min() - pad*dx, x.max() + pad*dx, n_grid),
@@ -206,27 +212,34 @@ def draw_hdr_contours(ax, x, y, xlim, ylim, n_grid=300, pad=0.15):
     cs = ax.contour(GX, GY, Z, levels=sorted(levels), colors=CONTOUR_COLOR,
                     linewidths=CONTOUR_LW, zorder=3)
 
-    # label positions: per level, the contour vertex whose on-screen bearing
-    # from the peak is closest to the ray (axes size in inches converts the
-    # data offsets to screen proportions)
+    # anchors: per level, the rightmost crossing of the horizontal through
+    # the density peak (the contour vertex right of the peak nearest that
+    # horizontal, measured on screen)
     i_peak = np.unravel_index(np.argmax(Z), Z.shape)
     px, py = GX[i_peak], GY[i_peak]
     fig_w, fig_h = ax.figure.get_size_inches()
     box = ax.get_position()
     sx = box.width*fig_w/(xlim[1] - xlim[0])
     sy = box.height*fig_h/(ylim[1] - ylim[0])
-    positions = []
-    for lev, segs in zip(cs.levels, cs.allsegs):
-        ray = np.deg2rad(CONTOUR_LABEL_BEARINGS[levels[lev]])
+    anchors = []
+    for segs in cs.allsegs:
         verts = np.concatenate([seg for seg in segs if len(seg)])
         bearing = np.arctan2((verts[:, 1] - py)*sy, (verts[:, 0] - px)*sx)
-        k = np.argmin(np.abs(np.angle(np.exp(1j*(bearing - ray)))))
-        positions.append(tuple(verts[k]))
-    labels = ax.clabel(cs, fmt={lev: f'{round(100*p)}%' for lev, p in levels.items()},
-                       manual=positions, fontsize=FONTS['clabel'], inline=True,
-                       inline_spacing=3)
-    for t in labels:
-        t.set_color(INK)
+        k = np.argmin(np.abs(bearing))
+        anchors.append(tuple(verts[k]))
+    # cs.levels ascend in density = descend in share, so reverse to go from
+    # the innermost (smallest share) contour outwards
+    order = list(range(len(anchors)))[::-1]
+    label_x = max(a[0] for a in anchors) + CONTOUR_LABEL_X_OFFSET
+    n = len(order)
+    for rank, i in enumerate(order):
+        share = levels[cs.levels[i]]
+        label_y = py + (n - 1)/2*CONTOUR_LABEL_DY - rank*CONTOUR_LABEL_DY
+        ax.annotate(f'{round(100*share)}%', xy=anchors[i], xytext=(label_x, label_y),
+                    ha='left', va='center', fontsize=FONTS['clabel'], color=INK,
+                    zorder=6,
+                    arrowprops=dict(arrowstyle='-', color=CONTOUR_COLOR,
+                                    lw=CONTOUR_LEADER_LW, shrinkA=2, shrinkB=0))
 
 
 def draw_box(ax, values, orientation):
@@ -281,8 +294,12 @@ def plot_uncertainty_MPSP_vs_TCI(results_file=None, baseline_file=None,
     ax_right = fig.add_subplot(gs[1, 1], sharey=ax)
 
     # fixed MPSP axis from zero (spans the market band and every sample)
-    xticks = nice_ticks(tci)
+    xticks = np.arange(TCI_AXIS_LIMITS[0], TCI_AXIS_LIMITS[1] + TCI_TICK_STEP/2,
+                       TCI_TICK_STEP)
     yticks = nice_ticks(np.array(MPSP_AXIS_LIMITS))
+    if not (xticks[0] <= tci.min() and tci.max() <= xticks[-1]):
+        raise ValueError(f'TCI_AXIS_LIMITS {TCI_AXIS_LIMITS} clip samples '
+                         f'({tci.min():.4g}-{tci.max():.4g} MM$)')
     if not (yticks[0] <= mpsp.min() and mpsp.max() <= yticks[-1]):
         raise ValueError(f'MPSP_AXIS_LIMITS {MPSP_AXIS_LIMITS} clip samples '
                          f'({mpsp.min():.3g}-{mpsp.max():.3g} $/GGE)')
