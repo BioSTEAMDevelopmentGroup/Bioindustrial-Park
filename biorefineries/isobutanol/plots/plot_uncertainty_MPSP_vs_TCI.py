@@ -13,7 +13,7 @@ workbook (*_1_full_evaluation.xlsx as written by
 analyses/full/uncertainties_IBO_EtOH.py).
 
 Joint panel: the Gaussian-KDE density of the Monte Carlo samples as filled
-contours (a blue -> teal ramp, light = sparse to dark = dense; the lightest band
+contours (one teal ramp, light = sparse to dark = dense; the lightest band
 fills the whole panel) and the baseline (the 'initial' row of the companion
 *_0_baseline.xlsx) as a white diamond. Marginal box plots outside the
 panel: box = 25th-75th percentile, line = median, whiskers = 5th-95th
@@ -39,7 +39,7 @@ import pandas as pd
 import matplotlib
 matplotlib.use('Agg')
 from matplotlib import pyplot as plt
-from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.colors import LinearSegmentedColormap, to_hex, to_rgb
 from matplotlib.lines import Line2D, TICKDOWN, TICKLEFT
 from matplotlib.ticker import AutoMinorLocator, MaxNLocator
 from scipy import stats
@@ -57,17 +57,25 @@ FONT_FAMILY = 'Arial'
 FONTS = {'tick': 12, 'axis_title': 12, 'legend': 9}
 TICK_LEN = {'major': 4.0, 'minor': 2.0} # pt; left/bottom ticks extend this far in AND out
 
-# the blue and teal of plots/plot_kin_opt_parameter_sets.py (HUE_COLORS[6]
-# and RELAY_COLOR): the density ramp runs near-surface -> blue -> teal ->
-# near-black teal, lightness falling monotonically; the box plots are blue
-# with teal outlines
-PARAMETER_SETS_BLUE = '#5a6bcc'
-PARAMETER_SETS_TEAL = '#0B6E7A'
-DENSITY_RAMP = ('#f1f3fb', '#cdd3f0', '#9ca6e0', PARAMETER_SETS_BLUE,
-                '#316da3', PARAMETER_SETS_TEAL, '#064950', '#022428')
+# the TRY-informed profitability campaign's teal (RELAY_COLOR in
+# plots/plot_kin_opt_parameter_sets.py), as ONE sequential hue: white-mixed
+# tints up to the teal itself, then darker shades of it (mixed with black)
+TEAL = '#0B6E7A'
+
+
+def _mix(color, other, t):
+    """`color` moved a fraction `t` of the way towards `other` (RGB)."""
+    a, b = np.array(to_rgb(color)), np.array(to_rgb(other))
+    return to_hex((1 - t)*a + t*b)
+
+
+DENSITY_RAMP = tuple([_mix(TEAL, 'white', t) for t in (0.94, 0.78, 0.58, 0.36, 0.16)]
+                     + [TEAL]
+                     + [_mix(TEAL, 'black', t) for t in (0.35, 0.65)])
 N_DENSITY_LEVELS = 10
-BOX_FACE = PARAMETER_SETS_BLUE
-BOX_EDGE = '#064950'
+BOX_FACE = TEAL
+BOX_EDGE = _mix(TEAL, 'black', 0.5)
+BOX_MEDIAN = 'white'
 INK = '#0b0b0b'
 BOX_PERCENTILES = {'whis': (5, 95), 'dots': (1, 99)}
 
@@ -148,7 +156,7 @@ def draw_box(ax, values, orientation):
     ax.boxplot(values, whis=[lo_w, hi_w], orientation=orientation,
                widths=0.6, showfliers=False, patch_artist=True,
                boxprops={'facecolor': BOX_FACE, 'edgecolor': BOX_EDGE, 'linewidth': 1.0},
-               medianprops={'color': BOX_EDGE, 'linewidth': 1.2},
+               medianprops={'color': BOX_MEDIAN, 'linewidth': 1.4},
                whiskerprops={'color': BOX_EDGE, 'linewidth': 0.8},
                capprops={'color': BOX_EDGE, 'linewidth': 0.8})
     dots = np.percentile(values, BOX_PERCENTILES['dots'])
