@@ -12,12 +12,15 @@ on a synthetic stage-1 document. Checks: (1) positive shares sum to 100 and
 credits stay negative; (2) the net total is the plain sum and operating cost
 converts USD/hr -> MM$/y; (3) an all-zero metric gives zero shares, not NaN;
 (4) format_total's plain 3-significant-figure notation; (5) panel subtitles;
-(6) the shared y floor and the legend omission of an invisible group;
-(7) legend columns keep each family in its own padded columns;
-(8) load_breakdowns refuses wrong units / an unstyled group / a missing
-panel; (9) main() renders PNG + PDF; (10) the per-scenario breakdown CSVs
-(names, shape, displayed units, net-total row, shares). Exit 0 + ALL 10
-CHECKS PASSED = clean."""
+(6) the shared y floor (revenue stacks + their label room) and the legend
+omission of an invisible category; (7) legend columns keep each family in
+its own padded columns; (8) load_breakdowns refuses wrong units / an
+unstyled group / a missing panel / a document without (or with other)
+product revenue; (9) main() renders PNG + PDF; (10) the per-scenario
+breakdown CSVs (names, shape, displayed units, revenue rows, net-total and
+revenue-total rows, shares); (11) the operating-cost bar's revenue credits
+(order, shares of the positive cost total, AOC and the other bars
+unchanged). Exit 0 + ALL 11 CHECKS PASSED = clean."""
 import os
 import csv
 import sys
@@ -38,6 +41,11 @@ HOURS = 8000.0
 GROUPS = list(ptb.GROUP_STYLES)
 METRICS = list(ptb.METRIC_SPECS)
 UNITS = {m: u for m, (_, u) in ptb.METRIC_SPECS.items()}
+PRODUCTS = list(ptb.REVENUE_STYLES)
+OPERATING = 'Operating cost'
+#: USD/hr; about 1.3x the synthetic positive operating cost (19 x ~10)
+REVENUE = {'ethanol': 150.0, 'isobutanol': 40.0, 'DDGS': 60.0,
+           'corn oil': 8.0}
 
 
 def synthetic_doc(seed=0):
@@ -53,14 +61,19 @@ def synthetic_doc(seed=0):
         breakdown['heat exchanger network']['Cooling duty'] = -10.0
         for m in METRICS:
             breakdown['excess electricity'][m] = -1e-9
+        # the baseline sells no isobutanol; the flagship sells the most
+        revenue = {p: (0.0 if key == 'baseline' and p == 'isobutanol'
+                       else v*(1.3 if key == 'flagship' else 1.0))
+                   for p, v in REVENUE.items()}
         scenarios[key] = dict(
             key=key, label=key.replace('_', ' '),
             trial_number=None if key == 'baseline' else 100 + n,
             IRR=-math.inf if key == 'ibo_titer' else 0.1 + 0.01*n,
-            breakdown=breakdown)
+            breakdown=breakdown, revenue=revenue)
     # copies: check 8 mutates its documents
     meta = dict(metrics=list(METRICS), metric_units=dict(UNITS),
-                groups=list(GROUPS), operating_hours=HOURS)
+                groups=list(GROUPS), operating_hours=HOURS,
+                revenue_products=list(PRODUCTS))
     return dict(meta=meta, order=keys, scenarios=scenarios)
 
 
@@ -133,16 +146,30 @@ CHECK('panel subtitles (baseline, -inf IRR, negative IRR)', check_5)
 
 
 def check_6():
-    low = min(float(ptb.breakdown_shares(doc['scenarios'][k]['breakdown'],
-                                         GROUPS, m)[0].clip(max=0).sum())
-              for row in ptb.LAYOUT for k in row for m in METRICS)
+    # the deepest stack is an operating-cost bar's revenue credits
+    lows = {}
+    for row in ptb.LAYOUT:
+        for k in row:
+            r = doc['scenarios'][k]
+            for m in METRICS:
+                shares, positive, _ = ptb.breakdown_shares(r['breakdown'],
+                                                           GROUPS, m)
+                low = float(shares.clip(max=0).sum())
+                if m == OPERATING:
+                    low -= 100*sum(r['revenue'].values())/positive
+                    low -= ptb.REVENUE_LABEL_ROOM
+                lows[k, m] = low
+    low = min(lows.values())
+    assert min(lows, key=lows.get)[1] == OPERATING, lows
     bottom = ptb.y_bottom(doc)
     assert bottom <= low and bottom > low - 10 and bottom % 10 == 0, (bottom, low)
     shown, omitted = ptb.legend_groups(doc)
     assert omitted == ['excess electricity'], omitted
-    assert shown == [g for g in GROUPS if g != 'excess electricity']
-    return f'y floor {bottom:g} % (lowest stack {low:.1f} %)'
-CHECK('shared y floor; invisible group left out of the legend', check_6)
+    assert shown == ([g for g in GROUPS if g != 'excess electricity']
+                     + list(ptb.REVENUE_CATEGORIES)), shown
+    return f'y floor {bottom:g} % (deepest stack + label room {low:.1f} %)'
+CHECK('shared y floor incl. revenue; invisible group left out of the legend',
+      check_6)
 
 
 def check_7():
@@ -154,13 +181,15 @@ def check_7():
     assert cols[2] == list(fams[1]), 'facilities not in column 3'
     assert [g for g in cols[3] if g] == [g for g in fams[2] if g in shown]
     assert cols[3][-1] is None, 'pseudo-group column not padded'
+    assert cols[4] == list(ptb.REVENUE_CATEGORIES) + [None], cols[4]
+    assert len(cols) == 5, len(cols)
     return f'{len(cols)} columns'
 CHECK('legend columns: one family per column set, padded', check_7)
 
 
 def check_8():
     with tempfile.TemporaryDirectory() as tmp:
-        def refused(mutate):
+        def refused(mutate, needle=''):
             bad = synthetic_doc()
             mutate(bad)
             path = os.path.join(tmp, 'bad.json')
@@ -168,8 +197,8 @@ def check_8():
                 json.dump(bad, f)
             try:
                 ptb.load_breakdowns(path)
-            except ValueError:
-                return True
+            except ValueError as e:
+                return needle in str(e)
             return False
         assert refused(lambda d: d['meta']['metric_units'].update(
             {'Operating cost': 'MM$/yr'})), 'wrong units accepted'
@@ -177,8 +206,17 @@ def check_8():
             'unstyled group accepted'
         assert refused(lambda d: d['scenarios'].pop('flagship')), \
             'missing panel accepted'
-CHECK('load_breakdowns refuses wrong units / unstyled group / missing panel',
-      check_8)
+        # a pre-revenue stage-1 document asks for a re-run
+        assert refused(lambda d: d['meta'].pop('revenue_products'),
+                       're-run'), 'document without revenue_products accepted'
+        assert refused(lambda d: d['scenarios']['ibo_yield'].pop('revenue'),
+                       're-run'), 'record without revenue accepted'
+        assert refused(lambda d: d['scenarios']['etoh_titer']['revenue'].pop(
+            'corn oil')), 'record missing a product accepted'
+        assert refused(lambda d: d['meta'].update(
+            revenue_products=PRODUCTS[::-1])), 'other product order accepted'
+CHECK('load_breakdowns refuses wrong units / unstyled group / missing panel / '
+      'missing or other revenue', check_8)
 
 
 def check_9():
@@ -206,22 +244,72 @@ def check_10():
         header, body = rows[0], rows[1:]
         assert header[0] == 'Unit group' and len(header) == 1 + 2*len(METRICS)
         assert 'Operating cost [MM$/yr]' in header, header
-        assert [r[0] for r in body] == GROUPS + ['Total (net)'], [r[0] for r in body]
+        names = [f'{p} revenue' for p in PRODUCTS]
+        assert [r[0] for r in body] == (GROUPS + names
+                                        + ['Total (net)', 'Total revenue']), \
+            [r[0] for r in body]
+        n = len(GROUPS)
+        groups_rows, revenue_rows = body[:n], body[n:n + len(names)]
+        net_row, revenue_total = body[-2], body[-1]
         j = header.index('Operating cost [MM$/yr]')
         i = GROUPS.index('boiler')
         want = bd['boiler']['Operating cost']*HOURS/1e6
         assert abs(float(body[i][j]) - want) < 1e-12, (body[i][j], want)
         for m in METRICS:
             col = header.index(f'{m} [{ptb.DISPLAY_UNITS[m]}]')
-            net = sum(float(r[col]) for r in body[:-1])
-            assert abs(float(body[-1][col]) - net) <= 1e-9*abs(net), (m, net)
-            s = [float(r[header.index(f'{m} share [% of positive total]')])
-                 for r in body[:-1]]
+            scol = header.index(f'{m} share [% of positive total]')
+            net = sum(float(r[col]) for r in groups_rows)
+            assert abs(float(net_row[col]) - net) <= 1e-9*abs(net), (m, net)
+            s = [float(r[scol]) for r in groups_rows]
             assert abs(sum(x for x in s if x > 0) - 100.0) < 1e-9, (m, sum(s))
-        assert body[-1][1 + len(METRICS):] == ['']*len(METRICS)
+            if m == OPERATING:
+                continue
+            # the revenue rows carry operating cost only
+            assert all(r[col] == '' and r[scol] == '' for r in revenue_rows)
+            assert revenue_total[col] == ''
+        flagship = doc['scenarios']['flagship']
+        _, positive, _ = ptb.breakdown_shares(bd, GROUPS, OPERATING)
+        for p, r in zip(PRODUCTS, revenue_rows):
+            credit = -flagship['revenue'][p]*HOURS/1e6
+            assert abs(float(r[j]) - credit) < 1e-12, (p, r[j], credit)
+            share = float(r[header.index(
+                f'{OPERATING} share [% of positive total]')])
+            assert abs(share + 100*flagship['revenue'][p]/positive) < 1e-9
+        total = sum(float(r[j]) for r in revenue_rows)
+        assert total < 0 and abs(float(revenue_total[j]) - total) < 1e-12
+        assert net_row[1 + len(METRICS):] == ['']*len(METRICS)
+        assert revenue_total[1 + len(METRICS):] == ['']*len(METRICS)
     return f'{len(paths)} CSVs x {len(body)} rows'
-CHECK('per-scenario breakdown CSVs: names, shape, units, totals, shares',
-      check_10)
+CHECK('per-scenario breakdown CSVs: names, shape, units, revenue rows, totals, '
+      'shares', check_10)
+
+
+def check_11():
+    flagship = doc['scenarios']['flagship']
+    segments, net, revenue = ptb.bar_segments(flagship, GROUPS, OPERATING)
+    # the unit groups first, then the credits in REVENUE_STYLES order
+    assert [c for c, _ in segments] == GROUPS + list(ptb.REVENUE_CATEGORIES)
+    shares, positive, net_ref = ptb.breakdown_shares(bd, GROUPS, OPERATING)
+    assert net == net_ref, (net, net_ref)       # the printed AOC is unchanged
+    assert abs(revenue - sum(flagship['revenue'].values())) < 1e-12
+    got = dict(segments[len(GROUPS):])
+    for p in PRODUCTS:
+        want = -100*flagship['revenue'][p]/positive
+        assert abs(got[f'{p} revenue'] - want) < 1e-12, (p, got, want)
+    depth = sum(got.values())
+    assert depth < -100, depth    # sales (1.3x positive cost) exceed the AOC
+    # every other bar is exactly the unit groups
+    for m in METRICS:
+        if m == OPERATING:
+            continue
+        seg, _, rev = ptb.bar_segments(flagship, GROUPS, m)
+        assert rev == 0.0 and [c for c, _ in seg] == GROUPS, m
+    assert ptb.category_style('corn oil revenue') == (
+        *ptb.REVENUE_STYLES['corn oil'], ptb.REVENUE_HATCH_COLOR)
+    assert ptb.category_style('boiler')[2] == ptb.EDGE_COLOR
+    return f'flagship revenue stack {depth:.1f} %'
+CHECK('operating-cost bar: revenue credits after the unit groups, shares of '
+      'the positive cost, AOC unchanged', check_11)
 
 
 if failures:

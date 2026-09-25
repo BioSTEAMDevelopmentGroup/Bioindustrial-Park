@@ -17,8 +17,13 @@ each at its objective-optimum trial. Every panel has five 100 %-stacked bars
 (the unit groups' installed equipment cost, cooling duty, heating duty,
 electricity consumption and operating cost), each group drawn as its share of
 the metric's POSITIVE total, so credits (the heat-exchanger-network savings,
-sold excess electricity) sit below zero. Each bar's NET total -- operating
-cost converted to MM$/y, i.e. the AOC -- is printed above it.
+sold excess electricity) sit below zero. The operating-cost bar also carries
+the sales revenue of the four products (ethanol, isobutanol, DDGS, corn oil;
+spec docs/superpowers/specs/2026-09-24-tea-breakdowns-revenue-design.md) as
+credits under the unit groups, on the same scale: a revenue stack deeper than
+-100 % means sales exceed the operating cost. Each bar's NET unit-group total
+-- operating cost converted to MM$/y, i.e. the AOC -- is printed above it,
+and the total revenue [MM$/y] under the operating-cost bar's revenue stack.
 
 Sim-safe: reads the stage-1 JSON only (json / numpy / matplotlib); never
 imports the biorefineries package, never load()s. Run:
@@ -28,10 +33,12 @@ imports the biorefineries package, never load()s. Run:
 --data defaults to the newest analyses/results/tea_breakdowns_split12d_*.json.
 Writes <stem>_<stamp>.png and .pdf to --out-dir (default analyses/results),
 and one breakdown CSV per scenario named after the data file,
-<data stem>_<key>[_trial<N>].csv (rows = the unit groups in stack order +
-'Total (net)'; columns = each metric in its displayed unit, then each
-group's share of the metric's positive total [%]); re-running on the same
-data overwrites them.
+<data stem>_<key>[_trial<N>].csv (rows = the unit groups in stack order,
+the four '<product> revenue' credits (negative, operating-cost column
+only), 'Total (net)' (the unit-group sum) and 'Total revenue' (the credits'
+sum); columns = each metric in its displayed unit, then each row's share of
+the metric's positive total [%]); re-running on the same data overwrites
+them.
 """
 import os
 import csv
@@ -73,7 +80,10 @@ METRIC_SPECS = {
     'Cooling duty': ('Cooling\nduty\n[$\\mathrm{GJ·h}^{-1}$]', 'GJ/hr'),
     'Heating duty': ('Heating\nduty\n[$\\mathrm{GJ·h}^{-1}$]', 'GJ/hr'),
     'Electricity consumption': ('Electricity\nconsumption\n[MW]', 'MW'),
-    OPERATING: ('Operating\ncost\n[$\\mathrm{MM\\$·y}^{-1}$]', 'USD/hr'),
+    # 'and revenue' on line 3, beside the short '[MW]' ('cost and' on line 2
+    # ran into 'consumption')
+    OPERATING: ('Operating\ncost\nand revenue\n[$\\mathrm{MM\\$·y}^{-1}$]',
+                'USD/hr'),
 }
 
 #: unit group -> (face colour, hatch). Process areas take the validated
@@ -103,12 +113,29 @@ GROUP_STYLES = {
     'fixed operating cost':               ('#ffffff', 'xxxx'),
     'excess electricity':                 ('#ffffff', '....'),
 }
+#: product (stage-1 `revenue` key, USD/hr) -> (face colour, hatch), in the
+#: order the revenue credits stack down the operating-cost bar. Each product
+#: takes its own process area's hue (ethanol / isobutanol purification, DDGS
+#: recovery; corn oil the amber slot) under a small-circle texture that no
+#: unit group uses, drawn in REVENUE_HATCH_COLOR so it shows on the dark
+#: hues, so a product never reads as its unit group. Adjacent pairs pass the
+#: dataviz validator (worst CVD dE 9.1, DDGS / corn oil).
+REVENUE_STYLES = {
+    'ethanol':    ('#008300', 'oo'),
+    'isobutanol': ('#4a3aa7', 'oo'),
+    'DDGS':       ('#1baf7a', 'oo'),
+    'corn oil':   ('#eda100', 'oo'),
+}
+REVENUE_HATCH_COLOR = 'white'
+#: legend / CSV category name of a product's revenue credit
+REVENUE_CATEGORIES = {f'{p} revenue': p for p in REVENUE_STYLES}
 #: legend columns: each family starts a new column (process areas fill two),
 #: columns padded to LEGEND_ROWS with blank entries so families line up
 GROUP_FAMILIES = (
     tuple(list(GROUP_STYLES)[:10]),     # process areas
     tuple(list(GROUP_STYLES)[10:15]),   # facilities
     tuple(list(GROUP_STYLES)[15:]),     # cost pseudo-groups
+    tuple(REVENUE_CATEGORIES),          # product revenue (credits)
 )
 LEGEND_ROWS = 5
 EDGE_COLOR = '0.15'
@@ -122,8 +149,11 @@ MIN_DRAWN_SHARE = 1e-6
 LEGEND_MIN_SHARE = 0.1
 TOTAL_SIG_FIGS = 3
 Y_TOP = 116.0          # room above 100 % for the totals
-TOTAL_PAD = 2.0        # gap between the stack top (100 %) and a total [%]
+TOTAL_PAD = 2.0        # gap between a stack end and its total [%]
+#: room kept under the deepest revenue stack for its total [%]
+REVENUE_LABEL_ROOM = 12.0
 Y_MAJOR, Y_MINOR = 25.0, 5.0
+FIGSIZE = (11.5, 15.5)
 
 FONT_FAMILY = 'Arial'
 FONTS = {'tick': 12, 'axis': 12, 'title': 12, 'subtitle': 10,
@@ -160,6 +190,19 @@ def load_breakdowns(path):
     missing = [k for row in LAYOUT for k in row if k not in doc['scenarios']]
     if missing:
         raise ValueError(f'{path}: no scenario record for {missing}')
+    no_revenue = [k for row in LAYOUT for k in row
+                  if 'revenue' not in doc['scenarios'][k]]
+    if 'revenue_products' not in meta or no_revenue:
+        raise ValueError(f'{path} has no product revenue '
+                         f'({no_revenue or "meta"}): re-run '
+                         'analyses/collect_tea_breakdowns_split12d.py')
+    products = list(REVENUE_STYLES)
+    wrong = [k for row in LAYOUT for k in row
+             if sorted(doc['scenarios'][k]['revenue']) != sorted(products)]
+    if meta['revenue_products'] != products or wrong:
+        raise ValueError(f'{path}: revenue products '
+                         f'{meta["revenue_products"]} (records {wrong}) != '
+                         f'{products}')
     return doc
 
 
@@ -171,6 +214,37 @@ def breakdown_shares(breakdown, groups, metric):
     positive = float(values[values > 0].sum())
     shares = 100*values/positive if positive > 0 else np.zeros_like(values)
     return shares, positive, float(values.sum())
+
+
+def revenue_shares(record, positive):
+    """{product: share [%]} of the product revenues drawn as credits in the
+    operating-cost bar: -revenue over the bar's POSITIVE cost total, the
+    rule of every segment (zeros when nothing is positive)."""
+    return {p: (-100*record['revenue'][p]/positive if positive > 0 else 0.0)
+            for p in REVENUE_STYLES}
+
+
+def bar_segments(record, groups, metric):
+    """One bar in stack order: ([(category, share [%]), ...], the unit
+    groups' net total, the total revenue [USD/hr]). The categories are the
+    unit groups, then -- operating cost only -- the '<product> revenue'
+    credits; the revenue is 0 for every other metric."""
+    shares, positive, net = breakdown_shares(record['breakdown'], groups,
+                                             metric)
+    segments = list(zip(groups, (float(s) for s in shares)))
+    if metric != OPERATING:
+        return segments, net, 0.0
+    segments += [(f'{p} revenue', s)
+                 for p, s in revenue_shares(record, positive).items()]
+    return segments, net, float(sum(record['revenue'].values()))
+
+
+def category_style(category):
+    """(face colour, hatch, hatch colour) of a unit group or revenue
+    category."""
+    if category in GROUP_STYLES:
+        return (*GROUP_STYLES[category], EDGE_COLOR)
+    return (*REVENUE_STYLES[REVENUE_CATEGORIES[category]], REVENUE_HATCH_COLOR)
 
 
 def display_total(net, metric, operating_hours):
@@ -206,29 +280,32 @@ def panel_subtitle(record):
 
 
 def y_bottom(doc):
-    """The shared y-axis floor: the most negative share of any bar, rounded
-    down to 10 % (0 when nothing is negative)."""
+    """The shared y-axis floor: the deepest negative stack of any bar -- less
+    REVENUE_LABEL_ROOM under a revenue stack, for its total -- rounded down
+    to 10 % (0 when nothing is negative)."""
     groups, low = doc['meta']['groups'], 0.0
     for key in (k for row in LAYOUT for k in row):
         for metric in doc['meta']['metrics']:
-            shares, _, _ = breakdown_shares(doc['scenarios'][key]['breakdown'],
-                                            groups, metric)
-            low = min(low, float(shares[shares < 0].sum()))
+            segments, _, revenue = bar_segments(doc['scenarios'][key], groups,
+                                                metric)
+            down = sum(s for _, s in segments if s < 0)
+            low = min(low, down - (REVENUE_LABEL_ROOM if revenue else 0.0))
     return 10.0*math.floor(low/10.0)
 
 
 def legend_groups(doc):
-    """Groups visible somewhere in the figure (|share| >= LEGEND_MIN_SHARE in
-    at least one bar), in stack order; and the omitted ones."""
+    """Categories (unit groups, then revenue credits) visible somewhere in
+    the figure (|share| >= LEGEND_MIN_SHARE in at least one bar), in stack
+    order; and the omitted ones."""
     groups, shown = doc['meta']['groups'], set()
     for key in (k for row in LAYOUT for k in row):
         for metric in doc['meta']['metrics']:
-            shares, _, _ = breakdown_shares(doc['scenarios'][key]['breakdown'],
-                                            groups, metric)
-            shown.update(g for g, s in zip(groups, shares)
-                         if abs(s) >= LEGEND_MIN_SHARE)
-    return ([g for g in groups if g in shown],
-            [g for g in groups if g not in shown])
+            segments, _, _ = bar_segments(doc['scenarios'][key], groups,
+                                          metric)
+            shown.update(c for c, s in segments if abs(s) >= LEGEND_MIN_SHARE)
+    categories = list(groups) + list(REVENUE_CATEGORIES)
+    return ([c for c in categories if c in shown],
+            [c for c in categories if c not in shown])
 
 
 def legend_columns(shown, rows=LEGEND_ROWS):
@@ -243,7 +320,7 @@ def legend_columns(shown, rows=LEGEND_ROWS):
             columns.append(chunk + [None]*(rows - len(chunk)))
     stray = [g for g in shown if not any(g in f for f in GROUP_FAMILIES)]
     if stray:
-        raise ValueError(f'unit groups in no legend family: {stray}')
+        raise ValueError(f'categories in no legend family: {stray}')
     return columns
 
 
@@ -284,18 +361,19 @@ def style_ticks(ax):
 
 
 def draw_panel(ax, record, groups, metrics, operating_hours):
-    """Five stacked bars of one scenario + their totals above the stacks."""
+    """Five stacked bars of one scenario, their unit-group totals above the
+    stacks and the total revenue under the operating-cost bar."""
     for j, metric in enumerate(metrics):
-        shares, _, net = breakdown_shares(record['breakdown'], groups, metric)
+        segments, net, revenue = bar_segments(record, groups, metric)
         up = down = 0.0
-        for group, share in zip(groups, shares):
+        for category, share in segments:
             if abs(share) < MIN_DRAWN_SHARE:
                 continue
-            color, hatch = GROUP_STYLES[group]
+            color, hatch, hatch_color = category_style(category)
             bottom = up if share > 0 else down
             ax.bar(j, share, bottom=bottom, width=BAR_WIDTH, color=color,
-                   hatch=hatch, edgecolor=EDGE_COLOR, linewidth=EDGE_WIDTH,
-                   zorder=2)
+                   hatch=hatch, hatchcolor=hatch_color, edgecolor=EDGE_COLOR,
+                   linewidth=EDGE_WIDTH, zorder=2)
             if share > 0:
                 up += share
             else:
@@ -303,6 +381,11 @@ def draw_panel(ax, record, groups, metrics, operating_hours):
         total = display_total(net, metric, operating_hours)
         ax.text(j, 100.0 + TOTAL_PAD, format_total(total), ha='center',
                 va='bottom', fontsize=FONTS['total'])
+        if revenue:
+            ax.text(j, down - TOTAL_PAD,
+                    format_total(display_total(revenue, metric,
+                                               operating_hours)),
+                    ha='center', va='top', fontsize=FONTS['total'])
     ax.axhline(0.0, color='k', linewidth=0.8, zorder=3)
     ax.set_title(record['label'], fontsize=FONTS['title'], fontweight='bold',
                  pad=18)
@@ -317,7 +400,7 @@ def make_figure(doc):
     groups, metrics = meta['groups'], meta['metrics']
     hours = meta['operating_hours']
     bottom = y_bottom(doc)
-    fig = plt.figure(figsize=(11.5, 12.8), layout='constrained')
+    fig = plt.figure(figsize=FIGSIZE, layout='constrained')
     axs = fig.subplots(len(LAYOUT), len(LAYOUT[0]), sharex=True, sharey=True)
     for row, keys in zip(axs, LAYOUT):
         for ax, key in zip(row, keys):
@@ -338,15 +421,21 @@ def make_figure(doc):
         ax.label_outer()
         ax.tick_params(labelsize=FONTS['tick'])
         ax.tick_params(axis='x', labelsize=FONTS['category'])
-    fig.supylabel('Cost and utility breakdown [%]', fontsize=FONTS['axis'])
+    fig.supylabel('Cost, utility and revenue breakdown [%]',
+                  fontsize=FONTS['axis'])
     shown, _ = legend_groups(doc)
     columns = legend_columns(shown)
-    handles = [Patch(facecolor=GROUP_STYLES[g][0], hatch=GROUP_STYLES[g][1],
-                     edgecolor=EDGE_COLOR, linewidth=EDGE_WIDTH,
-                     label=legend_label(g))
-               if g is not None else
-               Patch(facecolor='none', edgecolor='none', label=' ')
-               for column in columns for g in column]
+    handles = []
+    for column in columns:
+        for c in column:
+            if c is None:
+                handles.append(Patch(facecolor='none', edgecolor='none',
+                                     label=' '))
+                continue
+            color, hatch, hatch_color = category_style(c)
+            handles.append(Patch(facecolor=color, hatch=hatch,
+                                 hatchcolor=hatch_color, edgecolor=EDGE_COLOR,
+                                 linewidth=EDGE_WIDTH, label=legend_label(c)))
     fig.legend(handles=handles, loc='outside lower center', ncol=len(columns),
                fontsize=FONTS['legend'], frameon=False, handlelength=2.2,
                handleheight=1.3, columnspacing=1.6)
@@ -368,7 +457,10 @@ def csv_path(data_path, out_dir, record):
 def breakdown_rows(doc, key):
     """(header, rows) of one scenario's breakdown table: a row per unit group
     (stack order) with each metric in its displayed unit and its share of
-    the metric's positive total [%], then 'Total (net)' (shares blank)."""
+    the metric's positive total [%]; a row per '<product> revenue' credit
+    (SIGNED as drawn: -revenue in the operating-cost columns, the other
+    metrics blank); 'Total (net)' (the unit-group sum; shares blank); and
+    'Total revenue' (the credits' sum, operating cost only)."""
     meta = doc['meta']
     groups, metrics = meta['groups'], meta['metrics']
     hours = meta['operating_hours']
@@ -378,15 +470,27 @@ def breakdown_rows(doc, key):
               + [f'{m} share [% of positive total]' for m in metrics])
     values, shares, nets = {}, {}, {}
     for m in metrics:
-        s, _, net = breakdown_shares(record['breakdown'], groups, m)
+        s, positive, net = breakdown_shares(record['breakdown'], groups, m)
         shares[m] = s
         nets[m] = display_total(net, m, hours)
         values[m] = [display_total(record['breakdown'][g][m], m, hours)
                      for g in groups]
+        if m == OPERATING:
+            revenue_share = revenue_shares(record, positive)
     rows = [[g] + [values[m][i] for m in metrics]
             + [float(shares[m][i]) for m in metrics]
             for i, g in enumerate(groups)]
+
+    def operating_only(value):
+        return [value if m == OPERATING else '' for m in metrics]
+    for product, share in revenue_share.items():
+        credit = display_total(-record['revenue'][product], OPERATING, hours)
+        rows.append([f'{product} revenue'] + operating_only(credit)
+                    + operating_only(share))
     rows.append(['Total (net)'] + [nets[m] for m in metrics]
+                + ['']*len(metrics))
+    revenue = display_total(-sum(record['revenue'].values()), OPERATING, hours)
+    rows.append(['Total revenue'] + operating_only(revenue)
                 + ['']*len(metrics))
     return header, rows
 
@@ -418,6 +522,17 @@ def print_summary(doc):
             cells.append(f'{format_total(display_total(net, m, hours)):>13}')
         print(f'{r["label"] + " (" + panel_subtitle(r) + ")":<34}'[:34]
               + ''.join(cells))
+    products = list(REVENUE_STYLES)
+    print(f'\n{"revenue [MM$/y], % of it":<34}{"total":>13}'
+          + ''.join(f'{p:>12}' for p in products))
+    for key in (k for row in LAYOUT for k in row):
+        r = doc['scenarios'][key]
+        total = sum(r['revenue'].values())
+        cells = [f'{format_total(100*r["revenue"][p]/total)} %' if total
+                 else '—' for p in products]
+        print(f'{r["label"]:<34}'[:34]
+              + f'{format_total(display_total(total, OPERATING, hours)):>13}'
+              + ''.join(f'{c:>12}' for c in cells))
     _, omitted = legend_groups(doc)
     if omitted:
         print(f'not in the legend (|share| < {LEGEND_MIN_SHARE} % in every '
