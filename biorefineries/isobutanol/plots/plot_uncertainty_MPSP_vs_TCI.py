@@ -122,9 +122,11 @@ N_MINOR_PER_MAJOR = 4 # minor ticks between adjacent major ticks, both axes
 # - low end, ~40 MGY: Kurambhatti et al. (2019) report $83.95 million for the
 #   conventional dry-grind process at 40.2 million gal/yr, a TCI (direct fixed
 #   capital + working capital at 5 % of DFC)
-# - high end, ~61 MGY: Tanzil et al. (2021) model a typical mill producing
-#   230 ML/yr (~60.8 MGY) at a capital cost of $115 million
-TYPICAL_CORN_ETHANOL_TCI = (84.0, 115.0) # MM$
+# - high end: $135 million, from U.S. DOE EERE (2010), Current State of the
+#   U.S. Ethanol Industry, https://www1.eere.energy.gov/bioenergy/pdfs/
+#   current_state_of_the_us_ethanol_industry.pdf (raised from Tanzil et al.
+#   (2021)'s $115 million for a typical 230 ML/yr (~60.8 MGY) mill)
+TYPICAL_CORN_ETHANOL_TCI = (84.0, 135.0) # MM$
 # the ethanol range is a band in a light shade of the baseline grey of
 # plots/plot_kin_opt_parameter_sets.py (BASELINE_COLOR); the gasoline range,
 # which almost coincides with it, is two dashed lines in a dark shade of the
