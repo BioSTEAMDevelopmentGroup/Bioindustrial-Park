@@ -15,8 +15,11 @@ converts USD/hr -> MM$/y; (3) an all-zero metric gives zero shares, not NaN;
 (6) the shared y floor and the legend omission of an invisible group;
 (7) legend columns keep each family in its own padded columns;
 (8) load_breakdowns refuses wrong units / an unstyled group / a missing
-panel; (9) main() renders PNG + PDF. Exit 0 + ALL 9 CHECKS PASSED = clean."""
+panel; (9) main() renders PNG + PDF; (10) the per-scenario breakdown CSVs
+(names, shape, displayed units, net-total row, shares). Exit 0 + ALL 10
+CHECKS PASSED = clean."""
 import os
+import csv
 import sys
 import json
 import math
@@ -187,6 +190,38 @@ def check_9():
         for ext in ('.png', '.pdf'):
             assert os.path.getsize(base + ext) > 0, base + ext
 CHECK('main() renders PNG + PDF from a synthetic document', check_9)
+
+
+def check_10():
+    with tempfile.TemporaryDirectory() as tmp:
+        data = os.path.join(tmp, 'tea_breakdowns_split12d_X.json')
+        paths = ptb.write_breakdown_csvs(doc, data, tmp)
+        names = sorted(os.path.basename(p) for p in paths)
+        assert len(paths) == 9, names
+        assert 'tea_breakdowns_split12d_X_baseline.csv' in names, names
+        assert 'tea_breakdowns_split12d_X_flagship_trial102.csv' in names, names
+        with open(os.path.join(tmp, 'tea_breakdowns_split12d_X_flagship_trial102.csv'),
+                  newline='') as f:
+            rows = list(csv.reader(f))
+        header, body = rows[0], rows[1:]
+        assert header[0] == 'Unit group' and len(header) == 1 + 2*len(METRICS)
+        assert 'Operating cost [MM$/yr]' in header, header
+        assert [r[0] for r in body] == GROUPS + ['Total (net)'], [r[0] for r in body]
+        j = header.index('Operating cost [MM$/yr]')
+        i = GROUPS.index('boiler')
+        want = bd['boiler']['Operating cost']*HOURS/1e6
+        assert abs(float(body[i][j]) - want) < 1e-12, (body[i][j], want)
+        for m in METRICS:
+            col = header.index(f'{m} [{ptb.DISPLAY_UNITS[m]}]')
+            net = sum(float(r[col]) for r in body[:-1])
+            assert abs(float(body[-1][col]) - net) <= 1e-9*abs(net), (m, net)
+            s = [float(r[header.index(f'{m} share [% of positive total]')])
+                 for r in body[:-1]]
+            assert abs(sum(x for x in s if x > 0) - 100.0) < 1e-9, (m, sum(s))
+        assert body[-1][1 + len(METRICS):] == ['']*len(METRICS)
+    return f'{len(paths)} CSVs x {len(body)} rows'
+CHECK('per-scenario breakdown CSVs: names, shape, units, totals, shares',
+      check_10)
 
 
 if failures:

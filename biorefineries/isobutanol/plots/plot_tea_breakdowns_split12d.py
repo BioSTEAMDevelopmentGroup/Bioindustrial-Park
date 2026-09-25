@@ -26,9 +26,15 @@ imports the biorefineries package, never load()s. Run:
     python plots/plot_tea_breakdowns_split12d.py [--data <json>] [--out-dir DIR]
 
 --data defaults to the newest analyses/results/tea_breakdowns_split12d_*.json.
-Writes <stem>_<stamp>.png and .pdf to --out-dir (default analyses/results).
+Writes <stem>_<stamp>.png and .pdf to --out-dir (default analyses/results),
+and one breakdown CSV per scenario named after the data file,
+<data stem>_<key>[_trial<N>].csv (rows = the unit groups in stack order +
+'Total (net)'; columns = each metric in its displayed unit, then each
+group's share of the metric's positive total [%]); re-running on the same
+data overwrites them.
 """
 import os
+import csv
 import glob
 import json
 import math
@@ -58,6 +64,10 @@ LAYOUT = (('baseline', 'profitability', 'flagship'),
 #: factor to the displayed unit; operating cost USD/hr -> MM$/y is applied
 #: separately because it needs the operating hours)
 OPERATING = 'Operating cost'
+#: displayed unit per metric (plain ASCII, for the CSV headers)
+DISPLAY_UNITS = {'Installed equipment cost': 'MM$', 'Cooling duty': 'GJ/hr',
+                 'Heating duty': 'GJ/hr', 'Electricity consumption': 'MW',
+                 OPERATING: 'MM$/yr'}
 METRIC_SPECS = {
     'Installed equipment cost': ('Installed\nequipment\ncost\n[MM\\$]', 'MM$'),
     'Cooling duty': ('Cooling\nduty\n[$\\mathrm{GJ·h}^{-1}$]', 'GJ/hr'),
@@ -347,6 +357,54 @@ def make_figure(doc):
     return fig
 
 
+def csv_path(data_path, out_dir, record):
+    """<data stem>_<key>[_trial<N>].csv in `out_dir`."""
+    stem = os.path.splitext(os.path.basename(data_path))[0]
+    trial = record['trial_number']
+    suffix = record['key'] + ('' if trial is None else f'_trial{trial}')
+    return os.path.join(out_dir, f'{stem}_{suffix}.csv')
+
+
+def breakdown_rows(doc, key):
+    """(header, rows) of one scenario's breakdown table: a row per unit group
+    (stack order) with each metric in its displayed unit and its share of
+    the metric's positive total [%], then 'Total (net)' (shares blank)."""
+    meta = doc['meta']
+    groups, metrics = meta['groups'], meta['metrics']
+    hours = meta['operating_hours']
+    record = doc['scenarios'][key]
+    header = (['Unit group']
+              + [f'{m} [{DISPLAY_UNITS[m]}]' for m in metrics]
+              + [f'{m} share [% of positive total]' for m in metrics])
+    values, shares, nets = {}, {}, {}
+    for m in metrics:
+        s, _, net = breakdown_shares(record['breakdown'], groups, m)
+        shares[m] = s
+        nets[m] = display_total(net, m, hours)
+        values[m] = [display_total(record['breakdown'][g][m], m, hours)
+                     for g in groups]
+    rows = [[g] + [values[m][i] for m in metrics]
+            + [float(shares[m][i]) for m in metrics]
+            for i, g in enumerate(groups)]
+    rows.append(['Total (net)'] + [nets[m] for m in metrics]
+                + ['']*len(metrics))
+    return header, rows
+
+
+def write_breakdown_csvs(doc, data_path, out_dir):
+    """One CSV per scenario (LAYOUT order); returns the paths."""
+    paths = []
+    for key in (k for row in LAYOUT for k in row):
+        path = csv_path(data_path, out_dir, doc['scenarios'][key])
+        header, rows = breakdown_rows(doc, key)
+        with open(path, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(header)
+            writer.writerows(rows)
+        paths.append(path)
+    return paths
+
+
 def print_summary(doc):
     meta = doc['meta']
     groups, metrics, hours = meta['groups'], meta['metrics'], meta['operating_hours']
@@ -385,6 +443,9 @@ def main(argv=None):
     fig.savefig(base + '.pdf')
     plt.close(fig)
     print(f'wrote {base}.png / .pdf')
+    csvs = write_breakdown_csvs(doc, path, args.out_dir)
+    print(f'wrote {len(csvs)} breakdown CSVs: '
+          f'{os.path.join(args.out_dir, os.path.basename(csvs[0]))} ...')
     return base
 
 
