@@ -118,9 +118,13 @@ TCI_AXIS_LIMITS = (75.0, 200.0) # MM$
 TCI_TICK_STEP = 25.0 # MM$
 N_MINOR_PER_MAJOR = 4 # minor ticks between adjacent major ticks, both axes
 # the ethanol market band spans only the typical total capital investment of a
-# corn ethanol biorefinery
-# TODO: cite the source of the 100-150 MM$ typical corn-ethanol TCI range
-TYPICAL_CORN_ETHANOL_TCI = (100.0, 150.0) # MM$
+# conventional dry-grind corn ethanol biorefinery:
+# - low end, ~40 MGY: Kurambhatti et al. (2019) report $83.95 million for the
+#   conventional dry-grind process at 40.2 million gal/yr, a TCI (direct fixed
+#   capital + working capital at 5 % of DFC)
+# - high end, ~61 MGY: Tanzil et al. (2021) model a typical mill producing
+#   230 ML/yr (~60.8 MGY) at a capital cost of $115 million
+TYPICAL_CORN_ETHANOL_TCI = (84.0, 115.0) # MM$
 # the ethanol range is a band in a light shade of the baseline grey of
 # plots/plot_kin_opt_parameter_sets.py (BASELINE_COLOR); the gasoline range,
 # which almost coincides with it, is two dashed lines in a dark shade of the
