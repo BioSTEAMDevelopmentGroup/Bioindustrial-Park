@@ -70,8 +70,8 @@ K13_SWEEP_CSV = os.path.join(RESULTS_DIR, 'evaluate_k13_flagship_optimum.csv')
 OUT_DIR = os.path.join(RESULTS_DIR, 'publication', 'Objective-landscape')
 FONTS = k13p.FONTS
 PI_COLOR, YIELD_COLOR = k13p.PI_COLOR, k13p.YIELD_COLOR
-RATE = r'($\mathrm{g·L}^{-1}·\mathrm{h}^{-1}$)'
-CONC = r'($\mathrm{g·L}^{-1}$)'
+RATE = r'[$\mathrm{g·L}^{-1}·\mathrm{h}^{-1}$]'
+CONC = r'[$\mathrm{g·L}^{-1}$]'
 
 # decision variable -> (axis title, short title for the overview panels)
 AXIS_LABELS = {
@@ -282,7 +282,7 @@ def screen(dpi):
         ax.set_visible(False)
     fig.text(0.01, 0.5, 'Profitability index', color=PI_COLOR, rotation=90,
              va='center', fontsize=11)
-    fig.text(0.99, 0.5, r'Isobutanol yield ($\mathrm{g·g}^{-1}$)',
+    fig.text(0.99, 0.5, r'Isobutanol yield [$\mathrm{g·g}^{-1}$]',
              color=YIELD_COLOR, rotation=270, va='center', ha='right',
              fontsize=11)
     out = os.path.join(OUT_DIR, 'axis_flagship_screen')
@@ -369,9 +369,9 @@ def plot_param(param, dpi, stem=None, product='isobutanol', irr=True):
         ax.set_xscale('log')
     ax.set_xlim(x_lo, x_hi)
     ax.set_xlabel(AXIS_LABELS[param][0], fontsize=FONTS['axis_title'])
-    ax.set_ylabel('Profitability index (PI)', fontsize=FONTS['axis_title'],
+    ax.set_ylabel('Profitability index at 15% IRR', fontsize=FONTS['axis_title'],
                   color=PI_COLOR)
-    ax_r.set_ylabel(yield_label + r' ($\mathrm{g·g}^{-1}$)',
+    ax_r.set_ylabel(yield_label + r' [$\mathrm{g·g}^{-1}$]',
                     fontsize=FONTS['axis_title'], rotation=270, labelpad=16,
                     color=YIELD_COLOR)
     y_top = np.nanmax(Y)
@@ -381,7 +381,7 @@ def plot_param(param, dpi, stem=None, product='isobutanol', irr=True):
     ax.set_ylim(min(pi_lo - pad, -pad), pi_hi + 1.5*pad)
     aligned = False
     if irr:
-        ax_irr.set_ylabel('Internal rate of return, IRR (%)',
+        ax_irr.set_ylabel('IRR [%]',
                           fontsize=FONTS['axis_title'], rotation=270,
                           labelpad=16, color=IRR_COLOR)
         aligned = align_irr_axis(ax, ax_irr, IRR)
