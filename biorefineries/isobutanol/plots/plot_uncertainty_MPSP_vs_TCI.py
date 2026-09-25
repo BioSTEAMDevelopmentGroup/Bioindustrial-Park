@@ -39,7 +39,9 @@ Panel A also carries a light grey band for the ethanol market price range
 gasoline price range (GASOLINE_PRICE_RANGE). Panel B carries a box in the
 same grey spanning a typical corn ethanol biorefinery's ethanol production
 (TYPICAL_CORN_ETHANOL_PRODUCTION) and TCI (TYPICAL_CORN_ETHANOL_TCI), also
-unlabelled.
+unlabelled. Panel C carries one spanning the ethanol yield and titer
+reported for very-high-gravity fermentation (VHG_ETHANOL_YIELD,
+VHG_ETHANOL_TITER).
 
 Every panel also carries the Pareto frontier of its samples as a solid red
 staircase, in the sense set by the panel's `pareto` entry: A lower-left (MPSP
@@ -173,6 +175,18 @@ TYPICAL_CORN_ETHANOL_TCI = tuple(
     for v, year in TYPICAL_CORN_ETHANOL_TCI_SOURCE) # MM$ (2023$): ~110.3, ~195.6
 # typical dry-grind corn ethanol biorefinery capacity, for panel B's box
 TYPICAL_CORN_ETHANOL_PRODUCTION = (40.0, 60.0) # MM gal/y
+# ethanol yield and titer reported for (very) high-gravity S. cerevisiae
+# fermentation, for panel C's box:
+# - Gomes, D. et al. Very High Gravity Bioethanol Revisited: Main Challenges
+#   and Advances. Fermentation 7, 38 (2021).
+# - Deparis, Q., Claes, A., Foulquie-Moreno, M. R. & Thevelein, J. M.
+#   Engineering tolerance to industrially relevant stress factors in yeast
+#   cell factories. FEMS Yeast Res. 17 (2017).
+# - Tsegaye, K. N., Alemnew, M. & Berhane, N. Saccharomyces cerevisiae for
+#   lignocellulosic ethanol production: a look at key attributes and genome
+#   shuffling. Front. Bioeng. Biotechnol. 12, 1466644 (2024).
+VHG_ETHANOL_YIELD = (0.42, 0.48) # g/g
+VHG_ETHANOL_TITER = (126.0, 142.0) # g/L
 # the ethanol range is a band in a light shade of the baseline grey of
 # plots/plot_kin_opt_parameter_sets.py (BASELINE_COLOR); the gasoline range,
 # which almost coincides with it, is two dashed lines in a dark shade of the
@@ -206,7 +220,8 @@ PANELS = (
     dict(x='EtOH yield', y='EtOH titer', color=PURPLE, pareto=('max', 'max'),
          xlabel=r'Ethanol yield [$\mathrm{g·g}^{-1}$ sugars]',
          ylabel=r'Ethanol titer [$\mathrm{g·L}^{-1}$]',
-         xlim=(0.40, 0.50), ylim=(80.0, 140.0)),
+         xlim=(0.40, 0.50), ylim=(80.0, 150.0),
+         box=(VHG_ETHANOL_YIELD, VHG_ETHANOL_TITER)),
     dict(x='DDGS revenue', y='EtOH revenue', color=YELLOW, pareto=('max', 'max'),
          xlabel=r'DDGS sale revenue [$\mathrm{MM\$·y}^{-1}$]',
          ylabel=r'Ethanol sale revenue [$\mathrm{MM\$·y}^{-1}$]',
