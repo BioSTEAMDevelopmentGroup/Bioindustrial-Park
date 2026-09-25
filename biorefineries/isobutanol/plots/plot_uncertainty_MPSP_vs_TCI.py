@@ -20,7 +20,8 @@ written by analyses/full/uncertainties_IBO_EtOH.py):
      revenues (exact: the model's tea.sales is the sum of those four)
   D  empty (a fourth distribution will be added)
 
-Every joint panel: every Monte Carlo sample as a teal dot at 25 % opacity,
+Every joint panel, in its own hue (A teal, B purple, C yellow): every Monte
+Carlo sample as a dot at 25 % opacity,
 the baseline (the 'initial' row of the companion *_0_baseline.xlsx) as a
 white diamond (unlabelled: name it in the caption), contour lines of a
 Gaussian KDE enclosing 5 / 25 / 50 / 75 / 95 % of the samples (the
@@ -90,6 +91,10 @@ PARETO_LS = (0, (4, 2))
 # the TRY-informed profitability campaign's teal (RELAY_COLOR in
 # plots/plot_kin_opt_parameter_sets.py)
 TEAL = '#0B6E7A'
+# panels B and C: the ethanol-yield purple and ethanol-titer yellow of that
+# figure's hue palette (HUE_COLORS[4], HUE_COLORS[5])
+PURPLE = '#a280b9'
+YELLOW = '#f3c354'
 SAMPLE_ALPHA = 0.25   # joint-panel samples: 75 % transparent
 SAMPLE_SIZE = 6 # pt^2
 
@@ -100,12 +105,12 @@ def _mix(color, other, t):
     return to_hex((1 - t)*a + t*b)
 
 
-BOX_FACE = TEAL
-BOX_EDGE = _mix(TEAL, 'black', 0.5)
+# each panel has one hue: samples and box faces in it, box edges / whiskers
+# and the KDE contour lines in a dark shade of it (dark_shade)
+dark_shade = lambda color: _mix(color, 'black', 0.5)
 BOX_MEDIAN = 'black'
-# KDE contour lines: share of samples each encloses, drawn in dark teal
+# KDE contour lines: share of samples each encloses
 CONTOUR_SHARES = (0.05, 0.25, 0.50, 0.75, 0.95)
-CONTOUR_COLOR = BOX_EDGE
 CONTOUR_LW = 1.0
 INK = '#0b0b0b'
 
@@ -165,7 +170,7 @@ BOX_PERCENTILES = {'whis': (5, 95), 'dots': (1, 99)}
 
 # the joint panels of the 2 x 2 grid, row-major (the fourth cell is left empty
 # for now): (x outcome, y outcome) keyed by _outcomes' names, axis titles, and
-# fixed axis ticks / limits (neither = 'nice' ticks enclosing the samples and
+# panel hue, fixed axis ticks / limits (neither = 'nice' ticks enclosing the samples and
 # the baseline)
 PANELS = (
     dict(x='TCI', y='MPSP',
@@ -173,11 +178,11 @@ PANELS = (
          ylabel=r'Minimum ethanol selling price [$\mathrm{\$·GGE}^{-1}$]',
          xticks=np.arange(TCI_AXIS_LIMITS[0], TCI_AXIS_LIMITS[1] + TCI_TICK_STEP/2,
                           TCI_TICK_STEP),
-         ylim=MPSP_AXIS_LIMITS, market=True, pareto=True),
-    dict(x='EtOH yield', y='EtOH titer',
+         ylim=MPSP_AXIS_LIMITS, market=True, pareto=True, color=TEAL),
+    dict(x='EtOH yield', y='EtOH titer', color=PURPLE,
          xlabel=r'Ethanol yield [$\mathrm{g·g}^{-1}$ sugars]',
          ylabel=r'Ethanol titer [$\mathrm{g·L}^{-1}$]'),
-    dict(x='DDGS revenue', y='EtOH revenue',
+    dict(x='DDGS revenue', y='EtOH revenue', color=YELLOW,
          xlabel=r'DDGS sale revenue [$\mathrm{MM\$·yr}^{-1}$]',
          ylabel=r'Ethanol sale revenue [$\mathrm{MM\$·yr}^{-1}$]'),
 )
@@ -256,10 +261,10 @@ def nice_ticks(values, nbins=7):
                  (ticks >= values.max()).nonzero()[0][0] + 1]
 
 
-def draw_samples(ax, x, y):
+def draw_samples(ax, x, y, color):
     # every sample; rasterized so the PDF stays small (axes, text and the
     # baseline marker stay vector)
-    ax.scatter(x, y, s=SAMPLE_SIZE, color=TEAL, alpha=SAMPLE_ALPHA, lw=0,
+    ax.scatter(x, y, s=SAMPLE_SIZE, color=color, alpha=SAMPLE_ALPHA, lw=0,
                rasterized=True, zorder=2)
 
 
@@ -285,7 +290,7 @@ def draw_pareto_frontier(ax, x, y):
     return fx, fy
 
 
-def draw_hdr_contours(ax, x, y, n_grid=300, pad=0.15):
+def draw_hdr_contours(ax, x, y, color, n_grid=300, pad=0.15):
     """KDE contour lines enclosing CONTOUR_SHARES of the samples (unlabelled:
     name the shares in the caption)."""
     kde = stats.gaussian_kde(np.vstack([x, y]))
@@ -297,22 +302,23 @@ def draw_hdr_contours(ax, x, y, n_grid=300, pad=0.15):
     # the region holding share p is {density >= the (1 - p) quantile of the
     # density at the samples}; larger share -> lower level
     levels = {np.quantile(at_samples, 1 - p): p for p in CONTOUR_SHARES}
-    ax.contour(GX, GY, Z, levels=sorted(levels), colors=CONTOUR_COLOR,
+    ax.contour(GX, GY, Z, levels=sorted(levels), colors=dark_shade(color),
                     linewidths=CONTOUR_LW, zorder=3)
 
 
-def draw_box(ax, values, orientation):
+def draw_box(ax, values, orientation, color):
+    edge = dark_shade(color)
     lo_w, hi_w = BOX_PERCENTILES['whis']
     ax.boxplot(values, whis=[lo_w, hi_w], orientation=orientation,
                widths=0.6, showfliers=False, patch_artist=True,
-               boxprops={'facecolor': BOX_FACE, 'edgecolor': BOX_EDGE, 'linewidth': 1.0},
+               boxprops={'facecolor': color, 'edgecolor': edge, 'linewidth': 1.0},
                medianprops={'color': BOX_MEDIAN, 'linewidth': 1.4},
-               whiskerprops={'color': BOX_EDGE, 'linewidth': 0.8},
-               capprops={'color': BOX_EDGE, 'linewidth': 0.8})
+               whiskerprops={'color': edge, 'linewidth': 0.8},
+               capprops={'color': edge, 'linewidth': 0.8})
     dots = np.percentile(values, BOX_PERCENTILES['dots'])
     ones = np.ones_like(dots)
     xy = (dots, ones) if orientation == 'horizontal' else (ones, dots)
-    ax.plot(*xy, 'o', ms=5, mfc=BOX_FACE, mec='none', clip_on=False)
+    ax.plot(*xy, 'o', ms=5, mfc=color, mec='none', clip_on=False)
     ax.set_axis_off()
 
 
@@ -349,8 +355,8 @@ def draw_joint_panel(fig, cell, panel, samples, base, letter):
                         color=MARKET_BAND_COLOR, lw=0, zorder=0)
         for price in GASOLINE_PRICE_RANGE:
             ax.axhline(price, color=GASOLINE_LINE_COLOR, zorder=1, **GASOLINE_LINE_STYLE)
-    draw_samples(ax, x, y)
-    draw_hdr_contours(ax, x, y)
+    draw_samples(ax, x, y, panel['color'])
+    draw_hdr_contours(ax, x, y, panel['color'])
     if panel.get('pareto'):
         fx, fy = draw_pareto_frontier(ax, x, y)
         print(f'  Pareto frontier: {fx.size} non-dominated samples, '
@@ -367,8 +373,8 @@ def draw_joint_panel(fig, cell, panel, samples, base, letter):
     ax.xaxis.set_minor_locator(AutoMinorLocator(N_MINOR_PER_MAJOR + 1))
     ax.yaxis.set_minor_locator(AutoMinorLocator(N_MINOR_PER_MAJOR + 1))
 
-    draw_box(ax_top, x, 'horizontal')
-    draw_box(ax_right, y, 'vertical')
+    draw_box(ax_top, x, 'horizontal', panel['color'])
+    draw_box(ax_right, y, 'vertical', panel['color'])
     ax_top.set_ylim(0.4, 1.6)
     ax_right.set_xlim(0.4, 1.6)
     # panel letter in the cell's top-left corner, above the y-axis title
