@@ -15,10 +15,10 @@ analyses/full/uncertainties_IBO_EtOH.py).
 
 Joint panel: every Monte Carlo sample as a teal dot at 25 % opacity and the
 baseline (the 'initial' row of the companion *_0_baseline.xlsx) as a white
-diamond (unlabelled: name it in the caption), over two translucent grey
-bands, the ethanol market price range (ETHANOL_MARKET_RANGE, lighter) and the
-gasoline price range (GASOLINE_PRICE_RANGE, darker; darkest where they
-overlap), with contour lines
+diamond (unlabelled: name it in the caption), over a light grey band for the
+ethanol market price range (ETHANOL_MARKET_RANGE) and dark grey dashed lines
+at the ends of the gasoline price range (GASOLINE_PRICE_RANGE), with contour
+lines
 of a Gaussian KDE enclosing 5 / 25 / 50 / 75 / 95 % of the samples (the
 highest-density regions; each line is the density quantile AT the samples,
 so it holds that share of them). Marginal box plots
@@ -111,13 +111,14 @@ ETHANOL_MARKET_RANGE = tuple(v / GGE_PER_GAL for v in ETHANOL_MARKET_RANGE_PER_G
 # (a gallon of gasoline is 1 GGE by definition)
 GASOLINE_PRICE_RANGE = (2.16, 4.84) # $/GGE
 MPSP_AXIS_LIMITS = (0.0, 6.0) # $/GGE
-# both bands are the baseline grey of plots/plot_kin_opt_parameter_sets.py
-# (BASELINE_COLOR) laid over white at an opacity, so where they overlap the
-# grey stacks: ethanol-only 30 % (the old light shade), gasoline-only 50 %
-# (darker), overlap 1 - 0.7*0.5 = 65 %. Both unlabelled, named in the caption.
+# the ethanol range is a band in a light shade of the baseline grey of
+# plots/plot_kin_opt_parameter_sets.py (BASELINE_COLOR); the gasoline range,
+# which almost coincides with it, is two dashed lines in a dark shade of the
+# same grey. Both unlabelled, named in the caption.
 BASELINE_GRAY = '#90918e'
-ETHANOL_BAND_ALPHA = 0.3
-GASOLINE_BAND_ALPHA = 0.5
+MARKET_BAND_COLOR = _mix(BASELINE_GRAY, 'white', 0.7)
+GASOLINE_LINE_COLOR = _mix(BASELINE_GRAY, 'black', 0.45)
+GASOLINE_LINE_STYLE = dict(lw=1.0, ls=(0, (5, 3)))
 BOX_PERCENTILES = {'whis': (5, 95), 'dots': (1, 99)}
 
 
@@ -286,10 +287,9 @@ def plot_uncertainty_MPSP_vs_TCI(results_file=None, baseline_file=None,
         raise ValueError(f'MPSP_AXIS_LIMITS {MPSP_AXIS_LIMITS} clip samples '
                          f'({mpsp.min():.3g}-{mpsp.max():.3g} $/GGE)')
     xlim, ylim = (xticks[0], xticks[-1]), (yticks[0], yticks[-1])
-    ax.axhspan(*ETHANOL_MARKET_RANGE, color=BASELINE_GRAY,
-               alpha=ETHANOL_BAND_ALPHA, lw=0, zorder=0)
-    ax.axhspan(*GASOLINE_PRICE_RANGE, color=BASELINE_GRAY,
-               alpha=GASOLINE_BAND_ALPHA, lw=0, zorder=0)
+    ax.axhspan(*ETHANOL_MARKET_RANGE, color=MARKET_BAND_COLOR, lw=0, zorder=0)
+    for price in GASOLINE_PRICE_RANGE:
+        ax.axhline(price, color=GASOLINE_LINE_COLOR, zorder=1, **GASOLINE_LINE_STYLE)
     draw_samples(ax, tci, mpsp)
     draw_hdr_contours(ax, tci, mpsp, xlim, ylim)
     if base:
