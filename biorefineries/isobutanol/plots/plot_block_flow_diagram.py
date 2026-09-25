@@ -14,7 +14,7 @@ ethanol-isobutanol block flow diagram (fermentation process on top,
 separation process below, cream / light-blue panel tints, italic
 underlined boundary streams, bold products, dashed co-production units):
 
-* **a** — fermentation process: the saccharified slurry from the corn
+* **A** — fermentation process: the saccharified slurry from the corn
   dry-grind process is split between the initial-feed and spike-feed
   trains (multi-effect evaporation ``F301`` / ``F302``, dilution-water
   mixing ``M301`` / ``M302``), fermented in the aerated fermentor
@@ -22,7 +22,7 @@ underlined boundary streams, bold products, dashed co-production units):
   compressed air ``K330``, seed yeast), and the fermentation off-gas is
   scrubbed (``V409``) so the stripped alcohols rejoin the broth (``MX8``)
   ahead of the separation process.
-* **b** — separation process of the default build at its baseline gate
+* **B** — separation process of the default build at its baseline gate
   (``S201.split = 1.0``: all broth to the solvent-free IBO/EtOH train of
   ``separations.create_IBO_EtOH_separation_system``): beer column
   (``D101``) -> ethanol rectifier (``D102``) -> molecular sieves
@@ -49,7 +49,8 @@ solubles; WWT, wastewater treatment (also defined in the legend).
 Standalone on purpose: imports only matplotlib (NOT
 ``biorefineries.isobutanol``), so it runs no simulation and touches no
 numba cache. Sized to the 180 mm double-column width; Arial embedded as
-TrueType (fonttype 42); text 6-7 pt, panel letters 8 pt bold.
+TrueType (fonttype 42); text 6-7 pt, panel letters 8 pt bold (capitals,
+as in the reference).
 
 Run::
 
@@ -241,10 +242,10 @@ A_Y0, A_Y1 = 93.5, 158.0     # panel a vertical extent (mm)
 def draw_panel_a(d):
     ax = d.ax
     panel_background(ax, 0, A_Y0, FIG_W, A_Y1, C_FERM_BG)
-    panel_title(ax, A_Y1, 'a', 'Fermentation process')
+    panel_title(ax, A_Y1, 'A', 'Fermentation process')
 
     fill = C_FERM_BOX
-    y_top, y_bot = 130.0, 108.0          # the two feed trains
+    y_top, y_bot = 132.0, 110.0          # the two feed trains
     y_mid = (y_top + y_bot) / 2
     bh = 10.0
 
@@ -267,10 +268,10 @@ def draw_panel_a(d):
     gap = 4.5
     d.stream([(ev1['cx'], ev1['t']), (ev1['cx'], ev1['t'] + gap)])
     d.boundary_label(ev1['cx'], ev1['t'] + gap + 0.8,
-                     'water & other volatiles', va='bottom')
+                     'water & other\nvolatiles (to WWT)', va='bottom')
     d.stream([(ev2['cx'], ev2['b']), (ev2['cx'], ev2['b'] - gap)])
     d.boundary_label(ev2['cx'], ev2['b'] - gap - 0.8,
-                     'water & other volatiles', va='top')
+                     'water & other\nvolatiles (to WWT)', va='top')
     d.stream([(mx1['cx'], mx1['t'] + gap), (mx1['cx'], mx1['t'])])
     d.boundary_label(mx1['cx'], mx1['t'] + gap + 0.8, 'dilution water',
                      va='bottom')
@@ -280,7 +281,7 @@ def draw_panel_a(d):
 
     # fermentation: initial feed straight into the left side, spike feed
     # from below
-    fe = d.box(116, 124.0, 25, 16, 'fermentation\n(fed-batch\nor batch)', fill)
+    fe = d.box(116, 126.0, 25, 16, 'fermentation\n(fed-batch\nor batch)', fill)
     d.stream([(mx1['r'], y_top), (fe['l'], y_top)])
     d.label((mx1['r'] + fe['l']) / 2, y_top + 1.9, 'initial feed')
     x_spike = fe['l'] + 5.0
@@ -309,7 +310,7 @@ def draw_panel_a(d):
     d.stream([(vs['r'], vs['cy']), (vs['r'] + 4.5, vs['cy'])])
     d.boundary_label(vs['r'] + 5.3, vs['cy'], 'scrubbed\ngases', ha='left')
 
-    sep = d.box(167.0, fe['cy'], 19, 12, 'Separation\nprocess\n(to b)',
+    sep = d.box(167.0, fe['cy'], 19, 12, 'Separation\nprocess\n(to B)',
                 C_SEP_BOX, bold=True)
     d.stream([(fe['r'], fe['cy']), (sep['l'], fe['cy'])])
     d.label((fe['r'] + vs['cx']) / 2, fe['cy'] - 5.0,
@@ -329,7 +330,7 @@ B_Y0, B_Y1 = 13.0, 92.0
 def draw_panel_b(d):
     ax = d.ax
     panel_background(ax, 0, B_Y0, FIG_W, B_Y1, C_SEP_BG)
-    panel_title(ax, B_Y1, 'b', 'Separation process')
+    panel_title(ax, B_Y1, 'B', 'Separation process')
 
     fill = C_SEP_BOX
     bh = 10.0
@@ -342,7 +343,7 @@ def draw_panel_b(d):
         d.stream([(unit['r'], y), (x_prod - 1.5, y)])
 
     # ---- row 1: ethanol ---------------------------------------------------
-    fp = d.box(14, r1, 19, bh + 1, 'Fermentation\nprocess\n(from a)',
+    fp = d.box(14, r1, 19, bh + 1, 'Fermentation\nprocess\n(from A)',
                C_FERM_BOX, bold=True)
     bc = d.box(x1, r1, 18, bh, 'distillation\n(beer column)', fill)
     rc = d.box(x2, r1, 18, bh, 'distillation\n(rectifier)', fill)
