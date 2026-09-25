@@ -13,9 +13,9 @@ written by analyses/full/uncertainties_IBO_EtOH.py):
 
   A  purity-adjusted ethanol MPSP (y, converted from the workbook's $/kg to
      $/GGE, see USD_PER_KG_TO_USD_PER_GGE) vs total capital investment (x)
-  B  ethanol production (y, million gal of pure ethanol per year: the
-     purity-adjusted production rate / ETHANOL_DENSITY_KG_PER_L / L_PER_GAL)
-     vs total capital investment (x)
+  B  total capital investment (y) vs ethanol production (x, million gal of
+     pure ethanol per year: the purity-adjusted production rate /
+     ETHANOL_DENSITY_KG_PER_L / L_PER_GAL)
   C  ethanol titer (y, g/L-water) vs ethanol yield (x, g/g sugars added)
   D  ethanol sale revenue (y) vs DDGS sale revenue (x), MM$/y at the default
      product prices; ethanol revenue is not a workbook column and is derived
@@ -193,10 +193,10 @@ PANELS = (
          ylabel=r'Minimum ethanol selling price [$\mathrm{\$·GGE}^{-1}$]',
          xticks=TCI_TICKS,
          ylim=MPSP_AXIS_LIMITS, market=True, pareto=('min', 'min'), color=TEAL),
-    dict(x='TCI', y='EtOH production', color=GREEN, pareto=('min', 'max'),
-         xlabel='Total capital investment [MM\\$]',
-         ylabel=r'Ethanol production [$\mathrm{MM\ gal·y}^{-1}$]',
-         xticks=TCI_TICKS),
+    dict(x='EtOH production', y='TCI', color=GREEN, pareto=('max', 'min'),
+         xlabel=r'Ethanol production [$\mathrm{MM\ gal·y}^{-1}$]',
+         ylabel='Total capital investment [MM\\$]',
+         yticks=TCI_TICKS),
     dict(x='EtOH yield', y='EtOH titer', color=PURPLE, pareto=('max', 'max'),
          xlabel=r'Ethanol yield [$\mathrm{g·g}^{-1}$ sugars]',
          ylabel=r'Ethanol titer [$\mathrm{g·L}^{-1}$]',
