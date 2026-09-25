@@ -55,7 +55,7 @@ MPSP_COL = ('Biorefinery', 'Purity-adjusted ethanol MPSP [$/kg]')
 TCI_COL = ('Biorefinery', 'Total capital investment [10^6 $]')
 
 FONT_FAMILY = 'Arial'
-FONTS = {'tick': 12, 'axis_title': 12, 'band_label': 10}
+FONTS = {'tick': 12, 'axis_title': 12}
 TICK_LEN = {'major': 4.0, 'minor': 2.0} # pt; left/bottom ticks extend this far in AND out
 
 # the TRY-informed profitability campaign's teal (RELAY_COLOR in
@@ -78,14 +78,16 @@ BOX_FACE = TEAL
 BOX_EDGE = _mix(TEAL, 'black', 0.5)
 BOX_MEDIAN = 'black'
 INK = '#0b0b0b'
-INK_SECONDARY = '#52514e'
 
 # ethanol market price range, the same one analyses/full/uncertainties_IBO_EtOH.py
 # draws on its MPSP box plot: Jan 2021 - Dec 2025 five-year low and high,
 # 1.5475 and 3.4500 $/gal / (3.7854 L/gal * 0.789 kg/L), from
 # https://tradingeconomics.com/commodity/ethanol
 ETHANOL_MARKET_RANGE = (0.52, 1.15) # $/kg
-MARKET_BAND_COLOR = '#e4e4e2'
+# a light shade of the baseline grey of plots/plot_kin_opt_parameter_sets.py
+# (BASELINE_COLOR); the band is unlabelled, named in the caption
+BASELINE_GRAY = '#90918e'
+MARKET_BAND_COLOR = _mix(BASELINE_GRAY, 'white', 0.7)
 BOX_PERCENTILES = {'whis': (5, 95), 'dots': (1, 99)}
 
 
@@ -214,9 +216,6 @@ def plot_uncertainty_MPSP_vs_TCI(results_file=None, baseline_file=None,
     yticks = nice_ticks(np.concatenate([mpsp, ETHANOL_MARKET_RANGE]))
     xlim, ylim = (xticks[0], xticks[-1]), (yticks[0], yticks[-1])
     ax.axhspan(*ETHANOL_MARKET_RANGE, color=MARKET_BAND_COLOR, lw=0, zorder=0)
-    ax.text(0.03, ETHANOL_MARKET_RANGE[1], 'Market price range',
-            transform=ax.get_yaxis_transform(), ha='left', va='top',
-            fontsize=FONTS['band_label'], color=INK_SECONDARY, zorder=6)
     draw_density(ax, tci, mpsp, xlim, ylim)
     if base:
         ax.plot(*base, 'D', ms=8, mfc='w', mec=INK, mew=1.2, zorder=5)
