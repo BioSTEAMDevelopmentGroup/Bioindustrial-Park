@@ -226,10 +226,8 @@ def panel_background(ax, x0, y0, x1, y1, color):
 
 
 def panel_title(ax, y1, letter, title):
-    ax.text(2.5, y1 - 3.2, letter, fontsize=FS_PANEL, fontweight='bold',
-            va='center')
-    ax.text(6.0, y1 - 3.2, title, fontsize=FS_PANEL, fontweight='bold',
-            va='center')
+    ax.text(2.5, y1 - 3.2, f'{letter} {title}', fontsize=FS_PANEL,
+            fontweight='bold', va='center')
 
 
 # --------------------------------------------------------------------------
@@ -242,7 +240,7 @@ A_Y0, A_Y1 = 93.5, 158.0     # panel a vertical extent (mm)
 def draw_panel_a(d):
     ax = d.ax
     panel_background(ax, 0, A_Y0, FIG_W, A_Y1, C_FERM_BG)
-    panel_title(ax, A_Y1, 'A', 'Fermentation process')
+    panel_title(ax, A_Y1, 'A.', 'Fermentation process')
 
     fill = C_FERM_BOX
     y_top, y_bot = 132.0, 110.0          # the two feed trains
@@ -330,7 +328,7 @@ B_Y0, B_Y1 = 13.0, 92.0
 def draw_panel_b(d):
     ax = d.ax
     panel_background(ax, 0, B_Y0, FIG_W, B_Y1, C_SEP_BG)
-    panel_title(ax, B_Y1, 'B', 'Separation process')
+    panel_title(ax, B_Y1, 'B.', 'Separation process')
 
     fill = C_SEP_BOX
     bh = 10.0
