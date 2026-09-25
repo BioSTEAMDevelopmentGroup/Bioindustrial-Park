@@ -12,13 +12,13 @@ the total capital investment (x), from an uncertainty-analysis results
 workbook (*_1_full_evaluation.xlsx as written by
 analyses/full/uncertainties_IBO_EtOH.py).
 
-Joint panel: every Monte Carlo sample as a teal dot at 50 % opacity and the
+Joint panel: every Monte Carlo sample as a teal dot at 25 % opacity and the
 baseline (the 'initial' row of the companion *_0_baseline.xlsx) as a white
 diamond (unlabelled: name it in the caption), over a light grey band showing
 the ethanol market price range (ETHANOL_MARKET_RANGE). Marginal box plots
 outside the panel: box = 25th-75th percentile, line = median, whiskers = 5th-95th
 percentile (the whis=[5, 95] of contourplots.box_and_whiskers_plot), dots =
-1st and 99th percentiles.
+every sample beyond the whiskers (10 % of them), at 50 % opacity.
 
 Sim-safe: pure pandas/matplotlib/scipy, never imports biorefineries.
 
@@ -60,7 +60,8 @@ TICK_LEN = {'major': 4.0, 'minor': 2.0} # pt; left/bottom ticks extend this far 
 # the TRY-informed profitability campaign's teal (RELAY_COLOR in
 # plots/plot_kin_opt_parameter_sets.py)
 TEAL = '#0B6E7A'
-SAMPLE_ALPHA = 0.5
+SAMPLE_ALPHA = 0.25   # joint-panel samples: 75 % transparent
+OUTLIER_ALPHA = 0.5   # box-plot outlier dots: 50 % transparent
 SAMPLE_SIZE = 6 # pt^2
 
 
@@ -84,7 +85,7 @@ ETHANOL_MARKET_RANGE = (0.52, 1.15) # $/kg
 # (BASELINE_COLOR); the band is unlabelled, named in the caption
 BASELINE_GRAY = '#90918e'
 MARKET_BAND_COLOR = _mix(BASELINE_GRAY, 'white', 0.7)
-BOX_PERCENTILES = {'whis': (5, 95), 'dots': (1, 99)}
+BOX_WHISKER_PERCENTILES = (5, 95)
 
 
 def apply_font_rcparams():
@@ -156,17 +157,17 @@ def draw_samples(ax, x, y):
 
 
 def draw_box(ax, values, orientation):
-    lo_w, hi_w = BOX_PERCENTILES['whis']
-    ax.boxplot(values, whis=[lo_w, hi_w], orientation=orientation,
-               widths=0.6, showfliers=False, patch_artist=True,
+    # whiskers at the 5th/95th percentiles; every sample beyond them is an
+    # outlier dot
+    ax.boxplot(values, whis=list(BOX_WHISKER_PERCENTILES), orientation=orientation,
+               widths=0.6, showfliers=True, patch_artist=True,
                boxprops={'facecolor': BOX_FACE, 'edgecolor': BOX_EDGE, 'linewidth': 1.0},
                medianprops={'color': BOX_MEDIAN, 'linewidth': 1.4},
                whiskerprops={'color': BOX_EDGE, 'linewidth': 0.8},
-               capprops={'color': BOX_EDGE, 'linewidth': 0.8})
-    dots = np.percentile(values, BOX_PERCENTILES['dots'])
-    ones = np.ones_like(dots)
-    xy = (dots, ones) if orientation == 'horizontal' else (ones, dots)
-    ax.plot(*xy, 'o', ms=5, mfc=BOX_FACE, mec='none', clip_on=False)
+               capprops={'color': BOX_EDGE, 'linewidth': 0.8},
+               flierprops={'marker': 'o', 'markersize': 4, 'markerfacecolor': TEAL,
+                           'markeredgecolor': 'none', 'alpha': OUTLIER_ALPHA,
+                           'clip_on': False, 'rasterized': True})
     ax.set_axis_off()
 
 
