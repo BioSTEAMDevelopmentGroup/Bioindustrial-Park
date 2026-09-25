@@ -15,7 +15,10 @@ analyses/full/uncertainties_IBO_EtOH.py).
 Joint panel: every Monte Carlo sample as a teal dot at 25 % opacity and the
 baseline (the 'initial' row of the companion *_0_baseline.xlsx) as a white
 diamond (unlabelled: name it in the caption), over a light grey band showing
-the ethanol market price range (ETHANOL_MARKET_RANGE). Marginal box plots
+the ethanol market price range (ETHANOL_MARKET_RANGE), with contour lines
+of a Gaussian KDE enclosing 5 / 25 / 50 / 75 / 95 % of the samples (the
+highest-density regions; each line is the density quantile AT the samples,
+so it holds that share of them). Marginal box plots
 outside the panel: box = 25th-75th percentile, line = median, whiskers = 5th-95th
 percentile (the whis=[5, 95] of contourplots.box_and_whiskers_plot), dots =
 1st and 99th percentiles.
@@ -54,7 +57,7 @@ MPSP_COL = ('Biorefinery', 'Purity-adjusted ethanol MPSP [$/kg]')
 TCI_COL = ('Biorefinery', 'Total capital investment [10^6 $]')
 
 FONT_FAMILY = 'Arial'
-FONTS = {'tick': 12, 'axis_title': 12}
+FONTS = {'tick': 12, 'axis_title': 12, 'clabel': 10}
 TICK_LEN = {'major': 4.0, 'minor': 2.0} # pt; left/bottom ticks extend this far in AND out
 
 # the TRY-informed profitability campaign's teal (RELAY_COLOR in
@@ -73,6 +76,14 @@ def _mix(color, other, t):
 BOX_FACE = TEAL
 BOX_EDGE = _mix(TEAL, 'black', 0.5)
 BOX_MEDIAN = 'black'
+# KDE contour lines: share of samples each encloses, drawn in dark teal
+CONTOUR_SHARES = (0.05, 0.25, 0.50, 0.75, 0.95)
+CONTOUR_COLOR = BOX_EDGE
+CONTOUR_LW = 1.0
+# on-screen bearing [deg] from the density peak at which each contour is
+# labelled: the inner contours are too close together to label along one ray,
+# so the labels alternate sides (and keep clear of the baseline marker)
+CONTOUR_LABEL_BEARINGS = {0.05: 0, 0.25: 180, 0.50: 15, 0.75: 180, 0.95: -60}
 INK = '#0b0b0b'
 
 # ethanol market price range, the same one analyses/full/uncertainties_IBO_EtOH.py
@@ -155,6 +166,45 @@ def draw_samples(ax, x, y):
                rasterized=True, zorder=2)
 
 
+def draw_hdr_contours(ax, x, y, xlim, ylim, n_grid=300, pad=0.15):
+    """KDE contour lines enclosing CONTOUR_SHARES of the samples, labelled
+    inline with the share, each where its contour crosses the ray from the
+    density peak at that share's CONTOUR_LABEL_BEARINGS angle (on screen)."""
+    kde = stats.gaussian_kde(np.vstack([x, y]))
+    dx, dy = np.ptp(x), np.ptp(y)
+    GX, GY = np.meshgrid(np.linspace(x.min() - pad*dx, x.max() + pad*dx, n_grid),
+                         np.linspace(y.min() - pad*dy, y.max() + pad*dy, n_grid))
+    Z = kde(np.vstack([GX.ravel(), GY.ravel()])).reshape(GX.shape)
+    at_samples = kde(np.vstack([x, y]))
+    # the region holding share p is {density >= the (1 - p) quantile of the
+    # density at the samples}; larger share -> lower level
+    levels = {np.quantile(at_samples, 1 - p): p for p in CONTOUR_SHARES}
+    cs = ax.contour(GX, GY, Z, levels=sorted(levels), colors=CONTOUR_COLOR,
+                    linewidths=CONTOUR_LW, zorder=3)
+
+    # label positions: per level, the contour vertex whose on-screen bearing
+    # from the peak is closest to the ray (axes size in inches converts the
+    # data offsets to screen proportions)
+    i_peak = np.unravel_index(np.argmax(Z), Z.shape)
+    px, py = GX[i_peak], GY[i_peak]
+    fig_w, fig_h = ax.figure.get_size_inches()
+    box = ax.get_position()
+    sx = box.width*fig_w/(xlim[1] - xlim[0])
+    sy = box.height*fig_h/(ylim[1] - ylim[0])
+    positions = []
+    for lev, segs in zip(cs.levels, cs.allsegs):
+        ray = np.deg2rad(CONTOUR_LABEL_BEARINGS[levels[lev]])
+        verts = np.concatenate([seg for seg in segs if len(seg)])
+        bearing = np.arctan2((verts[:, 1] - py)*sy, (verts[:, 0] - px)*sx)
+        k = np.argmin(np.abs(np.angle(np.exp(1j*(bearing - ray)))))
+        positions.append(tuple(verts[k]))
+    labels = ax.clabel(cs, fmt={lev: f'{round(100*p)}%' for lev, p in levels.items()},
+                       manual=positions, fontsize=FONTS['clabel'], inline=True,
+                       inline_spacing=3)
+    for t in labels:
+        t.set_color(INK)
+
+
 def draw_box(ax, values, orientation):
     lo_w, hi_w = BOX_PERCENTILES['whis']
     ax.boxplot(values, whis=[lo_w, hi_w], orientation=orientation,
@@ -206,6 +256,7 @@ def plot_uncertainty_MPSP_vs_TCI(results_file=None, baseline_file=None,
     xlim, ylim = (xticks[0], xticks[-1]), (yticks[0], yticks[-1])
     ax.axhspan(*ETHANOL_MARKET_RANGE, color=MARKET_BAND_COLOR, lw=0, zorder=0)
     draw_samples(ax, tci, mpsp)
+    draw_hdr_contours(ax, tci, mpsp, xlim, ylim)
     if base:
         ax.plot(*base, 'D', ms=8, mfc='w', mec=INK, mew=1.2, zorder=5)
     ax.set_xticks(xticks)
@@ -214,7 +265,7 @@ def plot_uncertainty_MPSP_vs_TCI(results_file=None, baseline_file=None,
     ax.set_ylim(*ylim)
     ax.set_xlabel('Total capital investment [MM\\$]',
                   fontsize=FONTS['axis_title'])
-    ax.set_ylabel('Minimum ethanol selling price\n'
+    ax.set_ylabel('Minimum ethanol selling price '
                   r'[$\mathrm{\$·kg}^{-1}$]', fontsize=FONTS['axis_title'])
     ax.xaxis.set_minor_locator(AutoMinorLocator(2))
     ax.yaxis.set_minor_locator(AutoMinorLocator(2))
