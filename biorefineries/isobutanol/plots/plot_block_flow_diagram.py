@@ -309,7 +309,7 @@ def draw_panel_a(d):
     d.stream([(vs['r'], vs['cy']), (vs['r'] + 4.5, vs['cy'])])
     d.boundary_label(vs['r'] + 5.3, vs['cy'], 'scrubbed\ngases', ha='left')
 
-    sep = d.box(169.5, fe['cy'], 19, 12, 'Separation\nprocess\n(to b)',
+    sep = d.box(167.0, fe['cy'], 19, 12, 'Separation\nprocess\n(to b)',
                 C_SEP_BOX, bold=True)
     d.stream([(fe['r'], fe['cy']), (sep['l'], fe['cy'])])
     d.label((fe['r'] + vs['cx']) / 2, fe['cy'] - 5.0,
