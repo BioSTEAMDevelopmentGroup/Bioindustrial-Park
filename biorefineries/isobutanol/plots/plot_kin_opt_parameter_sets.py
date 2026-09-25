@@ -60,23 +60,27 @@ study preloaded with rows of the six process-level rs350 campaigns;
 metabolic_split_12d campaign with >= 2000 trials and the most recent relay
 (default_split_12d_specs / default_relay_spec). Each run writes three figure
 variants (--variants selects a subset):
-  overview    A  outcome trajectories of the seven regular campaigns; the
-                 IRR cell also marks each campaign's highest-IRR trial (open
-                 circle);
-              B  proteome allocation, one row per regular set (no relay);
-  parameters  the final kinetic and process parameters of every set, the
-              relay campaign included;
-  relay       (only with a relay) the overview's layout for the relay:
-              A  panel A's grid for the relay campaign alone, on the
-                 overview's value axes. Every cell's preload zone (trials
-                 0..N-1, shaded light grey) shows the preloaded donor rows in
-                 their donor campaign's colour, in shuffled order; the IRR
-                 cell also marks the seed (the best preloaded row, the
-                 relay's incumbent when its first simulated trial starts) and
-                 the relay's own highest-IRR simulated trial as open
-                 circles; the incumbent line starts at N;
-              B  the overview's proteome allocation plus the relay row (last).
-              The relay's legend line says what it was seeded with.
+  profitability  A  two IRR cells side by side on one value axis: the
+                    financial (Profitability) campaign and the flagship
+                    (relay) campaign, each with the baseline reference line
+                    and its highest-IRR trial circled. The flagship cell's
+                    preload zone (trials 0..N-1, shaded light grey) shows the
+                    preloaded donor rows in their donor campaign's colour, in
+                    shuffled order, and also circles the seed (the best
+                    preloaded row, the relay's incumbent when its first
+                    simulated trial starts) and every process-level
+                    campaign's highest-IRR trial that was preloaded; its
+                    incumbent line starts at N. No other outcome;
+                 B  proteome allocation of every set, the relay row last;
+  process        A  the six process-level outcomes (isobutanol yield /
+                    titer / productivity, then ethanol) in a 2x3 grid: each
+                    owning campaign's incumbent solid with its trial cloud,
+                    every other campaign's -- the financial and flagship
+                    ones included -- dashed. No IRR cell;
+                 B  as in profitability;
+  parameters     the final kinetic and process parameters of every set, the
+                 relay campaign included.
+The relay's legend line says what it was seeded with.
 Writes <stem>_<variant>_<stamp>.png and .pdf to --out-dir.
 """
 import os
@@ -424,9 +428,11 @@ PRELOAD_SHUFFLE_SEED = 0
 PRELOAD_ZONE_COLOR = '0.96'
 PRELOAD_ZONE_ALPHA = 0.5
 # figure variants written by one run (main --variants; default all three):
-# the panel-A + proteome overview, the standalone final-parameters figure and
-# the standalone relay-trajectory figure (file stems <stem>_<variant>_<stamp>)
-FIGURE_VARIANTS = ('overview', 'parameters', 'relay')
+# the two two-panel figures -- panel A the IRR trajectories of the financial
+# and flagship (relay) campaigns, or the six process-level trajectories; panel
+# B the proteome allocation of every set -- and the standalone
+# final-parameters figure (file stems <stem>_<variant>_<stamp>)
+FIGURE_VARIANTS = ('profitability', 'process', 'parameters')
 
 FONTS = {'band': 12, 'cell': 10, 'tick': 9, 'callout': 9,
          'legend': 10, 'axis': 11, 'panel': 14}
@@ -1467,7 +1473,7 @@ def _draw_best_irr_marks(ax, sets, colors):
 
 
 def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9,
-                 donor_sets=None, mark_best=False):
+                 donor_sets=None, mark_best=False, x_major=None):
     """One outcome metric as incumbent trajectories over trial_number: one
     step line per campaign set (the metric at that set's running incumbent,
     in its panel-b/c color), the scenario-A baseline as a dashed reference.
@@ -1475,7 +1481,8 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9,
     donor_sets (panel c): the plotted campaigns, so a relay's preloaded rows
     are drawn in its owned cell in their donor's colour (_draw_relay_preload);
     None keeps them hidden. mark_best (panel a): on the IRR cell, mark every
-    campaign's highest-IRR trial.
+    campaign's highest-IRR trial. x_major: the trial-axis major step (default
+    500 on the IRR cell, 1000 elsewhere).
     """
     lo, hi = ylim
 
@@ -1560,7 +1567,9 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9,
     ax.set_xlabel(_bold_axis_title('Trial'), fontsize=FONTS['tick'], labelpad=2)
     # the wide IRR cell fits five majors (0..2000 by 500); the narrow cells
     # take three (0, 1000, 2000). Four minor ticks sit between each major pair.
-    ax.xaxis.set_major_locator(MultipleLocator(500 if col == 'IRR' else 1000))
+    if x_major is None:
+        x_major = 500 if col == 'IRR' else 1000
+    ax.xaxis.set_major_locator(MultipleLocator(x_major))
     ax.xaxis.set_minor_locator(AutoMinorLocator(5))
     ax.yaxis.set_major_locator(MultipleLocator(step))
     if col == 'IRR':   # fraction stored; show the value axis in percent
@@ -1583,38 +1592,70 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9,
     _inward_top_right_ticks(ax, do_x=True, do_y=True)
 
 
-def draw_outcomes(fig, gs_cell, sets, colors, donor_sets=None,
-                  mark_best=False):
-    # mark_best reaches only the IRR cell; donor_sets (panel c) reaches every
-    # cell, which then draws the relay's preloaded rows (outcome_cell)
+# the profitability variant's two IRR cells sit side by side in panel a; this
+# wspace makes each the size of the retired 3x4 grid's big IRR cell (2 of 4
+# columns at wspace 0.62) while leaving the right cell's ylabel ~0.9 in
+IRR_PAIR_WSPACE = 0.24
+# the process variant's 2x3 grid (row 1 isobutanol, row 2 ethanol)
+PROCESS_GRID_WSPACE = 0.36
+PROCESS_GRID_HSPACE = 0.62
+
+
+def _trial_xmax(sets):
+    """The shared trial-axis extent: the last incumbent trial of any set."""
     xmax = 1.0
     for s in sets:
         tx = s.get('traj_x')
         if tx is not None and len(tx):
             xmax = max(xmax, float(tx[-1]))
-    # 3x4 grid: IRR (the headline outcome) fills the left 3x2 block and is the
-    # largest cell; the remaining six outcomes fill the right two columns
-    # product-by-product -- the isobutanol metrics (yield, titer, productivity)
-    # down column 3, the ethanol metrics down column 4, each top-to-bottom.
-    sub_gs = gs_cell.subgridspec(3, 4, wspace=0.62, hspace=0.62)
+    return xmax
+
+
+def draw_irr_pair(fig, gs_cell, cells, colors, xmax, donor_sets):
+    """Panel a of the profitability variant: one IRR cell per (title, sets)
+    entry of `cells`, side by side on a SHARED value axis. A relay set's cell
+    draws its preloaded donor rows in their donor's colour (donor_sets); every
+    cell circles its own campaign's highest-IRR trial (and, for a relay, the
+    preloaded seed / donor best-IRR trials)."""
+    col, label, yl = OUTCOMES[0]
+    sub_gs = gs_cell.subgridspec(1, max(len(cells), 2),
+                                 wspace=IRR_PAIR_WSPACE)
     axes = []
-    big, rest = OUTCOMES[0], OUTCOMES[1:]
-    ax_big = fig.add_subplot(sub_gs[0:3, 0:2])
-    outcome_cell(ax_big, sets, colors, big[0], big[1], big[2], xmax,
-                 donor_sets=donor_sets, mark_best=mark_best)
-    axes.append(ax_big)
-    big_w = ax_big.get_position().width
-    for (col, label, yl), (r, c) in zip(rest,
-                                        ((0, 2), (1, 2), (2, 2),
-                                         (0, 3), (1, 3), (2, 3))):
+    for i, (title, cell_sets) in enumerate(cells):
+        ax = fig.add_subplot(sub_gs[0, i])
+        relay = any(s.get('is_relay') for s in cell_sets)
+        outcome_cell(ax, cell_sets, colors, col, label, yl, xmax,
+                     donor_sets=donor_sets if relay else None,
+                     mark_best=True)
+        ax.set_title(title, fontsize=FONTS['cell'] + 1, fontweight='bold',
+                     pad=5)
+        axes.append(ax)
+    top = max(ax.get_ylim()[1] for ax in axes)
+    for ax in axes:
+        ax.set_ylim(yl[0], top)
+    return axes
+
+
+def draw_process_outcomes(fig, gs_cell, sets, colors, xmax):
+    """Panel a of the process variant: the six process-level outcomes in a
+    2x3 grid -- the isobutanol metrics (yield, titer, productivity) across
+    row 1, the ethanol metrics across row 2, mirroring the campaign legend.
+    Every cell draws every campaign's incumbent (the owner thick and solid
+    with its trial cloud, the rest dashed, the profitability and flagship
+    campaigns included)."""
+    sub_gs = gs_cell.subgridspec(2, 3, wspace=PROCESS_GRID_WSPACE,
+                                 hspace=PROCESS_GRID_HSPACE)
+    # the trial-cloud marker AREA scales with (cell width / big IRR cell
+    # width)^2, the big IRR cell (the profitability variant's) as reference
+    ref_w = gs_cell.get_position(fig).width / (2 + IRR_PAIR_WSPACE)
+    axes = []
+    for (col, label, yl), (r, c) in zip(OUTCOMES[1:],
+                                        ((0, 0), (0, 1), (0, 2),
+                                         (1, 0), (1, 1), (1, 2))):
         ax = fig.add_subplot(sub_gs[r, c])
-        # these cells are ~0.38x the linear size of the IRR cell (1 of 4 columns
-        # vs 2 columns + a wspace), so shrink the trial-cloud marker to match:
-        # scale its AREA by (cell width / IRR width)^2, i.e. its diameter by the
-        # linear ratio, from the actual rendered widths (robust to layout tweaks)
-        ratio = ax.get_position().width / big_w
+        ratio = ax.get_position().width / ref_w
         outcome_cell(ax, sets, colors, col, label, yl, xmax,
-                     point_size=9 * ratio ** 2, donor_sets=donor_sets)
+                     point_size=9 * ratio ** 2, x_major=500)
         axes.append(ax)
     return axes
 
@@ -2005,63 +2046,91 @@ def _legend_order(sets):
     return sets
 
 
-def plot(sets, band, out_stem, dpi=300, params_only=False, relay_view=False):
-    """The two-panel figure (overview): panel A the outcome trajectories,
-    panel B the proteome allocation. relay_view: the relay figure -- panel a
-    shows the relay campaign's trajectories (plot_relay_trajectories) and
-    panel b's proteome allocation adds the relay row; otherwise the relay
-    campaign is left out of both panels (the overview). params_only: the
-    standalone final-parameters figure (_plot_parameters_only)."""
+def plot(sets, band, out_stem, dpi=300, params_only=False,
+         view='profitability'):
+    """A two-panel figure: panel A outcome trajectories, panel B the proteome
+    allocation of EVERY set (the regular campaigns in order, the relay
+    campaign(s) last). view picks panel A:
+
+      'profitability'  two IRR cells side by side on one value axis: the
+                       financial campaign(s) (the regular sets owning the IRR
+                       cell) and the relay (flagship) campaign(s), each with
+                       the baseline reference line and its highest-IRR trial
+                       circled; the relay cell shows its preloaded donor rows
+                       in their donor's colour. No other outcome.
+      'process'        the six process-level outcomes (2x3: isobutanol row,
+                       ethanol row), every campaign's incumbent in every cell
+                       -- the owner solid with its trial cloud, the others
+                       (the profitability and flagship campaigns included)
+                       dashed. No IRR cell.
+
+    params_only: the standalone final-parameters figure
+    (_plot_parameters_only). Returns out_stem, or None (writing nothing) for
+    a profitability view with no financial or relay campaign among the
+    sets."""
     apply_fonts()
     LEFT, RIGHT = 0.083, 0.97
     if params_only:
         return _plot_parameters_only(sets, band, out_stem, dpi)
-    # panel a's IRR cell marks the other campaigns' highest-IRR trials (a
-    # fourth mark-key entry when any exist)
+    if view not in ('profitability', 'process'):
+        raise ValueError(f'unknown two-panel view {view!r}')
     relay_sets = [s for s in sets if s.get('is_relay')]
-    has_best_marks = bool(best_irr_points(sets))
-    # panel A on top, the proteome-allocation panel B below it; the a -> b gap
-    # carries the framed campaign legend + mark key.
-    # A relay campaign (is_relay) is left out of the overview entirely. In
-    # the relay figure (relay_view) panel a holds the relay's trajectories
-    # instead of the regular campaigns', and the relay takes the last
-    # proteome row and a legend line. Every layout fraction below is
-    # written for the 9.856-in canvas (H0) and mapped by fy(), which keeps
-    # each position's distance from the TOP edge in inches.
     a_sets = [s for s in sets if not s.get('is_relay')]
-    key_relay = relay_sets if relay_view else []
-    # arrange the swatches into a product-grouped grid that mirrors panel a:
-    # row 1 the isobutanol metrics, row 2 the ethanol metrics, columns reading
-    # yield -> titer -> productivity, with the baseline and the financial
-    # campaign leading column 1. fig.legend fills column-major, so the two
-    # rows are interleaved into the handle order; falls back to the natural
-    # set order whenever the expected labels aren't all present.
-    # (the relay campaign(s) get their own full-width line below the grid)
+    base_sets = [s for s in a_sets if s.get('is_baseline')]
+    fin_sets = [s for s in a_sets if not s.get('is_baseline')
+                and _owns_outcome(s.get('objective'), 'IRR')]
+    if view == 'profitability':
+        cells = []
+        if fin_sets:
+            cells.append((' + '.join(s['label'] for s in fin_sets),
+                          base_sets + fin_sets))
+        if relay_sets:
+            cells.append((' + '.join(s['label'] for s in relay_sets),
+                          base_sets + relay_sets))
+        if not cells:
+            return None
+        # every cell circles its own campaign's highest-IRR trial; only the
+        # owning campaign is drawn, so there are no dashed "other" lines
+        has_best_marks = True
+        has_other = False
+    else:
+        has_best_marks = False
+        has_other = True
+    # panel A on top, the proteome-allocation panel B below it; the a -> b gap
+    # carries the framed campaign legend + mark key. Every layout fraction
+    # below is written for the 9.856-in canvas (H0) and mapped by fy(), which
+    # keeps each position's distance from the TOP edge in inches.
+    # arrange the swatches into a product-grouped grid: row 1 the isobutanol
+    # metrics, row 2 the ethanol metrics, columns reading yield -> titer ->
+    # productivity, with the baseline and the financial campaign leading
+    # column 1. fig.legend fills column-major, so the two rows are interleaved
+    # into the handle order; falls back to the natural set order whenever the
+    # expected labels are not all present. The relay campaign(s) get their
+    # own full-width line below the grid.
     legend_sets = _legend_order(a_sets)
     H0 = 9.856
     # the framed key in the a -> b gap = the campaign grid (<= 4 columns),
     # one full-width line per relay campaign (its long "seeded with ..."
-    # label would blow up a grid column), and the mark key (two rows when
-    # the highest-IRR circle adds a fourth entry). Each row beyond the
-    # original 2 + 1 grows the key downward by one row height: the legend
-    # top stays put, the mark key and panel b move down by `extra`. The
-    # campaign-legend rows spill into the spare canvas below panel b's
-    # x-axis title (as before); the extra mark-key row grows the canvas.
+    # label would blow up a grid column), and the one-row mark key. Each row
+    # beyond the original 2 + 1 grows the key downward by one row height: the
+    # legend top stays put, the mark key and panel b move down by `extra`
+    # (into the spare canvas below panel b's x-axis title).
     n_grid_rows = -(-len(a_sets) // min(len(a_sets), 4))
     extra_grid = LEGEND_ROW_H * max(0, n_grid_rows - 2)
-    extra_leg = LEGEND_ROW_H * max(0, n_grid_rows + len(key_relay) - 2)
-    extra_style = LEGEND_ROW_H if has_best_marks else 0.0
-    extra = extra_leg + extra_style
-    H = H0 + extra_style * H0
+    extra = LEGEND_ROW_H * max(0, n_grid_rows + len(relay_sets) - 2)
+    H = H0
 
     def fy(y):
         return 1.0 - (1.0 - y) * H0 / H
 
     fig = plt.figure(figsize=(9.5, H))
     # panel a's bottom is lifted to widen the a -> b gap enough for the one
-    # framed box that now holds both the campaign key and the mark key
+    # framed box that holds both the campaign key and the mark key. The
+    # profitability view's cells carry a title each, so its top drops by the
+    # title height to keep the panel heading clear.
+    a_top = 0.9330 - (0.024 if view == 'profitability' else 0.0)
     a_gs = fig.add_gridspec(1, 1, left=LEFT, right=RIGHT,
-                            top=fy(0.9330), bottom=fy(0.6500))
+                            top=fy(a_top), bottom=fy(0.6500))
     # panel b (proteome) is pushed down ~0.027 vs panel a's bottom to widen
     # the a -> b gap enough for the legend box to clear both panel a's x-axis
     # titles above and panel b below with ~equal margins (see the anchors)
@@ -2070,30 +2139,21 @@ def plot(sets, band, out_stem, dpi=300, params_only=False, relay_view=False):
                             bottom=fy(0.1475 - extra))
     colors = set_colors(sets)
     k = H0 / H                     # H0-canvas fraction -> this canvas
-    if relay_view:
-        # the relay alone (plus the baseline reference line); donor_sets:
-        # its preloaded rows are drawn in every cell's preload zone in
-        # their donor campaign's colour. Same value axes as the overview's
-        # panel a, so each cell reads directly against its counterpart.
-        # mark_best: the IRR cell also circles the relay's own highest-IRR
-        # simulated trial, like each campaign's in the overview
-        base_sets = [s for s in sets if s.get('is_baseline')]
-        a_axes = draw_outcomes(fig, a_gs[0], base_sets + relay_sets,
-                               colors, donor_sets=a_sets, mark_best=True)
-        for ra, (ylim, ticks) in zip(a_axes,
-                                     _panel_a_value_axes(a_sets, colors)):
-            ra.set_ylim(ylim)
-            ra.yaxis.set_major_locator(FixedLocator(ticks))
-        a_title = 'Optimization trajectories of the flagship campaign'
+    xmax = _trial_xmax(sets)
+    if view == 'profitability':
+        a_axes = draw_irr_pair(fig, a_gs[0], cells, colors, xmax,
+                               donor_sets=a_sets)
+        a_title = 'Profitability optimization trajectories'
     else:
-        a_axes = draw_outcomes(fig, a_gs[0], a_sets, colors,
-                               mark_best=True)
-        a_title = 'Optimization trajectories'
-    # proteome rows: the regular sets in order, the relay campaign(s) last
-    # (bottom row) in the relay figure
-    axc = draw_burden(fig, c_gs[0], a_sets + key_relay, colors,
+        a_axes = draw_process_outcomes(fig, a_gs[0], sets, colors, xmax)
+        a_title = 'Process-level optimization trajectories'
+    # the panel heading keeps the same height in both views (the
+    # profitability cells' titles sit in the band between it and the cells)
+    a_title_y = fy(0.9330) + 0.012 * k
+    # proteome rows: every set, the relay campaign(s) last (bottom row)
+    axc = draw_burden(fig, c_gs[0], a_sets + relay_sets, colors,
                       offset_scale=k)
-    panels = [(a_axes[0].get_position().y1 + 0.012 * k, 'A', a_title),
+    panels = [(a_title_y, 'A', a_title),
               (axc.get_position().y1 + 0.005 * k, 'B',
                'Final proteome allocation')]
     # the campaign legend sits in the a -> b gap, doubling as the row key for
@@ -2107,26 +2167,23 @@ def plot(sets, band, out_stem, dpi=300, params_only=False, relay_view=False):
     # the campaign swatches sit a little high in the panel-a -> b gap so the
     # mark key can share the same framed box just below them
     legend_anchor = (0.527, fy(0.5394 - extra_grid / 2))   # top fixed
-    style_anchor = (0.527, fy(0.4904 - extra_leg - extra_style / 2))
+    style_anchor = (0.527, fy(0.4904 - extra))
     for y, letter, title in panels:
         fig.text(0.03, y, letter, fontsize=FONTS['panel'], fontweight='bold',
                  va='baseline')
         fig.text(0.055, y, title, fontsize=FONTS['panel'] - 1,
                  fontweight='bold', va='baseline')
-    # small colour-free key for the marks in panel a: what the points and the
-    # solid vs dashed lines mean (the campaign legend gives the colours).
-    # With the highest-IRR circle the key is two rows x two columns (filled
-    # column-major): trials | own incumbent over best-IRR trial | other
-    # incumbent; without it the original single row of three
-    style_handles = _style_handles(has_best_marks)
+    # small colour-free key for the marks in panel a: what the points, open
+    # circles and lines mean (the campaign legend gives the colours), one row
+    style_handles = _style_handles(has_best_marks, has_other)
     handles = [plt.Rectangle((0, 0), 1, 1, fc=colors[id(s)], label=s['label'])
                for s in legend_sets]
     # both keys share ONE framed box in the panel-a -> b gap -- the campaign
-    # swatches on top, the relay line(s), the mark key rows below, a single
+    # swatches on top, the relay line(s), the mark key row below, a single
     # manual frame.
     style_leg = fig.legend(handles=style_handles, loc='center',
                            bbox_to_anchor=style_anchor,
-                           ncol=2 if has_best_marks else 3, frameon=False,
+                           ncol=len(style_handles), frameon=False,
                            fontsize=FONTS['legend'], handlelength=2.2,
                            handletextpad=0.5, columnspacing=1.4)
     fig.add_artist(style_leg)
@@ -2143,7 +2200,7 @@ def plot(sets, band, out_stem, dpi=300, params_only=False, relay_view=False):
     renderer = fig.canvas.get_renderer()
     inv = fig.transFigure.inverted()
     keys = [leg, style_leg]
-    if key_relay:
+    if relay_sets:
         # the relay line(s): full width, centred in the gap between the
         # campaign grid and the mark key, swatch aligned with column 1
         lb = leg.get_window_extent(renderer).transformed(inv)
@@ -2151,7 +2208,7 @@ def plot(sets, band, out_stem, dpi=300, params_only=False, relay_view=False):
         relay_handles = [
             plt.Rectangle((0, 0), 1, 1, fc=colors[id(s)],
                           label=relay_legend_label(s, a_sets))
-            for s in key_relay]
+            for s in relay_sets]
         relay_leg = fig.legend(
             handles=relay_handles, loc='center left',
             bbox_to_anchor=(lb.x0, (lb.y0 + sb.y1) / 2), ncol=1,
@@ -2182,9 +2239,10 @@ def _frame_keys(fig, keys, zorder, padx=0.014, pady=0.011):
         linewidth=1.0, zorder=zorder))
 
 
-def _style_handles(has_best_marks):
+def _style_handles(has_best_marks, has_other=True):
     """The colour-free mark key: what the points, open circles and solid vs
-    dashed lines mean."""
+    dashed lines mean. Without has_other (every cell draws only its own
+    campaign) the incumbent entry is a plain 'Incumbent'."""
     style_c = '0.30'
     handles = [
         Line2D([], [], linestyle='none', marker='o', markersize=5,
@@ -2196,45 +2254,16 @@ def _style_handles(has_best_marks):
                    markerfacecolor='white', markeredgecolor=style_c,
                    markeredgewidth=BEST_MARK_LW,
                    label='Highest-IRR trial'))
-    handles += [
-        Line2D([], [], color=style_c, lw=2.4, linestyle='-',
-               label='Incumbent (campaign optimizing the shown metric)'),
-        Line2D([], [], color=style_c, lw=1.4, linestyle=(0, (2, 1.5)),
-               label='Incumbent (other campaign)')]
+    if has_other:
+        handles += [
+            Line2D([], [], color=style_c, lw=2.4, linestyle='-',
+                   label='Incumbent (campaign optimizing the shown metric)'),
+            Line2D([], [], color=style_c, lw=1.4, linestyle=(0, (2, 1.5)),
+                   label='Incumbent (other campaign)')]
+    else:
+        handles.append(Line2D([], [], color=style_c, lw=2.4, linestyle='-',
+                              label='Incumbent'))
     return handles
-
-
-def _panel_a_value_axes(a_sets, colors):
-    """(ylim, major ticks) of each panel-a outcome cell, from a throwaway
-    render of panel a (the limits and tick steps depend only on the data), so
-    the relay figure's cells read directly against their panel-a
-    counterparts."""
-    tmp = plt.figure(figsize=(9.5, 3.0))
-    gs = tmp.add_gridspec(1, 1)
-    axes = draw_outcomes(tmp, gs[0], a_sets, colors, mark_best=True)
-    out = []
-    for aa in axes:
-        lo, hi = aa.get_ylim()
-        out.append(((lo, hi), [t for t in aa.get_yticks()
-                               if lo - 1e-12 <= t <= hi + 1e-12]))
-    plt.close(tmp)
-    return out
-
-
-def plot_relay_trajectories(sets, out_stem, dpi=300):
-    """The relay figure: the overview's two-panel layout with panel a's 3x4
-    outcome grid for the relay campaign(s) alone (plus the baseline reference
-    line), on the overview's panel-a value axes, and panel b's proteome
-    allocation of every set, the relay campaign last. Every panel-a cell's
-    preload zone (trials 0..N-1, shaded light grey) shows the preloaded donor
-    rows in their donor campaign's colour, shuffled; the IRR cell also marks
-    the seed, every campaign's highest-IRR trial that was preloaded and the
-    relay's own highest-IRR simulated trial (open circles); the incumbent line
-    starts at N. Returns None (and writes
-    nothing) when there is no relay set."""
-    if not any(s.get('is_relay') for s in sets):
-        return None
-    return plot(sets, None, out_stem, dpi=dpi, relay_view=True)
 
 
 def _plot_parameters_only(sets, band, out_stem, dpi):
@@ -2460,12 +2489,14 @@ def main(argv=None):
     ap.add_argument('--variants', nargs='+', choices=FIGURE_VARIANTS,
                     default=list(FIGURE_VARIANTS),
                     help='figure variants to write (default: all three): '
-                         'overview = panel A trajectories + panel B proteome '
-                         'allocation; parameters = the final kinetic and '
-                         'process parameters of every set, relay included; '
-                         'relay = the relay campaign\'s trajectories + the '
-                         'proteome allocation with the relay row (skipped '
-                         'without a relay set)')
+                         'profitability = panel A the IRR trajectories of '
+                         'the financial and flagship (relay) campaigns + '
+                         'panel B the proteome allocation of every set; '
+                         'process = panel A the six process-level '
+                         'trajectories (every campaign, the financial and '
+                         'flagship ones dashed) + the same panel B; '
+                         'parameters = the final kinetic and process '
+                         'parameters of every set, relay included')
     ap.add_argument('--params-only', action='store_true',
                     help='shorthand for --variants parameters')
     ap.add_argument('--pathway', action='store_true',
@@ -2475,8 +2506,9 @@ def main(argv=None):
                     default=True,
                     help='default (no --set) path only: add the PI (log-tail) '
                          'relay campaign (pinned, or the most recent with '
-                         '--latest): the last proteome and parameter row '
-                         'plus the relay figure (on by default; '
+                         '--latest): the last proteome and parameter row, '
+                         'the second IRR cell of the profitability figure '
+                         'and a dashed line in the process figure (on by default; '
                          '--no-relay drops it). With --set, a relay campaign '
                          'is recognised by its _rl tag.')
     ap.add_argument('--latest', action='store_true',
@@ -2557,13 +2589,11 @@ def main(argv=None):
         if variant not in variants:
             continue
         out_stem = os.path.join(args.out_dir, f'{stem}_{variant}_{stamp}')
-        if variant == 'overview':
-            plot(sets, band, out_stem, dpi=args.dpi)
-        elif variant == 'parameters':
+        if variant == 'parameters':
             plot(sets, band, out_stem, dpi=args.dpi, params_only=True)
-        elif plot_relay_trajectories(sets, out_stem, dpi=args.dpi) is None:
-            print('  NOTE no relay campaign among the sets; relay figure '
-                  'skipped')
+        elif plot(sets, band, out_stem, dpi=args.dpi, view=variant) is None:
+            print('  NOTE no financial or relay campaign among the sets; '
+                  'profitability figure skipped')
             continue
         written.append(out_stem)
     console_report(sets, band_campaign)
