@@ -59,9 +59,8 @@ OPTIMA = [
     ('MPSP',              'min', 'MESP',         '*', '#33ccff', 14, (12, 24),   -0.3),
 ]
 # cell density and TCI sit on the blank no-ethanol column, so their labels
-# are carried onto the orange plateau; productivity's label sits in the dark
-# high-MESP wall, hence white
-LABEL_COLOR = {'productivity': 'white'}
+# are carried onto the orange plateau
+LABEL_COLOR = {}
 
 FIGURE = ksf.SweepFigure(
     output_stem='glycolysis_inhib_ethanol_A',
