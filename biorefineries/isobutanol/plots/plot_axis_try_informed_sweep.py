@@ -15,7 +15,7 @@ Two modes:
 * --param NAME (default k_3) -- the figure: a single panel of a
   full-resolution sweep (results/evaluate_axis_try_informed_optimum_<NAME>.csv),
   in the layout of plot_k13_try_informed_sweep.py: PI on the left axis, the
-  ethanol yield on the right, the PI = 0 line drawn, any part beyond the
+  ethanol yield on the right (no PI = 0 line), any part beyond the
   campaign band shaded, the onset of burden derating marked. A third,
   outboard y axis carries the IRR (%) (--no-irr drops it), raised into the
   upper part of the panel (IRR_BAND) so it does not sit on the PI curve it
@@ -356,7 +356,6 @@ def plot_param(param, dpi, stem=None, irr=True):
         ax_r.axvspan(*spans[side], **k13p.BAND_KW)
     if x_derate is not None:
         ax.axvline(x_derate, **k13p.DERATE_KW)
-    ax.axhline(0.0, **k13p.BREAKEVEN_KW)
 
     ax_r.plot(x, Y, **YIELD_LINE_KW)
     if irr:
@@ -402,7 +401,7 @@ def plot_param(param, dpi, stem=None, irr=True):
     for label in ax.get_yticklabels() + ax_r.get_yticklabels():
         label.set_text(k13p.minus(label.get_text()))
 
-    handles = []   # the PI = 0 line is drawn but not listed
+    handles = []
     if beyond:
         handles.append(Patch(**k13p.BAND_KW, label='Beyond the campaign band'))
     if x_derate is not None:
