@@ -83,7 +83,7 @@ CONTOUR_LW = 1.0
 # on-screen bearing [deg] from the density peak at which each contour is
 # labelled: the inner contours are too close together to label along one ray,
 # so the labels alternate sides (and keep clear of the baseline marker)
-CONTOUR_LABEL_BEARINGS = {0.05: 0, 0.25: 180, 0.50: 15, 0.75: 180, 0.95: -60}
+CONTOUR_LABEL_BEARINGS = {0.05: 0, 0.25: 180, 0.50: 0, 0.75: 180, 0.95: 0}
 INK = '#0b0b0b'
 
 # ethanol market price range, the same one analyses/full/uncertainties_IBO_EtOH.py
@@ -91,6 +91,7 @@ INK = '#0b0b0b'
 # 1.5475 and 3.4500 $/gal / (3.7854 L/gal * 0.789 kg/L), from
 # https://tradingeconomics.com/commodity/ethanol
 ETHANOL_MARKET_RANGE = (0.52, 1.15) # $/kg
+MPSP_AXIS_LIMITS = (0.0, 1.2) # $/kg
 # a light shade of the baseline grey of plots/plot_kin_opt_parameter_sets.py
 # (BASELINE_COLOR); the band is unlabelled, named in the caption
 BASELINE_GRAY = '#90918e'
@@ -250,9 +251,12 @@ def plot_uncertainty_MPSP_vs_TCI(results_file=None, baseline_file=None,
     ax_top = fig.add_subplot(gs[0, 0], sharex=ax)
     ax_right = fig.add_subplot(gs[1, 1], sharey=ax)
 
-    # the y axis spans the market range too, so the band's edges are visible
+    # fixed MPSP axis from zero (spans the market band and every sample)
     xticks = nice_ticks(tci)
-    yticks = nice_ticks(np.concatenate([mpsp, ETHANOL_MARKET_RANGE]))
+    yticks = nice_ticks(np.array(MPSP_AXIS_LIMITS))
+    if not (yticks[0] <= mpsp.min() and mpsp.max() <= yticks[-1]):
+        raise ValueError(f'MPSP_AXIS_LIMITS {MPSP_AXIS_LIMITS} clip samples '
+                         f'({mpsp.min():.3g}-{mpsp.max():.3g} $/kg)')
     xlim, ylim = (xticks[0], xticks[-1]), (yticks[0], yticks[-1])
     ax.axhspan(*ETHANOL_MARKET_RANGE, color=MARKET_BAND_COLOR, lw=0, zorder=0)
     draw_samples(ax, tci, mpsp)
