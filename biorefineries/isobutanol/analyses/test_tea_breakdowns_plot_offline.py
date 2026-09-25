@@ -16,11 +16,14 @@ converts USD/hr -> MM$/y; (3) an all-zero metric gives zero shares, not NaN;
 omission of an invisible category; (7) legend columns keep each family in
 its own padded columns; (8) load_breakdowns refuses wrong units / an
 unstyled group / a missing panel / a document without (or with other)
-product revenue; (9) main() renders PNG + PDF; (10) the per-scenario
-breakdown CSVs (names, shape, displayed units, revenue rows, net-total and
-revenue-total rows, shares); (11) the operating-cost bar's revenue credits
-(order, shares of the positive cost total, AOC and the other bars
-unchanged). Exit 0 + ALL 11 CHECKS PASSED = clean."""
+product revenue / half of a merged group set; (9) main() renders PNG + PDF
+from a stage-1 (unmerged) document; (10) the per-scenario breakdown CSVs
+(names, shape, displayed units, revenue rows, net-total and revenue-total
+rows, shares); (11) the operating-cost bar's revenue credits (order, shares
+of the positive cost total, AOC and the other bars unchanged); (12) the two
+natural-gas groups merged into one category (per-metric sums, stack place,
+input untouched, idempotent, closure). Exit 0 + ALL 12 CHECKS PASSED =
+clean."""
 import os
 import csv
 import sys
@@ -38,7 +41,9 @@ ptb = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(ptb)
 
 HOURS = 8000.0
+#: drawn categories (natural gas merged) and the stage-1 unit groups
 GROUPS = list(ptb.GROUP_STYLES)
+STAGE1_GROUPS = [m for g in GROUPS for m in ptb.MERGED_GROUPS.get(g, (g,))]
 METRICS = list(ptb.METRIC_SPECS)
 UNITS = {m: u for m, (_, u) in ptb.METRIC_SPECS.items()}
 PRODUCTS = list(ptb.REVENUE_STYLES)
@@ -49,12 +54,13 @@ REVENUE = {'ethanol': 150.0, 'isobutanol': 40.0, 'DDGS': 60.0,
 
 
 def synthetic_doc(seed=0):
+    """A stage-1 document (natural gas NOT merged)."""
     rng = np.random.default_rng(seed)
     scenarios = {}
     keys = [k for row in ptb.LAYOUT for k in row]
     for n, key in enumerate(keys):
         breakdown = {}
-        for g in GROUPS:
+        for g in STAGE1_GROUPS:
             breakdown[g] = {m: float(rng.uniform(0.5, 20.0)) for m in METRICS}
         # credits: HXN savings on the duties; excess electricity ~0 everywhere
         breakdown['heat exchanger network']['Heating duty'] = -40.0
@@ -72,7 +78,7 @@ def synthetic_doc(seed=0):
             breakdown=breakdown, revenue=revenue)
     # copies: check 8 mutates its documents
     meta = dict(metrics=list(METRICS), metric_units=dict(UNITS),
-                groups=list(GROUPS), operating_hours=HOURS,
+                groups=list(STAGE1_GROUPS), operating_hours=HOURS,
                 revenue_products=list(PRODUCTS))
     return dict(meta=meta, order=keys, scenarios=scenarios)
 
@@ -91,7 +97,8 @@ def CHECK(label, fn):
               flush=True)
 
 
-doc = synthetic_doc()
+raw_doc = synthetic_doc()
+doc = ptb.merge_groups(raw_doc)      # what load_breakdowns hands the figure
 bd = doc['scenarios']['flagship']['breakdown']
 
 
@@ -215,15 +222,19 @@ def check_8():
             'corn oil')), 'record missing a product accepted'
         assert refused(lambda d: d['meta'].update(
             revenue_products=PRODUCTS[::-1])), 'other product order accepted'
+        # half of a merged set cannot be merged
+        assert refused(lambda d: d['meta']['groups'].remove(
+            'natural gas (for product drying)'), 'cannot merge'), \
+            'partial natural-gas set accepted'
 CHECK('load_breakdowns refuses wrong units / unstyled group / missing panel / '
-      'missing or other revenue', check_8)
+      'missing or other revenue / a partial merge set', check_8)
 
 
 def check_9():
     with tempfile.TemporaryDirectory() as tmp:
         path = os.path.join(tmp, 'tea_breakdowns_split12d_test.json')
         with open(path, 'w') as f:
-            json.dump(doc, f)
+            json.dump(raw_doc, f)            # stage-1 form: main() merges
         base = ptb.main(['--data', path, '--out-dir', tmp, '--dpi', '60'])
         for ext in ('.png', '.pdf'):
             assert os.path.getsize(base + ext) > 0, base + ext
@@ -310,6 +321,33 @@ def check_11():
     return f'flagship revenue stack {depth:.1f} %'
 CHECK('operating-cost bar: revenue credits after the unit groups, shares of '
       'the positive cost, AOC unchanged', check_11)
+
+
+def check_12():
+    members = ptb.MERGED_GROUPS['natural gas']
+    groups = doc['meta']['groups']
+    assert groups == GROUPS, groups              # the drawn order
+    assert groups.index('natural gas') == STAGE1_GROUPS.index(members[0])
+    for key, record in doc['scenarios'].items():
+        raw = raw_doc['scenarios'][key]['breakdown']
+        assert not any(m in record['breakdown'] for m in members), key
+        for m in METRICS:
+            want = sum(raw[g][m] for g in members)
+            assert record['breakdown']['natural gas'][m] == want, (key, m)
+    # the input is untouched; merging a merged document is a no-op
+    assert all(m in raw_doc['meta']['groups'] for m in members)
+    assert all(m in raw_doc['scenarios']['baseline']['breakdown']
+               for m in members)
+    assert ptb.merge_groups(doc) == doc
+    # the merged column still closes: net = the stage-1 unit-group sum
+    _, _, net = ptb.breakdown_shares(bd, GROUPS, OPERATING)
+    raw_bd = raw_doc['scenarios']['flagship']['breakdown']
+    ref = sum(raw_bd[g][OPERATING] for g in STAGE1_GROUPS)
+    assert abs(net - ref) < 1e-9, (net, ref)
+    assert ptb.GROUP_STYLES['natural gas'] == ('#ffffff', '\\\\\\\\')
+    return f'{len(STAGE1_GROUPS)} stage-1 groups -> {len(GROUPS)} categories'
+CHECK('natural gas merged: summed per metric at the first member\'s place, '
+      'input untouched, idempotent', check_12)
 
 
 if failures:

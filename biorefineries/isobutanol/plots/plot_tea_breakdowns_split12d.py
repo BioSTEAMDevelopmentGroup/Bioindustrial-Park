@@ -17,7 +17,9 @@ each at its objective-optimum trial. Every panel has five 100 %-stacked bars
 (the unit groups' installed equipment cost, cooling duty, heating duty,
 electricity consumption and operating cost), each group drawn as its share of
 the metric's POSITIVE total, so credits (the heat-exchanger-network savings,
-sold excess electricity) sit below zero. The operating-cost bar also carries
+sold excess electricity) sit below zero; stage 1's two natural-gas groups
+(steam generation, product drying) are drawn and tabulated as one 'natural
+gas' category (MERGED_GROUPS). The operating-cost bar also carries
 the sales revenue of the four products (ethanol, isobutanol, DDGS, corn oil;
 spec docs/superpowers/specs/2026-09-24-tea-breakdowns-revenue-design.md) as
 credits under the unit groups, on the same scale: a revenue stack deeper than
@@ -42,6 +44,7 @@ them.
 """
 import os
 import csv
+import copy
 import glob
 import json
 import math
@@ -91,7 +94,9 @@ METRIC_SPECS = {
 #: and normal-vision floors); the two past eight repeat slots 3 and 1 with a
 #: texture (never a generated ninth hue). Facilities are neutral greys, the
 #: turbogenerator sharing the boiler's grey (both are BT801) under a texture.
-#: The four cost pseudo-groups (operating cost only) are white + texture.
+#: The cost pseudo-groups (operating cost only) are white + texture; stage
+#: 1's two natural-gas groups are drawn as ONE (MERGED_GROUPS), under the
+#: texture the steam-generation share (the bulk of it) had.
 GROUP_STYLES = {
     'feedstock acquisition':              ('#2a78d6', ''),
     'feedstock saccharification':         ('#eb6834', ''),
@@ -108,10 +113,15 @@ GROUP_STYLES = {
     'turbogenerator':                     ('#8a8984', '////'),
     'cooling utility facilities':         ('#c3c2b7', ''),
     'other facilities':                   ('#c3c2b7', '....'),
-    'natural gas (for steam generation)': ('#ffffff', '\\\\\\\\'),
-    'natural gas (for product drying)':   ('#ffffff', '////'),
+    'natural gas':                        ('#ffffff', '\\\\\\\\'),
     'fixed operating cost':               ('#ffffff', 'xxxx'),
     'excess electricity':                 ('#ffffff', '....'),
+}
+#: drawn category -> the stage-1 unit groups summed into it (per metric, at
+#: the first member's place in the stack)
+MERGED_GROUPS = {
+    'natural gas': ('natural gas (for steam generation)',
+                    'natural gas (for product drying)'),
 }
 #: product (stage-1 `revenue` key, USD/hr) -> (face colour, hatch), in the
 #: order the revenue credits stack down the operating-cost bar. Each product
@@ -171,8 +181,35 @@ def newest_data(results_dir=RESULTS_DIR):
     return paths[-1]
 
 
+def merge_groups(doc):
+    """A copy of a stage-1 document with each MERGED_GROUPS set of unit
+    groups summed into one category (per metric, in every scenario) at its
+    first member's place in meta['groups']. An already-merged document
+    passes through; a partial set raises ValueError."""
+    doc = copy.deepcopy(doc)
+    for name, members in MERGED_GROUPS.items():
+        groups = doc['meta']['groups']
+        present = [g for g in members if g in groups]
+        if not present and name in groups:
+            continue
+        if len(present) != len(members):
+            raise ValueError(f'cannot merge {name!r}: unit groups '
+                             f'{[g for g in members if g not in groups]} '
+                             'missing')
+        position = min(groups.index(g) for g in members)
+        merged = [g for g in groups if g not in members]
+        merged.insert(position, name)
+        doc['meta']['groups'] = merged
+        for record in doc['scenarios'].values():
+            parts = [record['breakdown'].pop(g) for g in members]
+            record['breakdown'][name] = {m: sum(p[m] for p in parts)
+                                         for m in parts[0]}
+    return doc
+
+
 def load_breakdowns(path):
-    """The stage-1 document, validated against what this figure assumes."""
+    """The stage-1 document with MERGED_GROUPS merged, validated against
+    what this figure assumes."""
     with open(path) as f:
         doc = json.load(f)
     meta = doc['meta']
@@ -184,6 +221,11 @@ def load_breakdowns(path):
             raise ValueError(f'{path}: {name!r} is in '
                              f'{meta["metric_units"][name]!r}, the figure '
                              f'labels assume {units!r}')
+    try:
+        doc = merge_groups(doc)
+    except ValueError as e:
+        raise ValueError(f'{path}: {e}') from None
+    meta = doc['meta']
     unknown = [g for g in meta['groups'] if g not in GROUP_STYLES]
     if unknown:
         raise ValueError(f'{path}: unit groups without a style {unknown}')
