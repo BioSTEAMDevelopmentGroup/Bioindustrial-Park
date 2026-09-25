@@ -12,12 +12,11 @@ the total capital investment (x), from an uncertainty-analysis results
 workbook (*_1_full_evaluation.xlsx as written by
 analyses/full/uncertainties_IBO_EtOH.py).
 
-Joint panel: the Gaussian-KDE density of the Monte Carlo samples as filled
-contours (one teal ramp, light = sparse to dark = dense; the lowest band is
-left unfilled, so the panel background stays white) and the baseline (the 'initial' row of the companion
-*_0_baseline.xlsx) as a white diamond (unlabelled: name it in the caption), over a light
-grey band showing the ethanol market price range (ETHANOL_MARKET_RANGE). Marginal box plots outside the
-panel: box = 25th-75th percentile, line = median, whiskers = 5th-95th
+Joint panel: every Monte Carlo sample as a teal dot at 50 % opacity and the
+baseline (the 'initial' row of the companion *_0_baseline.xlsx) as a white
+diamond (unlabelled: name it in the caption), over a light grey band showing
+the ethanol market price range (ETHANOL_MARKET_RANGE). Marginal box plots
+outside the panel: box = 25th-75th percentile, line = median, whiskers = 5th-95th
 percentile (the whis=[5, 95] of contourplots.box_and_whiskers_plot), dots =
 1st and 99th percentiles.
 
@@ -40,7 +39,7 @@ import pandas as pd
 import matplotlib
 matplotlib.use('Agg')
 from matplotlib import pyplot as plt
-from matplotlib.colors import LinearSegmentedColormap, to_hex, to_rgb
+from matplotlib.colors import to_hex, to_rgb
 from matplotlib.lines import TICKDOWN, TICKLEFT
 from matplotlib.ticker import AutoMinorLocator, MaxNLocator
 from scipy import stats
@@ -59,9 +58,10 @@ FONTS = {'tick': 12, 'axis_title': 12}
 TICK_LEN = {'major': 4.0, 'minor': 2.0} # pt; left/bottom ticks extend this far in AND out
 
 # the TRY-informed profitability campaign's teal (RELAY_COLOR in
-# plots/plot_kin_opt_parameter_sets.py), as ONE sequential hue: white-mixed
-# tints up to the teal itself, then darker shades of it (mixed with black)
+# plots/plot_kin_opt_parameter_sets.py)
 TEAL = '#0B6E7A'
+SAMPLE_ALPHA = 0.5
+SAMPLE_SIZE = 6 # pt^2
 
 
 def _mix(color, other, t):
@@ -70,10 +70,6 @@ def _mix(color, other, t):
     return to_hex((1 - t)*a + t*b)
 
 
-DENSITY_RAMP = tuple([_mix(TEAL, 'white', t) for t in (0.94, 0.78, 0.58, 0.36, 0.16)]
-                     + [TEAL]
-                     + [_mix(TEAL, 'black', t) for t in (0.35, 0.65)])
-N_DENSITY_LEVELS = 10
 BOX_FACE = TEAL
 BOX_EDGE = _mix(TEAL, 'black', 0.5)
 BOX_MEDIAN = 'black'
@@ -152,18 +148,11 @@ def nice_ticks(values, nbins=7):
                  (ticks >= values.max()).nonzero()[0][0] + 1]
 
 
-def draw_density(ax, x, y, xlim, ylim, n_grid=300):
-    kde = stats.gaussian_kde(np.vstack([x, y]))
-    GX, GY = np.meshgrid(np.linspace(*xlim, n_grid), np.linspace(*ylim, n_grid))
-    Z = kde(np.vstack([GX.ravel(), GY.ravel()])).reshape(GX.shape)
-    # the lowest band (0 to the first level) would fill the whole panel; it
-    # is left unfilled so the background stays white, the other bands keep
-    # their ramp colours
-    levels = np.linspace(0, Z.max(), N_DENSITY_LEVELS + 1)
-    cmap = LinearSegmentedColormap.from_list('density', DENSITY_RAMP)
-    colors = ['none'] + [cmap(i/(N_DENSITY_LEVELS - 1))
-                         for i in range(1, N_DENSITY_LEVELS)]
-    ax.contourf(GX, GY, Z, levels=levels, colors=colors, antialiased=True, zorder=1)
+def draw_samples(ax, x, y):
+    # every sample; rasterized so the PDF stays small (axes, text and the
+    # baseline marker stay vector)
+    ax.scatter(x, y, s=SAMPLE_SIZE, color=TEAL, alpha=SAMPLE_ALPHA, lw=0,
+               rasterized=True, zorder=2)
 
 
 def draw_box(ax, values, orientation):
@@ -216,7 +205,7 @@ def plot_uncertainty_MPSP_vs_TCI(results_file=None, baseline_file=None,
     yticks = nice_ticks(np.concatenate([mpsp, ETHANOL_MARKET_RANGE]))
     xlim, ylim = (xticks[0], xticks[-1]), (yticks[0], yticks[-1])
     ax.axhspan(*ETHANOL_MARKET_RANGE, color=MARKET_BAND_COLOR, lw=0, zorder=0)
-    draw_density(ax, tci, mpsp, xlim, ylim)
+    draw_samples(ax, tci, mpsp)
     if base:
         ax.plot(*base, 'D', ms=8, mfc='w', mec=INK, mew=1.2, zorder=5)
     ax.set_xticks(xticks)
