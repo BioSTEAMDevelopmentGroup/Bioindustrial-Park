@@ -13,9 +13,9 @@ workbook (*_1_full_evaluation.xlsx as written by
 analyses/full/uncertainties_IBO_EtOH.py).
 
 Joint panel: the Gaussian-KDE density of the Monte Carlo samples as filled
-contours (one teal ramp, light = sparse to dark = dense; the lightest band
-fills the whole panel) and the baseline (the 'initial' row of the companion
-*_0_baseline.xlsx) as a white diamond. Marginal box plots outside the
+contours (one teal ramp, light = sparse to dark = dense; the lowest band is
+left unfilled, so the panel background stays white) and the baseline (the 'initial' row of the companion
+*_0_baseline.xlsx) as a white diamond with an arrow callout. Marginal box plots outside the
 panel: box = 25th-75th percentile, line = median, whiskers = 5th-95th
 percentile (the whis=[5, 95] of contourplots.box_and_whiskers_plot), dots =
 1st and 99th percentiles.
@@ -40,7 +40,7 @@ import matplotlib
 matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap, to_hex, to_rgb
-from matplotlib.lines import Line2D, TICKDOWN, TICKLEFT
+from matplotlib.lines import TICKDOWN, TICKLEFT
 from matplotlib.ticker import AutoMinorLocator, MaxNLocator
 from scipy import stats
 
@@ -54,7 +54,8 @@ MPSP_COL = ('Biorefinery', 'Purity-adjusted ethanol MPSP [$/kg]')
 TCI_COL = ('Biorefinery', 'Total capital investment [10^6 $]')
 
 FONT_FAMILY = 'Arial'
-FONTS = {'tick': 12, 'axis_title': 12, 'legend': 9}
+FONTS = {'tick': 12, 'axis_title': 12, 'callout': 10}
+BASELINE_CALLOUT_OFFSET = (-55, 70) # pt from the baseline marker to the label's lower-right corner
 TICK_LEN = {'major': 4.0, 'minor': 2.0} # pt; left/bottom ticks extend this far in AND out
 
 # the TRY-informed profitability campaign's teal (RELAY_COLOR in
@@ -145,10 +146,14 @@ def draw_density(ax, x, y, xlim, ylim, n_grid=300):
     kde = stats.gaussian_kde(np.vstack([x, y]))
     GX, GY = np.meshgrid(np.linspace(*xlim, n_grid), np.linspace(*ylim, n_grid))
     Z = kde(np.vstack([GX.ravel(), GY.ravel()])).reshape(GX.shape)
-    # levels start at 0 so the lightest band fills the whole panel
+    # the lowest band (0 to the first level) would fill the whole panel; it
+    # is left unfilled so the background stays white, the other bands keep
+    # their ramp colours
     levels = np.linspace(0, Z.max(), N_DENSITY_LEVELS + 1)
     cmap = LinearSegmentedColormap.from_list('density', DENSITY_RAMP)
-    ax.contourf(GX, GY, Z, levels=levels, cmap=cmap, antialiased=True, zorder=1)
+    colors = ['none'] + [cmap(i/(N_DENSITY_LEVELS - 1))
+                         for i in range(1, N_DENSITY_LEVELS)]
+    ax.contourf(GX, GY, Z, levels=levels, colors=colors, antialiased=True, zorder=1)
 
 
 def draw_box(ax, values, orientation):
@@ -201,10 +206,12 @@ def plot_uncertainty_MPSP_vs_TCI(results_file=None, baseline_file=None,
     draw_density(ax, tci, mpsp, xlim, ylim)
     if base:
         ax.plot(*base, 'D', ms=8, mfc='w', mec=INK, mew=1.2, zorder=5)
-        ax.legend(handles=[Line2D([], [], ls='none', marker='D', ms=7, mfc='w',
-                                  mec=INK, mew=1.2, label='Baseline')],
-                  loc='upper right', frameon=False, fontsize=FONTS['legend'],
-                  handletextpad=0.3, borderaxespad=0.6)
+        # arrow callout from the sparse upper left, clear of the dense core
+        ax.annotate('Baseline', xy=base, xytext=BASELINE_CALLOUT_OFFSET,
+                    textcoords='offset points', ha='right', va='bottom',
+                    fontsize=FONTS['callout'], color=INK, zorder=6,
+                    arrowprops=dict(arrowstyle='-|>', color=INK, lw=1.0,
+                                    mutation_scale=10, shrinkA=2, shrinkB=7))
     ax.set_xticks(xticks)
     ax.set_yticks(yticks)
     ax.set_xlim(*xlim)
