@@ -28,8 +28,8 @@ the baseline (the 'initial' row of the companion *_0_baseline.xlsx) as a
 white diamond (unlabelled: name it in the caption), and marginal box plots
 outside the panel:
 box = 25th-75th percentile, line = median, whiskers = 5th-95th percentile
-(the whis=[5, 95] of contourplots.box_and_whiskers_plot), dots = 1st and 99th
-percentiles.
+(the whis=[5, 95] of contourplots.box_and_whiskers_plot), dots = the most
+outlying samples (minimum and maximum).
 
 Panel A also carries a light grey band for the ethanol market price range
 (ETHANOL_MARKET_RANGE) spanning the typical corn ethanol biorefinery TCI
@@ -172,7 +172,7 @@ BASELINE_GRAY = '#90918e'
 MARKET_BAND_COLOR = _mix(BASELINE_GRAY, 'white', 0.7)
 GASOLINE_LINE_COLOR = _mix(BASELINE_GRAY, 'black', 0.45)
 GASOLINE_LINE_STYLE = dict(lw=1.0, ls=(0, (5, 3)))
-BOX_PERCENTILES = {'whis': (5, 95), 'dots': (1, 99)}
+BOX_PERCENTILES = {'whis': (5, 95), 'dots': (0, 100)} # dots: min and max
 
 # the joint panels of the 2 x 2 grid, row-major (the fourth cell is left empty
 # for now): (x outcome, y outcome) keyed by _outcomes' names, axis titles, and
