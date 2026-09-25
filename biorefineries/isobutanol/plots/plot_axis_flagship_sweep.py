@@ -27,7 +27,11 @@ Two modes:
   plot_k13_flagship_sweep.py: PI on the left axis, isobutanol yield on the
   right, the trial marked, PI = 0, any part beyond the campaign band shaded,
   the onset of burden derating marked. --yield ethanol puts the ethanol yield
-  on the right axis instead (stem suffix _etoh_yield).
+  on the right axis instead (stem suffix _etoh_yield). A third, outboard
+  y axis carries the IRR (%) (--no-irr drops it), scaled so that the 15 %
+  hurdle rate sits on the PI = 0 line (NPV at 15 % = 0 <=> IRR = 15 %).
+  Each y axis is coloured like its curve; the legend lists only markers and
+  reference lines.
 
 Data: written by analyses/evaluate_axis_flagship_optimum.py (the simulation
 stage, ask-first). Sim-safe: reads CSV / JSON only; reuses the typeface and
@@ -51,8 +55,8 @@ matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
-from matplotlib.ticker import (FuncFormatter, LogLocator, NullFormatter,
-                               NullLocator)
+from matplotlib.ticker import (FuncFormatter, LogLocator, MultipleLocator,
+                               NullFormatter, NullLocator)
 
 _here = os.path.dirname(os.path.abspath(__file__))
 _spec = importlib.util.spec_from_file_location(
@@ -137,6 +141,36 @@ def slice_summary(param, x, PI, Y, n_total):
                 Y_TV=tv_y, Y_maxima=nmax_y, Y_jump=jump_y,
                 decoupled=decoupled_step(PI, Y),
                 score=(tv_p - 1) - (tv_y - 1))
+
+
+#: the third (IRR) axis: colour, curve style, spine offset beyond the yield
+#: spine, and the hurdle rate the PI is computed at (NPV at 15 % = 0 <=> IRR =
+#: 15 %, so the IRR axis is scaled to put 15 % on the PI = 0 line)
+IRR_COLOR = '#6A3D9A'
+IRR_KW = dict(color=IRR_COLOR, lw=1.2, ls=(0, (4, 1.5)), marker='^', ms=2.2,
+              zorder=3)
+IRR_AXIS_GAP_IN = 0.82
+HURDLE_PCT = 15.0
+
+
+def align_irr_axis(ax, ax_irr, IRR):
+    """Scale the IRR axis (%) so HURDLE_PCT sits at PI = 0 on `ax` and every
+    finite IRR fits; returns False (independent limits) when PI = 0 is not
+    inside the PI axis or no IRR is finite."""
+    lo, hi = ax.get_ylim()
+    f0 = -lo/(hi - lo)   # axes fraction of PI = 0
+    finite = IRR[np.isfinite(IRR)]
+    if not finite.size:
+        return False
+    if not 0 < f0 < 1:
+        pad = 0.08*max(np.ptp(finite), 1.0)
+        ax_irr.set_ylim(finite.min() - pad, finite.max() + pad)
+        return False
+    up = max(finite.max() - HURDLE_PCT, 0.0)/(1 - f0)
+    down = max(HURDLE_PCT - finite.min(), 0.0)/f0
+    span = 1.06*max(up, down, 1e-9)   # % per unit axes fraction
+    ax_irr.set_ylim(HURDLE_PCT - span*f0, HURDLE_PCT + span*(1 - f0))
+    return True
 
 
 #: --yield choice -> (sweep CSV column, axis / legend label, output-stem suffix)
@@ -260,7 +294,7 @@ def screen(dpi):
 # -----------------------------------------------------------------------------
 # --param: the publication figure of one full-resolution slice
 # -----------------------------------------------------------------------------
-def plot_param(param, dpi, stem=None, product='isobutanol'):
+def plot_param(param, dpi, stem=None, product='isobutanol', irr=True):
     yield_column, yield_label, stem_suffix = YIELD_METRICS[product]
     path = os.path.join(RESULTS_DIR, f'{SWEEP_STEM}_{param}.csv')
     with open(path[:-len('.csv')] + '_anchor.json') as fh:
@@ -269,6 +303,8 @@ def plot_param(param, dpi, stem=None, product='isobutanol'):
     band = anchor['bands'][param]
     x, PI, Y = ok_series(frame, yield_column)
     ok = frame['state'] == 'OK'
+    IRR = frame['IRR'].to_numpy(float)*100
+    IRR = np.where(ok & np.isfinite(IRR), IRR, np.nan)   # -inf: no IRR root
     dfac = frame['burden_factor'].to_numpy(float)
     i_opt = int(np.flatnonzero(frame['is_anchor'].to_numpy() == 1)[0])
     x_opt = x[i_opt]
@@ -287,14 +323,26 @@ def plot_param(param, dpi, stem=None, product='isobutanol'):
     n_legend = (2 + bool(beyond) + (x_derate is not None)
                 + bool((frame['state'] != 'OK').any()))
     axes_h, top_in, xlabel_in, entry_in = 2.59, 0.19, 0.72, 0.22
+    axes_w, left_in, right_in = 3.234, 0.833, 0.833
+    irr_gap_in = IRR_AXIS_GAP_IN if irr else 0.0   # yield spine -> IRR spine
+    fig_w = left_in + axes_w + irr_gap_in + right_in
     fig_h = top_in + axes_h + xlabel_in + entry_in*n_legend + 0.1
     k13p.apply_font_rcparams()
-    fig, ax = plt.subplots(figsize=(4.9, fig_h))
-    fig.subplots_adjust(left=0.17, right=0.83, top=1 - top_in/fig_h,
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+    fig.subplots_adjust(left=left_in/fig_w, right=(left_in + axes_w)/fig_w,
+                        top=1 - top_in/fig_h,
                         bottom=(fig_h - top_in - axes_h)/fig_h)
     ax_r = ax.twinx()
-    ax.set_zorder(ax_r.get_zorder() + 1)   # PI (and its star) on top
+    ax.set_zorder(ax_r.get_zorder() + 2)   # PI (and its star) on top
     ax.patch.set_visible(False)
+    if irr:   # a third y axis, outboard of the yield axis
+        ax_irr = ax.twinx()
+        ax_irr.set_zorder(ax_r.get_zorder() + 1)
+        ax_irr.spines['right'].set_position(('axes', 1 + irr_gap_in/axes_w))
+        for side in ('left', 'top', 'bottom'):
+            ax_irr.spines[side].set_visible(False)
+        ax_irr.spines['right'].set_color(IRR_COLOR)
+        ax_irr.spines['right'].set_linewidth(1.2)
 
     if log:
         x_lo, x_hi = x.min()/1.25, x.max()*1.25
@@ -310,6 +358,8 @@ def plot_param(param, dpi, stem=None, product='isobutanol'):
 
     ax_r.plot(x, Y, **k13p.YIELD_KW)
     ax_r.plot([x_opt], [Y[i_opt]], **k13p.RING_KW)
+    if irr:   # no ring at the optimum: it would sit on the yield ring
+        ax_irr.plot(x, IRR, **IRR_KW)
     ax.plot(x, PI, **k13p.PI_KW)
     ax.plot([x_opt], [PI[i_opt]], **k13p.STAR_KW)
 
@@ -327,6 +377,15 @@ def plot_param(param, dpi, stem=None, product='isobutanol'):
     pi_lo, pi_hi = np.nanmin(PI), np.nanmax(PI)
     pad = 0.08*(pi_hi - pi_lo)
     ax.set_ylim(min(pi_lo - pad, -pad), pi_hi + 1.5*pad)
+    aligned = False
+    if irr:
+        ax_irr.set_ylabel('Internal rate of return, IRR (%)',
+                          fontsize=FONTS['axis_title'], rotation=270,
+                          labelpad=16, color=IRR_COLOR)
+        aligned = align_irr_axis(ax, ax_irr, IRR)
+        if aligned:   # ticks through the hurdle rate: 0, 15, 30 %
+            ax_irr.yaxis.set_major_locator(MultipleLocator(HURDLE_PCT))
+            ax_irr.yaxis.set_minor_locator(MultipleLocator(HURDLE_PCT/3))
     ax.spines['left'].set_color(PI_COLOR)
     ax_r.spines['left'].set_visible(False)
     ax.spines['right'].set_visible(False)
@@ -338,6 +397,12 @@ def plot_param(param, dpi, stem=None, product='isobutanol'):
     k13p.style_twin_ticks(ax, ax_r)
     ax.tick_params(axis='y', which='both', labelcolor=PI_COLOR)
     ax_r.tick_params(axis='y', which='both', labelcolor=YIELD_COLOR)
+    if irr:
+        for which, L in k13p.TICK_LEN.items():
+            ax_irr.tick_params(axis='y', which=which, direction='inout',
+                               length=2*L, left=False, right=True,
+                               labelsize=FONTS['tick'], color=IRR_COLOR,
+                               labelcolor=IRR_COLOR)
     for label in ax.get_yticklabels() + ax_r.get_yticklabels():
         label.set_text(k13p.minus(label.get_text()))
 
@@ -348,7 +413,9 @@ def plot_param(param, dpi, stem=None, product='isobutanol'):
         line(k13p.STAR_KW, f"Flagship optimum (#{anchor['trial_number']}, "
                            f"PI {PI[i_opt]:.2f})"),
         Line2D([], [], **k13p.BREAKEVEN_KW,
-               label='PI = 0 (break-even at a 15 % hurdle rate)'),
+               label=('PI = 0 and IRR = 15 % (break-even at the hurdle rate)'
+                      if aligned else
+                      'PI = 0 (break-even at a 15 % hurdle rate)')),
     ]
     if beyond:
         handles.append(Patch(**k13p.BAND_KW, label='Beyond the campaign band'))
@@ -363,8 +430,8 @@ def plot_param(param, dpi, stem=None, product='isobutanol'):
                               ', '.join(f'{v} {s.lower()}'
                                         for s, v in states.items())))
     fig.legend(handles=handles, loc='lower center', ncol=1, frameon=False,
-               fontsize=FONTS['legend'], bbox_to_anchor=(0.5, 0.0),
-               handlelength=2.2)
+               fontsize=FONTS['legend'], handlelength=2.2,
+               bbox_to_anchor=((left_in + axes_w/2)/fig_w, 0.0))  # under the axes
 
     out = os.path.join(OUT_DIR, stem or f'{param}_flagship_sweep{stem_suffix}')
     os.makedirs(OUT_DIR, exist_ok=True)
@@ -381,6 +448,10 @@ def plot_param(param, dpi, stem=None, product='isobutanol'):
           f"{s['PI_maxima']} maxima, largest step {s['PI_jump']:.2f} of range")
     print(f"{yield_label} {s['Y_min']:.4f}..{s['Y_max']:.4f}: TV {s['Y_TV']:.2f}, "
           f"{s['Y_maxima']} maxima, largest step {s['Y_jump']:.2f} of range")
+    if irr:
+        print(f'IRR {np.nanmin(IRR):.2f}..{np.nanmax(IRR):.2f} %; '
+              f'{int(np.isnan(IRR).sum())} points without an IRR; axis '
+              f"{'aligned (15 % at PI = 0)' if aligned else 'NOT aligned'}")
     print(f'wrote {out}.png / .pdf')
 
 
@@ -392,13 +463,15 @@ def main(argv=None):
     ap.add_argument('--yield', dest='product', choices=tuple(YIELD_METRICS),
                     default='isobutanol',
                     help='yield on the right axis of a --param figure')
+    ap.add_argument('--no-irr', dest='irr', action='store_false',
+                    help='drop the third (IRR) axis of a --param figure')
     ap.add_argument('--stem', default=None)
     ap.add_argument('--dpi', type=int, default=300)
     args = ap.parse_args(argv)
     if args.screen:
         screen(args.dpi)
     else:
-        plot_param(args.param, args.dpi, args.stem, args.product)
+        plot_param(args.param, args.dpi, args.stem, args.product, args.irr)
 
 
 if __name__ == '__main__':
