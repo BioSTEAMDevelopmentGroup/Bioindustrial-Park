@@ -54,6 +54,14 @@ PINNED_PYTHONPATH.txt), under the supervisor with the matching stem:
     python supervise_sweep.py evaluate_axis_flagship_optimum.py \
         --stem evaluate_axis_flagship_optimum_screen
 
+The k_3 figure's data (plots/plot_axis_flagship_sweep.py) is the full campaign
+band 0.00581-23.24 at 218 log-spaced points (+ the trial's own value; the
+density of the earlier 160-point 0.0058-2.5 zoom), approved 2026-09-24:
+
+    $env:IBO_AXIS_SWEEP = 'k_3'; $env:IBO_AXIS_N_POINTS = '218'
+    python supervise_sweep.py evaluate_axis_flagship_optimum.py \
+        --stem evaluate_axis_flagship_optimum_k_3
+
 Checkpoint + resume (the supervise_sweep.py convention, per run tag):
 results/<stem>_<tag>_checkpoint.csv (one flushed row per point) and
 results/<stem>_<tag>_inflight.json (written right before each point); a
