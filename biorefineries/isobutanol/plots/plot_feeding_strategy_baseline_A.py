@@ -71,16 +71,19 @@ MPSP_CBAR_TICKS = np.arange(0.85, 1.15001, 0.05)
 
 # Optimum markers: (sweep metric, 'min'/'max', label, marker, face colour,
 # size [pt], label offset from the marker [pt], arrow curvature). Offsets are
-# set by eye for the current sweep; retune them if the optima move.
+# set by eye for the current sweep; retune them if the optima move. A label is
+# left-/right-aligned by the sign of its x offset unless LABEL_HA overrides it.
 # Aeration, AOC and slurry evaporation duty are deliberately not marked.
 OPTIMA = [
-    ('EtOH Titer',        'max', 'titer',        '^', 'white',   10, (18, -26),  0.3),
-    ('Cell loading',      'max', 'cell density', 'o', 'white',   10, (-10, 26), -0.3),
-    ('EtOH Productivity', 'max', 'productivity', 's', 'white',    9, (8, 26),   -0.3),
-    ('EtOH Yield',        'max', 'yield',        'p', 'white',   10, (20, -24),  0.3),
-    ('TCI',               'min', 'TCI',          'p', '#33ccff', 10, (-16, -32), 0.3),
-    ('MPSP',              'min', 'MPSP',         '*', '#33ccff', 14, (16, -22),  0.3),
+    ('EtOH Titer',        'max', 'titer',        '^', 'white',   10, (11, -15),  0.3),
+    ('Cell loading',      'max', 'cell density', 'o', 'white',   10, (-6, 16),  -0.3),
+    ('EtOH Productivity', 'max', 'productivity', 's', 'white',    9, (8, 17),   -0.2),
+    ('EtOH Yield',        'max', 'yield',        'p', 'white',   10, (12, -14),  0.3),
+    ('TCI',               'min', 'TCI',          'p', '#33ccff', 10, (-10, -18), 0.3),
+    ('MPSP',              'min', 'MPSP',         '*', '#33ccff', 14, (12, -14),  0.3),
 ]
+# centred above the productivity optimum, clear of the batch label to its right
+LABEL_HA = {'productivity': 'center'}
 
 # Panel B series: (nskinetics results key, legend label); default colour cycle
 TRAJECTORY_SERIES = [
@@ -296,10 +299,10 @@ def draw_panel_A(fig, ax, cax):
                 markeredgewidth=0.8, zorder=10, clip_on=False)
         ax.annotate(label, xy=(ox, oy), xytext=offset,
                     textcoords='offset points', fontsize=FONTS['annotation'],
-                    ha='left' if offset[0] >= 0 else 'right',
+                    ha=LABEL_HA.get(label, 'left' if offset[0] >= 0 else 'right'),
                     va='bottom' if offset[1] >= 0 else 'top', zorder=11,
                     annotation_clip=False,
-                    arrowprops=dict(arrowstyle='->', color='black', lw=0.9,
+                    arrowprops=dict(arrowstyle='-|>', mutation_scale=9, color='black', lw=0.9,
                                     shrinkA=1, shrinkB=size/2 + 1,
                                     connectionstyle=f'arc3,rad={rad}'))
 
@@ -347,7 +350,7 @@ def draw_panel_B(fig, ax, df, meta):
         ax.annotate(text, xy=(t, CONC_LIM[1]), xytext=(4, 12),
                     textcoords='offset points', ha='left', va='bottom',
                     fontsize=FONTS['annotation'], annotation_clip=False,
-                    arrowprops=dict(arrowstyle='->', color='black', lw=0.9,
+                    arrowprops=dict(arrowstyle='-|>', mutation_scale=9, color='black', lw=0.9,
                                     shrinkA=1, shrinkB=1,
                                     connectionstyle='arc3,rad=0.4'))
 
