@@ -275,9 +275,23 @@ def plot_param(param, dpi, stem=None, product='isobutanol'):
     log = band['log']
     derated = np.flatnonzero(np.isfinite(dfac) & (dfac < 1 - 1e-9))
 
+    # the legend lists only the markers / reference lines; the two curves are
+    # identified by their colour-matched axes. Legend entries are known before
+    # drawing, so the figure is sized to them (axes box fixed in inches).
+    beyond = []
+    if x.max() > band['high']*(1 + 1e-9):
+        beyond.append('high')
+    if x.min() < band['low']*(1 - 1e-9) - 1e-12:
+        beyond.append('low')
+    x_derate = (x[derated[0]] if derated.size and derated[0] > 0 else None)
+    n_legend = (2 + bool(beyond) + (x_derate is not None)
+                + bool((frame['state'] != 'OK').any()))
+    axes_h, top_in, xlabel_in, entry_in = 2.59, 0.19, 0.72, 0.22
+    fig_h = top_in + axes_h + xlabel_in + entry_in*n_legend + 0.1
     k13p.apply_font_rcparams()
-    fig, ax = plt.subplots(figsize=(4.9, 4.8))
-    fig.subplots_adjust(left=0.17, right=0.83, top=0.96, bottom=0.42)
+    fig, ax = plt.subplots(figsize=(4.9, fig_h))
+    fig.subplots_adjust(left=0.17, right=0.83, top=1 - top_in/fig_h,
+                        bottom=(fig_h - top_in - axes_h)/fig_h)
     ax_r = ax.twinx()
     ax.set_zorder(ax_r.get_zorder() + 1)   # PI (and its star) on top
     ax.patch.set_visible(False)
@@ -287,16 +301,10 @@ def plot_param(param, dpi, stem=None, product='isobutanol'):
     else:
         pad = 0.03*(x.max() - x.min())
         x_lo, x_hi = x.min() - pad, x.max() + pad
-    beyond = []
-    if x.max() > band['high']*(1 + 1e-9):
-        beyond.append((band['high'], x_hi))
-    if x.min() < band['low']*(1 - 1e-9) - 1e-12:
-        beyond.append((x_lo, band['low']))
-    for lo, hi in beyond:   # bottom (right-axis) layer: never covers a curve
-        ax_r.axvspan(lo, hi, **k13p.BAND_KW)
-    x_derate = None
-    if derated.size and derated[0] > 0:
-        x_derate = x[derated[0]]
+    spans = {'high': (band['high'], x_hi), 'low': (x_lo, band['low'])}
+    for side in beyond:   # bottom (right-axis) layer: never covers a curve
+        ax_r.axvspan(*spans[side], **k13p.BAND_KW)
+    if x_derate is not None:
         ax.axvline(x_derate, **k13p.DERATE_KW)
     ax.axhline(0.0, **k13p.BREAKEVEN_KW)
 
@@ -309,9 +317,11 @@ def plot_param(param, dpi, stem=None, product='isobutanol'):
         ax.set_xscale('log')
     ax.set_xlim(x_lo, x_hi)
     ax.set_xlabel(AXIS_LABELS[param][0], fontsize=FONTS['axis_title'])
-    ax.set_ylabel('Profitability index (PI)', fontsize=FONTS['axis_title'])
+    ax.set_ylabel('Profitability index (PI)', fontsize=FONTS['axis_title'],
+                  color=PI_COLOR)
     ax_r.set_ylabel(yield_label + r' ($\mathrm{g·g}^{-1}$)',
-                    fontsize=FONTS['axis_title'], rotation=270, labelpad=16)
+                    fontsize=FONTS['axis_title'], rotation=270, labelpad=16,
+                    color=YIELD_COLOR)
     y_top = np.nanmax(Y)
     ax_r.set_ylim(-0.03*y_top, 1.12*y_top)
     pi_lo, pi_hi = np.nanmin(PI), np.nanmax(PI)
@@ -326,6 +336,8 @@ def plot_param(param, dpi, stem=None, product='isobutanol'):
         ax_r.spines[side].set_linewidth(1.2)
     fig.canvas.draw()
     k13p.style_twin_ticks(ax, ax_r)
+    ax.tick_params(axis='y', which='both', labelcolor=PI_COLOR)
+    ax_r.tick_params(axis='y', which='both', labelcolor=YIELD_COLOR)
     for label in ax.get_yticklabels() + ax_r.get_yticklabels():
         label.set_text(k13p.minus(label.get_text()))
 
@@ -333,8 +345,6 @@ def plot_param(param, dpi, stem=None, product='isobutanol'):
         return Line2D([], [], **{k: v for k, v in kw.items() if k != 'zorder'},
                       label=label)
     handles = [
-        line(k13p.PI_KW, 'Profitability index (left axis)'),
-        line(k13p.YIELD_KW, f'{yield_label} (right axis)'),
         line(k13p.STAR_KW, f"Flagship optimum (#{anchor['trial_number']}, "
                            f"PI {PI[i_opt]:.2f})"),
         Line2D([], [], **k13p.BREAKEVEN_KW,
