@@ -126,7 +126,16 @@ N_MINOR_PER_MAJOR = 4 # minor ticks between adjacent major ticks, both axes
 #   U.S. Ethanol Industry, https://www1.eere.energy.gov/bioenergy/pdfs/
 #   current_state_of_the_us_ethanol_industry.pdf (raised from Tanzil et al.
 #   (2021)'s $115 million for a typical 230 ML/yr (~60.8 MGY) mill)
-TYPICAL_CORN_ETHANOL_TCI = (84.0, 135.0) # MM$
+# Each bound is escalated from its source's year to the model's 2023 dollars by
+# CEPCI ratio (annual averages, Chemical Engineering magazine; 2023 = 797.9,
+# process_settings.CEPCI). Years are the sources' publication years.
+CEPCI_ANNUAL = {2010: 550.8, 2019: 607.5, 2023: 797.9}
+TCI_COST_YEAR = 2023
+TYPICAL_CORN_ETHANOL_TCI_SOURCE = ((83.95, 2019), # MM$, Kurambhatti et al.
+                                   (135.0, 2010)) # MM$, DOE EERE
+TYPICAL_CORN_ETHANOL_TCI = tuple(
+    v * CEPCI_ANNUAL[TCI_COST_YEAR] / CEPCI_ANNUAL[year]
+    for v, year in TYPICAL_CORN_ETHANOL_TCI_SOURCE) # MM$ (2023$): ~110.3, ~195.6
 # the ethanol range is a band in a light shade of the baseline grey of
 # plots/plot_kin_opt_parameter_sets.py (BASELINE_COLOR); the gasoline range,
 # which almost coincides with it, is two dashed lines in a dark shade of the
