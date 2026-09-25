@@ -52,10 +52,10 @@ SPEC_2 = np.linspace(1e-3, 2.0, SWEEP_STEPS[1])  # inhib_ethanol multiplier [-]
 # for the current sweep; retune them if the optima move.
 OPTIMA = [
     ('EtOH Titer',        'max', 'titer',        '^', 'white',   10, (10, 20),   -0.3),
-    ('Cell loading',      'max', 'cell density', 'o', 'white',   10, (28, 40),   -0.3),
+    ('Cell loading',      'max', 'cell density', 'o', 'white',   10, (22, 24),   -0.3),
     ('EtOH Productivity', 'max', 'productivity', 's', 'white',    9, (18, -4),    0.3),
     ('Combined Yield',    'max', 'yield',        'p', 'white',   10, (-14, 16),   0.3),
-    ('TCI',               'min', 'TCI',          'p', '#33ccff', 10, (58, 14),   -0.2),
+    ('TCI',               'min', 'TCI',          'p', '#33ccff', 10, (30, 10),   -0.2),
     ('MPSP',              'min', 'MESP',         '*', '#33ccff', 14, (12, 24),   -0.3),
 ]
 # cell density and TCI sit on the blank no-ethanol column, so their labels
