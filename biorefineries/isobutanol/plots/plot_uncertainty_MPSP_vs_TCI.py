@@ -231,6 +231,10 @@ PANELS = (
          xticks=DDGS_REVENUE_TICKS, yticks=ETOH_REVENUE_TICKS),
 )
 GRID_SHAPE = (2, 2)
+# gaps between grid cells (fractions of the mean cell width / height) and the
+# panel letter's position in its joint axes' coordinates
+GRID_SPACE = {'w': 0.26, 'h': 0.16}
+PANEL_LETTER_XY = (-0.15, 1.12)
 
 
 def apply_font_rcparams():
@@ -242,6 +246,14 @@ def apply_font_rcparams():
     plt.rcParams['mathtext.it'] = f'{FONT_FAMILY}:italic'
     plt.rcParams['mathtext.bf'] = f'{FONT_FAMILY}:bold'
     plt.rcParams['mathtext.fallback'] = 'stixsans'
+
+
+def bold_title(label):
+    """An axis title with its name in bold and its ' [units]' part regular:
+    the name is set as mathtext bold (mathtext.bf = the bold of FONT_FAMILY)."""
+    name, sep, units = label.partition(' [')
+    name = r'$\mathbf{' + name.replace(' ', r'\ ') + '}$'
+    return name + sep + units
 
 
 def style_ticks(ax):
@@ -409,8 +421,8 @@ def draw_joint_panel(fig, cell, panel, samples, base, letter):
     ax.set_yticks(yticks)
     ax.set_xlim(xticks[0], xticks[-1])
     ax.set_ylim(yticks[0], yticks[-1])
-    ax.set_xlabel(panel['xlabel'], fontsize=FONTS['axis_title'])
-    ax.set_ylabel(panel['ylabel'], fontsize=FONTS['axis_title'])
+    ax.set_xlabel(bold_title(panel['xlabel']), fontsize=FONTS['axis_title'])
+    ax.set_ylabel(bold_title(panel['ylabel']), fontsize=FONTS['axis_title'])
     ax.xaxis.set_minor_locator(AutoMinorLocator(N_MINOR_PER_MAJOR + 1))
     ax.yaxis.set_minor_locator(AutoMinorLocator(N_MINOR_PER_MAJOR + 1))
 
@@ -418,8 +430,9 @@ def draw_joint_panel(fig, cell, panel, samples, base, letter):
     draw_box(ax_right, y, 'vertical', panel['color'])
     ax_top.set_ylim(0.4, 1.6)
     ax_right.set_xlim(0.4, 1.6)
-    # panel letter in the cell's top-left corner, above the y-axis title
-    ax_top.text(-0.22, 1.0, letter, transform=ax_top.transAxes, ha='left', va='top',
+    # panel letter just above the y-axis title, level with the top box
+    ax.text(PANEL_LETTER_XY[0], PANEL_LETTER_XY[1], letter, transform=ax.transAxes,
+            ha='left', va='top',
                 fontsize=FONTS['panel_letter'], fontweight='bold')
     return ax
 
@@ -452,7 +465,7 @@ def plot_uncertainty_MPSP_vs_TCI(results_file=None, baseline_file=None,
     apply_font_rcparams()
     n_rows, n_cols = GRID_SHAPE
     fig = plt.figure(figsize=(5.6*n_cols, 5.4*n_rows))
-    grid = fig.add_gridspec(n_rows, n_cols, wspace=0.38, hspace=0.26,
+    grid = fig.add_gridspec(n_rows, n_cols, wspace=GRID_SPACE['w'], hspace=GRID_SPACE['h'],
                             left=0.1, right=0.98, bottom=0.075, top=0.985)
     axes = []
     for i, panel in enumerate(PANELS):
