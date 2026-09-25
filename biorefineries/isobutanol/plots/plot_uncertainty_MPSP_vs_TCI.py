@@ -179,8 +179,8 @@ BOX_PERCENTILES = {'whis': (5, 95), 'dots': (0, 100)} # dots: min and max
 # panel hue, Pareto sense per axis ('min' / 'max', x then y), fixed axis
 # ticks / limits (neither = 'nice' ticks enclosing the samples and
 # the baseline)
-# panel C: ethanol revenue 0-180, DDGS revenue 0-30 MM$/y
-ETOH_REVENUE_TICKS = np.arange(0.0, 181.0, 30.0) # MM$/y
+# panel C: ethanol revenue 60-180, DDGS revenue 0-30 MM$/y
+ETOH_REVENUE_TICKS = np.arange(60.0, 181.0, 20.0) # MM$/y
 DDGS_REVENUE_TICKS = np.arange(0.0, 31.0, 5.0) # MM$/y
 PANELS = (
     dict(x='TCI', y='MPSP',
