@@ -55,7 +55,7 @@ matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
-from matplotlib.ticker import (FixedLocator, FuncFormatter, LogLocator,
+from matplotlib.ticker import (FuncFormatter, LogLocator, MultipleLocator,
                                NullFormatter, NullLocator)
 
 _here = os.path.dirname(os.path.abspath(__file__))
@@ -157,9 +157,9 @@ IRR_AXIS_GAP_IN = 0.82
 
 
 def place_irr_axis(ax_irr, IRR):
-    """Scale the IRR axis (%) so its tick range -- the finite IRRs rounded
-    out to a 10 % (or, under a 20 % spread, 5 %) step -- fills IRR_BAND of
-    the axes height; the spine and the ticks cover only that range."""
+    """Scale the IRR axis (%) so the finite IRRs, rounded out to a 10 % (or,
+    under a 20 % spread, 5 %) step, fill IRR_BAND of the axes height; the
+    spine and its ticks span the full height."""
     finite = IRR[np.isfinite(IRR)]
     if not finite.size:
         return
@@ -169,12 +169,8 @@ def place_irr_axis(ax_irr, IRR):
     f_lo, f_hi = IRR_BAND
     scale = (hi - lo)/(f_hi - f_lo)   # % per unit axes fraction
     ax_irr.set_ylim(lo - f_lo*scale, lo + (1 - f_lo)*scale)
-    ax_irr.spines['right'].set_bounds(lo, hi)
-    ax_irr.yaxis.set_major_locator(FixedLocator(np.arange(lo, hi + step/2,
-                                                          step)))
-    ax_irr.yaxis.set_minor_locator(FixedLocator(np.arange(lo, hi + step/4,
-                                                          step/2)))
-    ax_irr.yaxis.label.set_y((f_lo + f_hi)/2)   # title centred on the spine
+    ax_irr.yaxis.set_major_locator(MultipleLocator(step))
+    ax_irr.yaxis.set_minor_locator(MultipleLocator(step/2))
 
 
 #: --yield choice -> (sweep CSV column, axis / legend label, output-stem suffix)
