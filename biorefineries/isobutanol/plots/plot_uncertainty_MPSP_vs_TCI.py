@@ -113,7 +113,7 @@ ETHANOL_MARKET_RANGE = tuple(v / GGE_PER_GAL for v in ETHANOL_MARKET_RANGE_PER_G
 # Gasoline and Diesel Fuel Update, https://www.eia.gov/petroleum/gasdiesel/
 # (a gallon of gasoline is 1 GGE by definition)
 GASOLINE_PRICE_RANGE = (2.16, 4.84) # $/GGE
-MPSP_AXIS_LIMITS = (0.0, 6.0) # $/GGE
+MPSP_AXIS_LIMITS = (2.0, 6.0) # $/GGE
 TCI_AXIS_LIMITS = (75.0, 200.0) # MM$
 TCI_TICK_STEP = 25.0 # MM$
 N_MINOR_PER_MAJOR = 4 # minor ticks between adjacent major ticks, both axes
@@ -295,7 +295,7 @@ def plot_uncertainty_MPSP_vs_TCI(results_file=None, baseline_file=None,
     ax_top = fig.add_subplot(gs[0, 0], sharex=ax)
     ax_right = fig.add_subplot(gs[1, 1], sharey=ax)
 
-    # fixed MPSP axis from zero (spans the market band and every sample)
+    # fixed MPSP axis (spans the market band, the gasoline lines and every sample)
     xticks = np.arange(TCI_AXIS_LIMITS[0], TCI_AXIS_LIMITS[1] + TCI_TICK_STEP/2,
                        TCI_TICK_STEP)
     yticks = nice_ticks(np.array(MPSP_AXIS_LIMITS))
