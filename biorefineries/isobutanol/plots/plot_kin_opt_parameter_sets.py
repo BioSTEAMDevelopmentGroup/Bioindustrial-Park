@@ -111,11 +111,12 @@ RESULTS_DIR = os.path.join(PKG_DIR, 'analyses', 'results')
 # objective with at least DEFAULT_MIN_TRIALS logged trials (see
 # default_split_12d_specs). The financial set optimizes PI (log-tail) but is
 # drawn on the IRR axis (OUTCOME_OWN_OBJECTIVES), hence the
-# "Profitability" label.
+# "Profitability (uninformed)" label (uninformed = not seeded, vs. the
+# TRY-informed relay below).
 DEFAULT_STUDY_TYPE = 'metabolic_split_12d'
 DEFAULT_MIN_TRIALS = 2000
 DEFAULT_OBJECTIVES = [
-    ('Profitability', 'PI (log-tail)'),
+    ('Profitability (uninformed)', 'PI (log-tail)'),
     ('Isobutanol yield', 'IBO yield'),
     ('Isobutanol titer', 'IBO titer'),
     ('Isobutanol productivity', 'IBO productivity'),
@@ -149,7 +150,7 @@ DEFAULT_RELAY_CAMPAIGN = ('kin_opt_ethanol_isobutanol_metabolic_split_12d'
 # carries the '_rl<sha1-8>' tag (ko.relay_study_tag); relay studies are never
 # picked as one of the seven DEFAULT_OBJECTIVES campaigns.
 DEFAULT_RELAY_OBJECTIVE = 'PI (log-tail)'
-DEFAULT_RELAY_LABEL = 'Profitability (flagship)'   # figures call it "flagship"
+DEFAULT_RELAY_LABEL = 'Profitability (TRY-informed)'   # seeded with the titer / yield / productivity campaigns' trials
 DEFAULT_RELAY_MIN_TRIALS = 1000
 _RELAY_TAG_RE = re.compile(r'_rl[0-9a-f]{8}(?=_|$)')
 
@@ -979,7 +980,7 @@ def set_colors(sets):
 # restricted from DEFAULT_OBJECTIVES: financial optimum (PI, drawn on the IRR
 # axis), isobutanol-titer max, ethanol-titer max.
 PATHWAY_OBJECTIVES = [
-    ('Profitability', 'PI (log-tail)'),
+    ('Profitability (uninformed)', 'PI (log-tail)'),
     ('Isobutanol titer', 'IBO titer'),
     ('Ethanol titer', 'EtOH titer'),
 ]
@@ -2043,7 +2044,7 @@ def _legend_order(sets):
     # (plus, optionally, the relay label) are exactly present.
     row1 = ('Baseline (no optimization)', 'Isobutanol yield',
             'Isobutanol titer', 'Isobutanol productivity')
-    row2 = ('Profitability', 'Ethanol yield',
+    row2 = ('Profitability (uninformed)', 'Ethanol yield',
             'Ethanol titer', 'Ethanol productivity')
     by_label = {s['label']: s for s in sets}
     has_relay = DEFAULT_RELAY_LABEL in by_label
