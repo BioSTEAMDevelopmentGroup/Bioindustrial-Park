@@ -18,7 +18,7 @@ baseline (the 'initial' row of the companion *_0_baseline.xlsx) as a white
 diamond (unlabelled: name it in the caption), over a light grey band for the
 ethanol market price range (ETHANOL_MARKET_RANGE) spanning the typical corn
 ethanol biorefinery TCI (TYPICAL_CORN_ETHANOL_TCI), the MPSP-TCI Pareto
-frontier of the samples (lower-left, both minimized) as a blue staircase, and dark grey dashed lines
+frontier of the samples (lower-left, both minimized) as a red dashed staircase, and dark grey dashed lines
 at the ends of the gasoline price range (GASOLINE_PRICE_RANGE), with contour
 lines
 of a Gaussian KDE enclosing 5 / 25 / 50 / 75 / 95 % of the samples (the
@@ -65,10 +65,11 @@ FONT_FAMILY = 'Arial'
 FONTS = {'tick': 12, 'axis_title': 12}
 TICK_LEN = {'major': 4.0, 'minor': 2.0} # pt; left/bottom ticks extend this far in AND out
 
-# the uninformed profitability campaign's colour (HUE_COLORS[0] of
-# plots/plot_kin_opt_parameter_sets.py), for the MPSP-TCI Pareto frontier
-PARETO_COLOR = '#18C4DC'
+# the MPSP-TCI Pareto frontier: dashed, in the red of the hue palette of
+# plots/plot_kin_opt_parameter_sets.py (HUE_COLORS[3])
+PARETO_COLOR = '#ED586F'
 PARETO_LW = 1.5
+PARETO_LS = (0, (4, 2))
 # the TRY-informed profitability campaign's teal (RELAY_COLOR in
 # plots/plot_kin_opt_parameter_sets.py)
 TEAL = '#0B6E7A'
@@ -216,7 +217,8 @@ def draw_pareto_frontier(ax, x, y):
     # staircase: between two frontier samples the lowest attainable MPSP is
     # the left one's, so step horizontally, then down
     fx, fy = pareto_frontier(x, y)
-    ax.step(fx, fy, where='post', color=PARETO_COLOR, lw=PARETO_LW, zorder=4)
+    ax.step(fx, fy, where='post', color=PARETO_COLOR, lw=PARETO_LW, ls=PARETO_LS,
+            zorder=4)
     return fx, fy
 
 
