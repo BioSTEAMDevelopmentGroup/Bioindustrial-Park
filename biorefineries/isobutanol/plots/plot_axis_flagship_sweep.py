@@ -26,7 +26,8 @@ Two modes:
   sweep (results/evaluate_axis_flagship_optimum_<NAME>.csv), in the layout of
   plot_k13_flagship_sweep.py: PI on the left axis, isobutanol yield on the
   right, the trial marked, PI = 0, any part beyond the campaign band shaded,
-  the onset of burden derating marked.
+  the onset of burden derating marked. --yield ethanol puts the ethanol yield
+  on the right axis instead (stem suffix _etoh_yield).
 
 Data: written by analyses/evaluate_axis_flagship_optimum.py (the simulation
 stage, ask-first). Sim-safe: reads CSV / JSON only; reuses the typeface and
@@ -36,6 +37,7 @@ biorefineries package.
 Usage:
     python plot_axis_flagship_sweep.py --screen [--dpi 300]
     python plot_axis_flagship_sweep.py --param threshold_conc [--dpi 300]
+    python plot_axis_flagship_sweep.py --param k_3 --yield ethanol
 """
 import os
 import json
@@ -137,11 +139,18 @@ def slice_summary(param, x, PI, Y, n_total):
                 score=(tv_p - 1) - (tv_y - 1))
 
 
-def ok_series(frame):
+#: --yield choice -> (sweep CSV column, axis / legend label, output-stem suffix)
+YIELD_METRICS = {
+    'isobutanol': ('IBO yield', 'Isobutanol yield', ''),
+    'ethanol': ('EtOH yield', 'Ethanol yield', '_etoh_yield'),
+}
+
+
+def ok_series(frame, yield_column='IBO yield'):
     ok = frame['state'] == 'OK'
     return (frame['value'].to_numpy(float),
             np.where(ok, frame['PI'], np.nan),
-            np.where(ok, frame['IBO yield'], np.nan))
+            np.where(ok, frame[yield_column], np.nan))
 
 
 def k13_reference(n_points):
@@ -251,13 +260,14 @@ def screen(dpi):
 # -----------------------------------------------------------------------------
 # --param: the publication figure of one full-resolution slice
 # -----------------------------------------------------------------------------
-def plot_param(param, dpi, stem=None):
+def plot_param(param, dpi, stem=None, product='isobutanol'):
+    yield_column, yield_label, stem_suffix = YIELD_METRICS[product]
     path = os.path.join(RESULTS_DIR, f'{SWEEP_STEM}_{param}.csv')
     with open(path[:-len('.csv')] + '_anchor.json') as fh:
         anchor = json.load(fh)
     frame = pd.read_csv(path).sort_values('value').reset_index(drop=True)
     band = anchor['bands'][param]
-    x, PI, Y = ok_series(frame)
+    x, PI, Y = ok_series(frame, yield_column)
     ok = frame['state'] == 'OK'
     dfac = frame['burden_factor'].to_numpy(float)
     i_opt = int(np.flatnonzero(frame['is_anchor'].to_numpy() == 1)[0])
@@ -300,7 +310,7 @@ def plot_param(param, dpi, stem=None):
     ax.set_xlim(x_lo, x_hi)
     ax.set_xlabel(AXIS_LABELS[param][0], fontsize=FONTS['axis_title'])
     ax.set_ylabel('Profitability index (PI)', fontsize=FONTS['axis_title'])
-    ax_r.set_ylabel(r'Isobutanol yield ($\mathrm{g·g}^{-1}$)',
+    ax_r.set_ylabel(yield_label + r' ($\mathrm{g·g}^{-1}$)',
                     fontsize=FONTS['axis_title'], rotation=270, labelpad=16)
     y_top = np.nanmax(Y)
     ax_r.set_ylim(-0.03*y_top, 1.12*y_top)
@@ -324,7 +334,7 @@ def plot_param(param, dpi, stem=None):
                       label=label)
     handles = [
         line(k13p.PI_KW, 'Profitability index (left axis)'),
-        line(k13p.YIELD_KW, 'Isobutanol yield (right axis)'),
+        line(k13p.YIELD_KW, f'{yield_label} (right axis)'),
         line(k13p.STAR_KW, f"Flagship optimum (#{anchor['trial_number']}, "
                            f"PI {PI[i_opt]:.2f})"),
         Line2D([], [], **k13p.BREAKEVEN_KW,
@@ -346,7 +356,7 @@ def plot_param(param, dpi, stem=None):
                fontsize=FONTS['legend'], bbox_to_anchor=(0.5, 0.0),
                handlelength=2.2)
 
-    out = os.path.join(OUT_DIR, stem or f'{param}_flagship_sweep')
+    out = os.path.join(OUT_DIR, stem or f'{param}_flagship_sweep{stem_suffix}')
     os.makedirs(OUT_DIR, exist_ok=True)
     for ext in ('png', 'pdf'):
         fig.savefig(f'{out}.{ext}', dpi=dpi)
@@ -359,7 +369,7 @@ def plot_param(param, dpi, stem=None):
           f"recorded {anchor['recorded_PI']:.5f})")
     print(f"PI {s['PI_min']:.3f}..{s['PI_max']:.3f}: TV {s['PI_TV']:.2f}, "
           f"{s['PI_maxima']} maxima, largest step {s['PI_jump']:.2f} of range")
-    print(f"IBO yield {s['Y_min']:.4f}..{s['Y_max']:.4f}: TV {s['Y_TV']:.2f}, "
+    print(f"{yield_label} {s['Y_min']:.4f}..{s['Y_max']:.4f}: TV {s['Y_TV']:.2f}, "
           f"{s['Y_maxima']} maxima, largest step {s['Y_jump']:.2f} of range")
     print(f'wrote {out}.png / .pdf')
 
@@ -369,13 +379,16 @@ def main(argv=None):
     mode = ap.add_mutually_exclusive_group(required=True)
     mode.add_argument('--screen', action='store_true')
     mode.add_argument('--param')
+    ap.add_argument('--yield', dest='product', choices=tuple(YIELD_METRICS),
+                    default='isobutanol',
+                    help='yield on the right axis of a --param figure')
     ap.add_argument('--stem', default=None)
     ap.add_argument('--dpi', type=int, default=300)
     args = ap.parse_args(argv)
     if args.screen:
         screen(args.dpi)
     else:
-        plot_param(args.param, args.dpi, args.stem)
+        plot_param(args.param, args.dpi, args.stem, args.product)
 
 
 if __name__ == '__main__':
