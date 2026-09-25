@@ -75,15 +75,21 @@ MPSP_CBAR_TICKS = np.arange(0.85, 1.15001, 0.05)
 # left-/right-aligned by the sign of its x offset unless LABEL_HA overrides it.
 # Aeration, AOC and slurry evaporation duty are deliberately not marked.
 OPTIMA = [
-    ('EtOH Titer',        'max', 'titer',        '^', 'white',   10, (11, -15),  0.3),
+    ('EtOH Titer',        'max', 'titer',        '^', 'white',   10, (12, 14),  -0.3),
     ('Cell loading',      'max', 'cell density', 'o', 'white',   10, (-6, 16),  -0.3),
     ('EtOH Productivity', 'max', 'productivity', 's', 'white',    9, (8, 17),   -0.2),
     ('EtOH Yield',        'max', 'yield',        'p', 'white',   10, (12, -14),  0.3),
-    ('TCI',               'min', 'TCI',          'p', '#33ccff', 10, (-10, -18), 0.3),
+    ('TCI',               'min', 'TCI',          'p', '#33ccff', 10, (0, -22),   0.3),
     ('MPSP',              'min', 'MPSP',         '*', '#33ccff', 14, (12, -14),  0.3),
 ]
-# centred above the productivity optimum, clear of the batch label to its right
-LABEL_HA = {'productivity': 'center'}
+# productivity: centred above its optimum, clear of the batch label to its
+# right; TCI: right-aligned just right of its optimum, so the label sits
+# wholly in the white (threshold > target) region
+LABEL_HA = {'productivity': 'center', 'TCI': 'right'}
+
+# Both batch / fed-batch labels: anchored on the boundary line at threshold
+# 150 g/L, then shifted by this many points (x, y)
+BATCH_LABEL_SHIFT = (-8., -5.)
 
 # Panel B series: (nskinetics results key, legend label); default colour cycle
 TRAJECTORY_SERIES = [
@@ -283,8 +289,10 @@ def draw_panel_A(fig, ax, cax):
     p1 = ax.transData.transform((bx[k] + 1., by[k] + slope))
     angle = np.arctan2(p1[1] - p0[1], p1[0] - p0[0])
     normal = np.array([-np.sin(angle), np.cos(angle)])
-    for text, side in (('↑ batch', 1), ('↓ fed-batch', -1)):
-        ax.annotate(text, xy=(bx[k], by[k]), xytext=side * 9. * normal,
+    # (gap from the line in points: the batch label sits over the steps)
+    for text, gap in (('↑ batch', 12.), ('↓ fed-batch', -9.)):
+        ax.annotate(text, xy=(bx[k], by[k]),
+                    xytext=gap * normal + np.array(BATCH_LABEL_SHIFT),
                     textcoords='offset points', ha='center', va='center',
                     rotation=np.degrees(angle), rotation_mode='anchor',
                     color='white', fontsize=FONTS['annotation'], zorder=4)
