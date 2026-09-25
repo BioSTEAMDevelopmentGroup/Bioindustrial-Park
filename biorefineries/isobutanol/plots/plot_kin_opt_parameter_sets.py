@@ -60,10 +60,13 @@ study preloaded with rows of the six process-level rs350 campaigns;
 metabolic_split_12d campaign with >= 2000 trials and the most recent relay
 (default_split_12d_specs / default_relay_spec). Each run writes three figure
 variants (--variants selects a subset):
-  profitability  A  two IRR cells side by side on one value axis: the
-                    financial (Profitability) campaign and the flagship
-                    (relay) campaign, each with the baseline reference line
-                    and its highest-IRR trial circled. The flagship cell's
+  irr            A  two IRR cells side by side on one value axis (one
+                    shared value-axis title, no cell titles), each with the
+                    baseline reference line: the financial (Profitability)
+                    campaign, solid, with the process-level campaigns'
+                    incumbents dashed and every campaign's highest-IRR trial
+                    circled; and the flagship (relay) campaign alone, its
+                    highest-IRR simulated trial circled. The flagship cell's
                     preload zone (trials 0..N-1, shaded light grey) shows the
                     preloaded donor rows in their donor campaign's colour, in
                     shuffled order, and also circles the seed (the best
@@ -77,7 +80,7 @@ variants (--variants selects a subset):
                     owning campaign's incumbent solid with its trial cloud,
                     every other campaign's -- the financial and flagship
                     ones included -- dashed. No IRR cell;
-                 B  as in profitability;
+                 B  as in irr;
   parameters     the final kinetic and process parameters of every set, the
                  relay campaign included.
 The relay's legend line says what it was seeded with.
@@ -432,7 +435,11 @@ PRELOAD_ZONE_ALPHA = 0.5
 # and flagship (relay) campaigns, or the six process-level trajectories; panel
 # B the proteome allocation of every set -- and the standalone
 # final-parameters figure (file stems <stem>_<variant>_<stamp>)
-FIGURE_VARIANTS = ('profitability', 'process', 'parameters')
+FIGURE_VARIANTS = ('irr', 'process', 'parameters')
+# the longest output path savefig can open on this machine (Windows MAX_PATH
+# 260 incl. the terminating NUL); the default campaign-derived stem leaves
+# only a few characters of headroom, so main() checks before rendering
+MAX_PATH_CHARS = 259
 
 FONTS = {'band': 12, 'cell': 10, 'tick': 9, 'callout': 9,
          'legend': 10, 'axis': 11, 'panel': 14}
@@ -1592,7 +1599,7 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9,
     _inward_top_right_ticks(ax, do_x=True, do_y=True)
 
 
-# the profitability variant's two IRR cells sit side by side in panel a and
+# the irr variant's two IRR cells sit side by side in panel a and
 # share the left cell's value-axis title, so the gap between them only has to
 # hold the right cell's tick labels (~0.35 in)
 IRR_PAIR_WSPACE = 0.09
@@ -1616,7 +1623,7 @@ def _trial_xmax(sets):
 
 
 def draw_irr_pair(fig, gs_cell, cells, colors, xmax, donor_sets):
-    """Panel a of the profitability variant: one IRR cell per entry (a list
+    """Panel a of the irr variant: one IRR cell per entry (a list
     of sets) of `cells`, side by side on a SHARED value axis whose title only
     the leftmost cell carries. A relay set's cell draws its preloaded donor
     rows in their donor's colour (donor_sets); every cell circles the
@@ -1651,7 +1658,7 @@ def draw_process_outcomes(fig, gs_cell, sets, colors, xmax):
     sub_gs = gs_cell.subgridspec(2, 3, wspace=PROCESS_GRID_WSPACE,
                                  hspace=PROCESS_GRID_HSPACE)
     # the trial-cloud marker AREA scales with (cell width / big IRR cell
-    # width)^2, the big IRR cell (the profitability variant's) as reference
+    # width)^2, the big IRR cell (the irr variant's) as reference
     ref_w = gs_cell.get_position(fig).width / (2 + REF_IRR_CELL_WSPACE)
     axes = []
     for (col, label, yl), (r, c) in zip(OUTCOMES[1:],
@@ -2052,12 +2059,12 @@ def _legend_order(sets):
 
 
 def plot(sets, band, out_stem, dpi=300, params_only=False,
-         view='profitability'):
+         view='irr'):
     """A two-panel figure: panel A outcome trajectories, panel B the proteome
     allocation of EVERY set (the regular campaigns in order, the relay
     campaign(s) last). view picks panel A:
 
-      'profitability'  two IRR cells side by side on one value axis, each
+      'irr'            two IRR cells side by side on one value axis, each
                        with the baseline reference line: the financial
                        campaign(s) (the regular sets owning the IRR cell),
                        solid, with the process-level campaigns' incumbents
@@ -2073,20 +2080,20 @@ def plot(sets, band, out_stem, dpi=300, params_only=False,
 
     params_only: the standalone final-parameters figure
     (_plot_parameters_only). Returns out_stem, or None (writing nothing) for
-    a profitability view with no financial or relay campaign among the
+    an irr view with no financial or relay campaign among the
     sets."""
     apply_fonts()
     LEFT, RIGHT = 0.083, 0.97
     if params_only:
         return _plot_parameters_only(sets, band, out_stem, dpi)
-    if view not in ('profitability', 'process'):
+    if view not in ('irr', 'process'):
         raise ValueError(f'unknown two-panel view {view!r}')
     relay_sets = [s for s in sets if s.get('is_relay')]
     a_sets = [s for s in sets if not s.get('is_relay')]
     base_sets = [s for s in a_sets if s.get('is_baseline')]
     fin_sets = [s for s in a_sets if not s.get('is_baseline')
                 and _owns_outcome(s.get('objective'), 'IRR')]
-    if view == 'profitability':
+    if view == 'irr':
         # the financial cell draws every regular set: the financial incumbent
         # solid with its trial cloud, the process-level campaigns' incumbents
         # dashed, and every campaign's highest-IRR trial circled; the flagship
@@ -2152,7 +2159,7 @@ def plot(sets, band, out_stem, dpi=300, params_only=False,
     colors = set_colors(sets)
     k = H0 / H                     # H0-canvas fraction -> this canvas
     xmax = _trial_xmax(sets)
-    if view == 'profitability':
+    if view == 'irr':
         a_axes = draw_irr_pair(fig, a_gs[0], cells, colors, xmax,
                                donor_sets=a_sets)
         a_title = 'Profitability optimization trajectories'
@@ -2501,7 +2508,7 @@ def main(argv=None):
     ap.add_argument('--variants', nargs='+', choices=FIGURE_VARIANTS,
                     default=list(FIGURE_VARIANTS),
                     help='figure variants to write (default: all three): '
-                         'profitability = panel A the IRR trajectories of '
+                         'irr = panel A the IRR trajectories of '
                          'the financial and flagship (relay) campaigns + '
                          'panel B the proteome allocation of every set; '
                          'process = panel A the six process-level '
@@ -2519,7 +2526,7 @@ def main(argv=None):
                     help='default (no --set) path only: add the PI (log-tail) '
                          'relay campaign (pinned, or the most recent with '
                          '--latest): the last proteome and parameter row, '
-                         'the second IRR cell of the profitability figure '
+                         'the second IRR cell of the irr figure '
                          'and a dashed line in the process figure (on by default; '
                          '--no-relay drops it). With --set, a relay campaign '
                          'is recognised by its _rl tag.')
@@ -2596,16 +2603,24 @@ def main(argv=None):
     stem = args.stem or f'{os.path.basename(specs[0][1]).replace(".csv", "")}' \
                         '_parameter_sets'
     variants = ('parameters',) if args.params_only else tuple(args.variants)
+    out_stems = {v: os.path.join(args.out_dir, f'{stem}_{v}_{stamp}')
+                 for v in FIGURE_VARIANTS if v in variants}
+    # fail before rendering, not at savefig, when a path would exceed this
+    # machine's 260-character MAX_PATH (259 usable)
+    too_long = [p for p in out_stems.values()
+                if len(os.path.abspath(p + '.png')) > MAX_PATH_CHARS]
+    if too_long:
+        raise ValueError(
+            f'output path over {MAX_PATH_CHARS} characters '
+            f'({len(os.path.abspath(too_long[0] + ".png"))}): '
+            f'{too_long[0]}.png -- pass a shorter --stem or --out-dir')
     written = []
-    for variant in FIGURE_VARIANTS:
-        if variant not in variants:
-            continue
-        out_stem = os.path.join(args.out_dir, f'{stem}_{variant}_{stamp}')
+    for variant, out_stem in out_stems.items():
         if variant == 'parameters':
             plot(sets, band, out_stem, dpi=args.dpi, params_only=True)
         elif plot(sets, band, out_stem, dpi=args.dpi, view=variant) is None:
             print('  NOTE no financial or relay campaign among the sets; '
-                  'profitability figure skipped')
+                  'irr figure skipped')
             continue
         written.append(out_stem)
     console_report(sets, band_campaign)
