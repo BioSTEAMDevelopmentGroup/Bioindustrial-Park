@@ -74,6 +74,13 @@ FIGURE = ksf.SweepFigure(
     xlim=(0., 4.), ylim=(0., 2.),
     x_major=1., x_minor_div=4, y_major=0.5, y_minor_div=5,
     label_color=LABEL_COLOR,
+    # MESP axis 3.5-7 $/GGE (the sweep spans 3.79-16.1; past 7 = over-colour),
+    # 70 levels of 0.05 to stay under the colormap's 90 colours
+    mesp_levels=np.arange(3.5, 7.00001, 0.05),
+    mesp_cbar_ticks=np.arange(3.5, 7.00001, 0.5),
+    mesp_cbar_minor_step=0.1,
+    # hatched: MESP within the ethanol market price range (2.31-5.15 $/GGE)
+    comparison_range=ksf.ETHANOL_MARKET_RANGE,
 )
 
 if __name__ == '__main__':

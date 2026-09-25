@@ -47,11 +47,29 @@ USD_PER_KG_TO_USD_PER_GGE = fs.USD_PER_KG_TO_USD_PER_GGE
 RESULTS_DIR = os.path.join(os.path.dirname(HERE), 'analyses', 'results')
 OUTPUT_DIR = os.path.join(RESULTS_DIR, 'publication', 'Kinetic-sweeps')
 
-# Colour scale (MESP, $/GGE): the feeding-strategy figure's levels, so the
-# figures read on one scale; values past 5.25 take the over-colour
+# Default colour scale (MESP, $/GGE): the feeding-strategy figure's levels, so
+# the figures read on one scale; values past the top take the over-colour. A
+# figure may override all three (SweepFigure.mesp_*); keep the number of
+# levels below the colormap's 90 colours.
 MESP_LEVELS = fs.MESP_LEVELS
 MESP_CBAR_TICKS = fs.MESP_CBAR_TICKS
 MESP_CBAR_MINOR_STEP = fs.MESP_CBAR_MINOR_STEP
+
+# Ethanol market price range, the one plots/plot_uncertainty_MPSP_vs_TCI.py
+# (ETHANOL_MARKET_RANGE) and uncertainties_IBO_EtOH.py use: Jan 2021 - Dec 2025
+# five-year low and high, 1.5475 and 3.4500 $/gal, from
+# https://tradingeconomics.com/commodity/ethanol, / 0.67 GGE/gal -> $/GGE
+ETHANOL_MARKET_RANGE_PER_GAL = (1.5475, 3.4500) # $/gal
+ETHANOL_MARKET_RANGE = tuple(v / fs.GGE_PER_GAL for v in ETHANOL_MARKET_RANGE_PER_GAL) # $/GGE
+
+# Comparison-range style (contourplots' comparison_range convention: white
+# '///' hatch over the in-range region + a white bounding contour, the same
+# hatch on the colourbar)
+COMPARISON_HATCH = '///'
+COMPARISON_HATCH_RGBA = (1., 1., 1., 0.45)
+COMPARISON_LINE_RGBA = (1., 1., 1., 0.9)
+COMPARISON_LINE_WIDTH = 0.9
+COMPARISON_HATCH_LINE_WIDTH = 0.6
 
 G_PER_L_PER_H = r'$\mathrm{g·L}^{-1}\mathrm{·h}^{-1}$'
 
@@ -64,7 +82,9 @@ class SweepFigure:
     colour, size [pt], label offset from the marker [pt], arrow curvature); a
     label is left-/right-aligned by the sign of its x offset unless
     `label_ha` overrides it; `marker_nudge` fans co-located optima apart
-    [pt]."""
+    [pt]. `mesp_levels` / `mesp_cbar_ticks` / `mesp_cbar_minor_step` override
+    the default colour scale; `comparison_range` = (low, high) $/GGE hatches
+    the region whose MESP lies in that range (e.g. ETHANOL_MARKET_RANGE)."""
     output_stem: str
     csv_prefix: str
     spec_1: np.ndarray
@@ -82,6 +102,10 @@ class SweepFigure:
     label_color: dict = field(default_factory=dict)
     marker_nudge: dict = field(default_factory=dict)
     figsize: tuple = (5.6, 4.2)
+    mesp_levels: np.ndarray = None
+    mesp_cbar_ticks: np.ndarray = None
+    mesp_cbar_minor_step: float = None
+    comparison_range: tuple = None
 
 #%% Sweep data
 
@@ -127,13 +151,28 @@ def fill_failed_cells(figure, arr):
 def draw_panel(figure, fig, ax, cax):
     mesp = fill_failed_cells(
         figure, load_sweep_metric(figure, 'MPSP') * USD_PER_KG_TO_USD_PER_GGE)
+    levels = MESP_LEVELS if figure.mesp_levels is None else figure.mesp_levels
+    cbar_ticks = MESP_CBAR_TICKS if figure.mesp_cbar_ticks is None else figure.mesp_cbar_ticks
+    minor_step = figure.mesp_cbar_minor_step or MESP_CBAR_MINOR_STEP
     cmap = fs.JBEI_UCB_colormap()
-    norm = BoundaryNorm(MESP_LEVELS, cmap.N, extend='max')
-    cs = ax.contourf(figure.spec_1, figure.spec_2, mesp, levels=MESP_LEVELS,
+    norm = BoundaryNorm(levels, cmap.N, extend='max')
+    cs = ax.contourf(figure.spec_1, figure.spec_2, mesp, levels=levels,
                      cmap=cmap, norm=norm, extend='max', zorder=1)
     cs.set_edgecolor('face')  # no hairline seams between bands in the PDF
     ax.set_xlim(*(figure.xlim or (figure.spec_1[0], figure.spec_1[-1])))
     ax.set_ylim(*(figure.ylim or (figure.spec_2[0], figure.spec_2[-1])))
+
+    # comparison range: hatch the in-range region, bound it with a contour
+    if figure.comparison_range is not None:
+        with matplotlib.rc_context({'hatch.color': COMPARISON_HATCH_RGBA,
+                                    'hatch.linewidth': COMPARISON_HATCH_LINE_WIDTH}):
+            ax.contourf(figure.spec_1, figure.spec_2, mesp,
+                        levels=list(figure.comparison_range), colors='none',
+                        hatches=[COMPARISON_HATCH], zorder=2)
+        ax.contour(figure.spec_1, figure.spec_2, mesp,
+                   levels=list(figure.comparison_range),
+                   colors=[COMPARISON_LINE_RGBA], linewidths=COMPARISON_LINE_WIDTH,
+                   zorder=3)
 
     # optimum markers + labels
     optima = {}
@@ -167,12 +206,17 @@ def draw_panel(figure, fig, ax, cax):
     sm = ScalarMappable(norm=norm, cmap=cmap)
     cbar = fig.colorbar(sm, cax=cax, spacing='proportional', extend='max',
                         extendfrac=0.04)
-    cbar.set_ticks(MESP_CBAR_TICKS)
-    cbar.set_ticklabels([f'{t:.2f}' for t in MESP_CBAR_TICKS])
+    cbar.set_ticks(cbar_ticks)
+    cbar.set_ticklabels([f'{t:.2f}' for t in cbar_ticks])
     cbar.ax.yaxis.set_minor_locator(FixedLocator(
-        [v for v in np.arange(MESP_LEVELS[0], MESP_LEVELS[-1] + 1e-9,
-                              MESP_CBAR_MINOR_STEP)
-         if not np.any(np.isclose(v, MESP_CBAR_TICKS))]))
+        [v for v in np.arange(levels[0], levels[-1] + 1e-9, minor_step)
+         if not np.any(np.isclose(v, cbar_ticks))]))
+    if figure.comparison_range is not None:
+        with matplotlib.rc_context({'hatch.color': COMPARISON_HATCH_RGBA,
+                                    'hatch.linewidth': COMPARISON_HATCH_LINE_WIDTH}):
+            cbar.ax.fill_betweenx(figure.comparison_range, 0., 1., facecolor='none',
+                                  edgecolor=COMPARISON_HATCH_RGBA,
+                                  hatch=COMPARISON_HATCH, linewidth=0., zorder=3)
     cbar.ax.tick_params(which='major', labelsize=FONTS['tick'],
                         length=TICK_LEN['major'])
     cbar.ax.tick_params(which='minor', length=TICK_LEN['minor'])
