@@ -179,7 +179,9 @@ BOX_PERCENTILES = {'whis': (5, 95), 'dots': (0, 100)} # dots: min and max
 # panel hue, Pareto sense per axis ('min' / 'max', x then y), fixed axis
 # ticks / limits (neither = 'nice' ticks enclosing the samples and
 # the baseline)
-REVENUE_TICKS = np.arange(0.0, 181.0, 30.0) # MM$/y, panel C (both axes 0-180)
+# panel C: ethanol revenue 0-180, DDGS revenue 0-30 MM$/y
+ETOH_REVENUE_TICKS = np.arange(0.0, 181.0, 30.0) # MM$/y
+DDGS_REVENUE_TICKS = np.arange(0.0, 31.0, 5.0) # MM$/y
 PANELS = (
     dict(x='TCI', y='MPSP',
          xlabel='Total capital investment [MM\\$]',
@@ -194,7 +196,7 @@ PANELS = (
     dict(x='DDGS revenue', y='EtOH revenue', color=YELLOW, pareto=('max', 'max'),
          xlabel=r'DDGS sale revenue [$\mathrm{MM\$·y}^{-1}$]',
          ylabel=r'Ethanol sale revenue [$\mathrm{MM\$·y}^{-1}$]',
-         xticks=REVENUE_TICKS, yticks=REVENUE_TICKS),
+         xticks=DDGS_REVENUE_TICKS, yticks=ETOH_REVENUE_TICKS),
 )
 GRID_SHAPE = (2, 2)
 
