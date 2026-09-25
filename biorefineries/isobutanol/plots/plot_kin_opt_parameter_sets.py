@@ -1592,10 +1592,14 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9,
     _inward_top_right_ticks(ax, do_x=True, do_y=True)
 
 
-# the profitability variant's two IRR cells sit side by side in panel a; this
-# wspace makes each the size of the retired 3x4 grid's big IRR cell (2 of 4
-# columns at wspace 0.62) while leaving the right cell's ylabel ~0.9 in
-IRR_PAIR_WSPACE = 0.24
+# the profitability variant's two IRR cells sit side by side in panel a and
+# share the left cell's value-axis title, so the gap between them only has to
+# hold the right cell's tick labels (~0.35 in)
+IRR_PAIR_WSPACE = 0.09
+# trial-cloud marker reference: the retired 3x4 grid's big IRR cell (2 of 4
+# columns at wspace 0.62), i.e. a 1x2 split of panel a at this wspace; the
+# process variant scales its marker area by (cell width / this width)^2
+REF_IRR_CELL_WSPACE = 0.24
 # the process variant's 2x3 grid (row 1 isobutanol, row 2 ethanol)
 PROCESS_GRID_WSPACE = 0.36
 PROCESS_GRID_HSPACE = 0.62
@@ -1612,23 +1616,24 @@ def _trial_xmax(sets):
 
 
 def draw_irr_pair(fig, gs_cell, cells, colors, xmax, donor_sets):
-    """Panel a of the profitability variant: one IRR cell per (title, sets)
-    entry of `cells`, side by side on a SHARED value axis. A relay set's cell
-    draws its preloaded donor rows in their donor's colour (donor_sets); every
-    cell circles the highest-IRR trial of each campaign it draws (and, for a
-    relay, the preloaded seed / donor best-IRR trials)."""
+    """Panel a of the profitability variant: one IRR cell per entry (a list
+    of sets) of `cells`, side by side on a SHARED value axis whose title only
+    the leftmost cell carries. A relay set's cell draws its preloaded donor
+    rows in their donor's colour (donor_sets); every cell circles the
+    highest-IRR trial of each campaign it draws (and, for a relay, the
+    preloaded seed / donor best-IRR trials)."""
     col, label, yl = OUTCOMES[0]
     sub_gs = gs_cell.subgridspec(1, max(len(cells), 2),
                                  wspace=IRR_PAIR_WSPACE)
     axes = []
-    for i, (title, cell_sets) in enumerate(cells):
+    for i, cell_sets in enumerate(cells):
         ax = fig.add_subplot(sub_gs[0, i])
         relay = any(s.get('is_relay') for s in cell_sets)
         outcome_cell(ax, cell_sets, colors, col, label, yl, xmax,
                      donor_sets=donor_sets if relay else None,
                      mark_best=True)
-        ax.set_title(title, fontsize=FONTS['cell'] + 1, fontweight='bold',
-                     pad=5)
+        if i:
+            ax.set_ylabel('')
         axes.append(ax)
     top = max(ax.get_ylim()[1] for ax in axes)
     for ax in axes:
@@ -1647,7 +1652,7 @@ def draw_process_outcomes(fig, gs_cell, sets, colors, xmax):
                                  hspace=PROCESS_GRID_HSPACE)
     # the trial-cloud marker AREA scales with (cell width / big IRR cell
     # width)^2, the big IRR cell (the profitability variant's) as reference
-    ref_w = gs_cell.get_position(fig).width / (2 + IRR_PAIR_WSPACE)
+    ref_w = gs_cell.get_position(fig).width / (2 + REF_IRR_CELL_WSPACE)
     axes = []
     for (col, label, yl), (r, c) in zip(OUTCOMES[1:],
                                         ((0, 0), (0, 1), (0, 2),
@@ -2088,10 +2093,9 @@ def plot(sets, band, out_stem, dpi=300, params_only=False,
         # cell draws the relay alone (its preload zone holds the donor rows)
         cells = []
         if fin_sets:
-            cells.append((' + '.join(s['label'] for s in fin_sets), a_sets))
+            cells.append(a_sets)
         if relay_sets:
-            cells.append((' + '.join(s['label'] for s in relay_sets),
-                          base_sets + relay_sets))
+            cells.append(base_sets + relay_sets)
         if not cells:
             return None
         has_best_marks = True
@@ -2136,12 +2140,9 @@ def plot(sets, band, out_stem, dpi=300, params_only=False,
 
     fig = plt.figure(figsize=(9.5, H))
     # panel a's bottom is lifted to widen the a -> b gap enough for the one
-    # framed box that holds both the campaign key and the mark key. The
-    # profitability view's cells carry a title each, so its top drops by the
-    # title height to keep the panel heading clear.
-    a_top = 0.9330 - (0.024 if view == 'profitability' else 0.0)
+    # framed box that holds both the campaign key and the mark key
     a_gs = fig.add_gridspec(1, 1, left=LEFT, right=RIGHT,
-                            top=fy(a_top), bottom=fy(0.6500))
+                            top=fy(0.9330), bottom=fy(0.6500))
     # panel b (proteome) is pushed down ~0.027 vs panel a's bottom to widen
     # the a -> b gap enough for the legend box to clear both panel a's x-axis
     # titles above and panel b below with ~equal margins (see the anchors)
@@ -2158,9 +2159,7 @@ def plot(sets, band, out_stem, dpi=300, params_only=False,
     else:
         a_axes = draw_process_outcomes(fig, a_gs[0], sets, colors, xmax)
         a_title = 'Process-level optimization trajectories'
-    # the panel heading keeps the same height in both views (the
-    # profitability cells' titles sit in the band between it and the cells)
-    a_title_y = fy(0.9330) + 0.012 * k
+    a_title_y = a_axes[0].get_position().y1 + 0.012 * k
     # proteome rows: every set, the relay campaign(s) last (bottom row)
     axc = draw_burden(fig, c_gs[0], a_sets + relay_sets, colors,
                       offset_scale=k)
