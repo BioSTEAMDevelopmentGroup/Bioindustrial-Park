@@ -16,7 +16,9 @@ analyses/full/uncertainties_IBO_EtOH.py).
 Joint panel: every Monte Carlo sample as a teal dot at 25 % opacity and the
 baseline (the 'initial' row of the companion *_0_baseline.xlsx) as a white
 diamond (unlabelled: name it in the caption), over a light grey band for the
-ethanol market price range (ETHANOL_MARKET_RANGE) and dark grey dashed lines
+ethanol market price range (ETHANOL_MARKET_RANGE) spanning the typical corn
+ethanol biorefinery TCI (TYPICAL_CORN_ETHANOL_TCI), the MPSP-TCI Pareto
+frontier of the samples (lower-left, both minimized) as a blue staircase, and dark grey dashed lines
 at the ends of the gasoline price range (GASOLINE_PRICE_RANGE), with contour
 lines
 of a Gaussian KDE enclosing 5 / 25 / 50 / 75 / 95 % of the samples (the
@@ -63,6 +65,10 @@ FONT_FAMILY = 'Arial'
 FONTS = {'tick': 12, 'axis_title': 12}
 TICK_LEN = {'major': 4.0, 'minor': 2.0} # pt; left/bottom ticks extend this far in AND out
 
+# the uninformed profitability campaign's colour (HUE_COLORS[0] of
+# plots/plot_kin_opt_parameter_sets.py), for the MPSP-TCI Pareto frontier
+PARETO_COLOR = '#18C4DC'
+PARETO_LW = 1.5
 # the TRY-informed profitability campaign's teal (RELAY_COLOR in
 # plots/plot_kin_opt_parameter_sets.py)
 TEAL = '#0B6E7A'
@@ -109,6 +115,11 @@ GASOLINE_PRICE_RANGE = (2.16, 4.84) # $/GGE
 MPSP_AXIS_LIMITS = (0.0, 6.0) # $/GGE
 TCI_AXIS_LIMITS = (75.0, 200.0) # MM$
 TCI_TICK_STEP = 25.0 # MM$
+N_MINOR_PER_MAJOR = 4 # minor ticks between adjacent major ticks, both axes
+# the ethanol market band spans only the typical total capital investment of a
+# corn ethanol biorefinery
+# TODO: cite the source of the 100-150 MM$ typical corn-ethanol TCI range
+TYPICAL_CORN_ETHANOL_TCI = (100.0, 150.0) # MM$
 # the ethanol range is a band in a light shade of the baseline grey of
 # plots/plot_kin_opt_parameter_sets.py (BASELINE_COLOR); the gasoline range,
 # which almost coincides with it, is two dashed lines in a dark shade of the
@@ -186,6 +197,27 @@ def draw_samples(ax, x, y):
     # baseline marker stay vector)
     ax.scatter(x, y, s=SAMPLE_SIZE, color=TEAL, alpha=SAMPLE_ALPHA, lw=0,
                rasterized=True, zorder=2)
+
+
+def pareto_frontier(x, y):
+    """The non-dominated samples when minimizing both x and y, sorted by
+    ascending x (so descending y)."""
+    order = np.lexsort((y, x)) # by x, ties by y
+    front, best = [], np.inf
+    for i in order:
+        if y[i] < best:
+            front.append(i)
+            best = y[i]
+    front = np.array(front)
+    return x[front], y[front]
+
+
+def draw_pareto_frontier(ax, x, y):
+    # staircase: between two frontier samples the lowest attainable MPSP is
+    # the left one's, so step horizontally, then down
+    fx, fy = pareto_frontier(x, y)
+    ax.step(fx, fy, where='post', color=PARETO_COLOR, lw=PARETO_LW, zorder=4)
+    return fx, fy
 
 
 def draw_hdr_contours(ax, x, y, n_grid=300, pad=0.15):
@@ -266,11 +298,15 @@ def plot_uncertainty_MPSP_vs_TCI(results_file=None, baseline_file=None,
         raise ValueError(f'MPSP_AXIS_LIMITS {MPSP_AXIS_LIMITS} clip samples '
                          f'({mpsp.min():.3g}-{mpsp.max():.3g} $/GGE)')
     xlim, ylim = (xticks[0], xticks[-1]), (yticks[0], yticks[-1])
-    ax.axhspan(*ETHANOL_MARKET_RANGE, color=MARKET_BAND_COLOR, lw=0, zorder=0)
+    ax.fill_between(TYPICAL_CORN_ETHANOL_TCI, *ETHANOL_MARKET_RANGE,
+                    color=MARKET_BAND_COLOR, lw=0, zorder=0)
     for price in GASOLINE_PRICE_RANGE:
         ax.axhline(price, color=GASOLINE_LINE_COLOR, zorder=1, **GASOLINE_LINE_STYLE)
     draw_samples(ax, tci, mpsp)
     draw_hdr_contours(ax, tci, mpsp)
+    fx, fy = draw_pareto_frontier(ax, tci, mpsp)
+    print(f'Pareto frontier: {fx.size} non-dominated samples, TCI '
+          f'{fx[0]:.4g}-{fx[-1]:.4g} MM$, MPSP {fy[0]:.4g}-{fy[-1]:.4g} $/GGE')
     if base:
         ax.plot(*base, 'D', ms=8, mfc='w', mec=INK, mew=1.2, zorder=5)
     ax.set_xticks(xticks)
@@ -281,8 +317,8 @@ def plot_uncertainty_MPSP_vs_TCI(results_file=None, baseline_file=None,
                   fontsize=FONTS['axis_title'])
     ax.set_ylabel('Minimum ethanol selling price '
                   r'[$\mathrm{\$·GGE}^{-1}$]', fontsize=FONTS['axis_title'])
-    ax.xaxis.set_minor_locator(AutoMinorLocator(2))
-    ax.yaxis.set_minor_locator(AutoMinorLocator(2))
+    ax.xaxis.set_minor_locator(AutoMinorLocator(N_MINOR_PER_MAJOR + 1))
+    ax.yaxis.set_minor_locator(AutoMinorLocator(N_MINOR_PER_MAJOR + 1))
 
     draw_box(ax_top, tci, 'horizontal')
     draw_box(ax_right, mpsp, 'vertical')
