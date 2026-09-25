@@ -22,14 +22,19 @@ it leaves the flowsheet at the trial, so the unit groups read the trial).
 After every simulation the five metrics of the 19 unit groups are read and
 two closures pinned by analyses/test_unit_groups.py are asserted (the
 installed-cost column sums to tea.installed_equipment_cost, the
-Operating-cost column to tea.AOC / operating_hours); a failed simulation or
-closure aborts. A reproduction whose tracked metrics differ from the
-recorded row by more than 2 % is recorded and printed, not fatal.
+Operating-cost column to tea.AOC / operating_hours); so is the sales revenue
+of the four products (ethanol, isobutanol, DDGS, corn oil; spec
+docs/superpowers/specs/2026-09-24-tea-breakdowns-revenue-design.md), read at
+the prices the panel's IRR was solved with and required to sum to tea.sales /
+operating_hours. A failed simulation or closure aborts. A reproduction
+whose tracked metrics differ from the recorded row by more than 2 % is
+recorded and printed, not fatal.
 
 Writes analyses/results/tea_breakdowns_split12d_<stamp>.json: meta (metric
 names + units, group order, operating hours, hensmith path) and one record per
 scenario (label, campaign, trial, summary metrics, reproduction check,
-ABSOLUTE metric values per group; operating cost in USD/hr).
+ABSOLUTE metric values per group; operating cost in USD/hr; product revenue
+in USD/hr).
 
 Run (the campaigns ran with hensmith master 2b5b27d pinned via PYTHONPATH;
 use the same pin):
@@ -80,6 +85,12 @@ METRICS = ('Installed equipment cost', 'Cooling duty', 'Heating duty',
 INSTALLED, OPERATING = METRICS[0], METRICS[-1]
 #: closure tolerances of analyses/test_unit_groups.py checks 1 and 5
 INSTALLED_RTOL, OPERATING_RTOL = 1e-9, 1e-6
+#: product (display key, in the figure's stack order) -> sold stream ID
+REVENUE_STREAMS = {'ethanol': 'ethanol', 'isobutanol': 'isobutanol',
+                   'DDGS': 'DDGS', 'corn oil': 'crude_oil'}
+#: the products must sum to tea.sales (which also counts any other priced
+#: product and the cost units' outlet revenue)
+SALES_RTOL = 1e-6
 BASELINE_PIN_RTOL = 0.01
 WATCHDOG_MIN = 45.0
 
@@ -149,9 +160,26 @@ def read_breakdown(system):
             f'Operating-cost column {operating!r} != tea.AOC/operating_hours '
             f'{operating_ref!r} USD/hr')
     totals = dict(installed_equipment_cost=installed_ref,
-                  AOC=tea.AOC/1e6, TCI=tea.TCI/1e6,
+                  AOC=tea.AOC/1e6, TCI=tea.TCI/1e6, sales=tea.sales/1e6,
                   operating_hours=float(tea.operating_hours))
     return values, units, totals
+
+
+def read_revenue(system):
+    """{product: USD/hr} sales revenue of the REVENUE_STREAMS products at
+    their live prices -- read right after a TEA solve, which leaves both
+    alcohols at their purity-based default prices (the prices the IRR was
+    solved with); raises BreakdownClosureError unless they sum to
+    tea.sales / operating_hours."""
+    tea = system.corn_EtOH_IBO_sys_tea
+    revenue = {product: _json_float(getattr(system.f, ID).cost)
+               for product, ID in REVENUE_STREAMS.items()}
+    total, ref = sum(revenue.values()), tea.sales/tea.operating_hours
+    if not _close(total, ref, SALES_RTOL):
+        raise BreakdownClosureError(
+            f'product revenue {total!r} != tea.sales/operating_hours {ref!r} '
+            f'USD/hr: another product (or outlet revenue) is priced')
+    return revenue
 
 
 def baseline_record(system, ko, scenarios):
@@ -173,7 +201,8 @@ def baseline_record(system, ko, scenarios):
                 MPSPs=mpsps, IRR=_json_float(solution['IRR']),
                 metrics=metrics, reproduction=dict(baseline_pin=pin,
                                                    baseline_pin_ok=pin_ok),
-                totals=totals, breakdown=values), units
+                totals=totals, breakdown=values,
+                revenue=read_revenue(system)), units
 
 
 def campaign_record(system, ko, key, label, study, objective, trial,
@@ -210,7 +239,7 @@ def campaign_record(system, ko, key, label, study, objective, trial,
                 metrics={k: _json_float(v)
                          for k, v in reproduced['metrics'].items()},
                 reproduction=reproduction, totals=totals,
-                breakdown=values), units
+                breakdown=values, revenue=read_revenue(system)), units
 
 
 #%% Runner
@@ -266,6 +295,7 @@ def main(argv=None):
                   anchor_scenario=ANCHOR_SCENARIO,
                   metrics=list(METRICS), metric_units=units,
                   groups=[g.name for g in system.unit_groups],
+                  revenue_products=list(REVENUE_STREAMS),
                   operating_hours=float(tea.operating_hours),
                   hensmith=os.path.dirname(hensmith.__file__)),
         order=[BASELINE_KEY] + [s[0] for s in selected],
@@ -279,13 +309,13 @@ def main(argv=None):
     watchdog.cancel()
 
     print(f'\n{"scenario":<18}{"trial":>7}{"IRR":>9}{"PI":>9}{"TCI":>8}'
-          f'{"AOC":>8}{"max rel":>10}  warnings')
+          f'{"AOC":>8}{"sales":>8}{"max rel":>10}  warnings')
     for key in doc['order']:
         r = records[key]
         rep = r['reproduction']
         print(f'{key:<18}{str(r["trial_number"] or "-"):>7}{r["IRR"]:>9.4f}'
               f'{r["metrics"]["PI"]:>9.4f}{r["totals"]["TCI"]:>8.1f}'
-              f'{r["totals"]["AOC"]:>8.1f}'
+              f'{r["totals"]["AOC"]:>8.1f}{r["totals"]["sales"]:>8.1f}'
               f'{rep.get("max_rel_delta", math.nan):>10.2e}  '
               f'{rep.get("metric_warnings", "")}')
     print(f'\nwrote {path}')
