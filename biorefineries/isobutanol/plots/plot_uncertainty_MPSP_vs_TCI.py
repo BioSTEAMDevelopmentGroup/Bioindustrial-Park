@@ -7,26 +7,34 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 """
-Bivariate uncertainty plot of the purity-adjusted ethanol MPSP (y, converted
-from the workbook's $/kg to $/GGE, see USD_PER_KG_TO_USD_PER_GGE) against
-the total capital investment (x), from an uncertainty-analysis results
-workbook (*_1_full_evaluation.xlsx as written by
-analyses/full/uncertainties_IBO_EtOH.py).
+Multi-panel bivariate uncertainty figure (2 x 2 grid, fourth cell reserved)
+from an uncertainty-analysis results workbook (*_1_full_evaluation.xlsx as
+written by analyses/full/uncertainties_IBO_EtOH.py):
 
-Joint panel: every Monte Carlo sample as a teal dot at 25 % opacity and the
-baseline (the 'initial' row of the companion *_0_baseline.xlsx) as a white
-diamond (unlabelled: name it in the caption), over a light grey band for the
-ethanol market price range (ETHANOL_MARKET_RANGE) spanning the typical corn
-ethanol biorefinery TCI (TYPICAL_CORN_ETHANOL_TCI), the MPSP-TCI Pareto
-frontier of the samples (lower-left, both minimized) as a red dashed staircase, and dark grey dashed lines
-at the ends of the gasoline price range (GASOLINE_PRICE_RANGE), with contour
-lines
-of a Gaussian KDE enclosing 5 / 25 / 50 / 75 / 95 % of the samples (the
+  A  purity-adjusted ethanol MPSP (y, converted from the workbook's $/kg to
+     $/GGE, see USD_PER_KG_TO_USD_PER_GGE) vs total capital investment (x)
+  B  ethanol titer (y, g/L-water) vs ethanol yield (x, g/g sugars added)
+  C  ethanol sale revenue (y) vs DDGS sale revenue (x), MM$/yr at the default
+     product prices; ethanol revenue is not a workbook column and is derived
+     as the annual product sale minus the DDGS, crude-oil and isobutanol sale
+     revenues (exact: the model's tea.sales is the sum of those four)
+  D  empty (a fourth distribution will be added)
+
+Every joint panel: every Monte Carlo sample as a teal dot at 25 % opacity,
+the baseline (the 'initial' row of the companion *_0_baseline.xlsx) as a
+white diamond (unlabelled: name it in the caption), contour lines of a
+Gaussian KDE enclosing 5 / 25 / 50 / 75 / 95 % of the samples (the
 highest-density regions; each line is the density quantile AT the samples,
-so it holds that share of them). Marginal box plots
-outside the panel: box = 25th-75th percentile, line = median, whiskers = 5th-95th
-percentile (the whis=[5, 95] of contourplots.box_and_whiskers_plot), dots =
-1st and 99th percentiles.
+so it holds that share of them), and marginal box plots outside the panel:
+box = 25th-75th percentile, line = median, whiskers = 5th-95th percentile
+(the whis=[5, 95] of contourplots.box_and_whiskers_plot), dots = 1st and 99th
+percentiles.
+
+Panel A also carries a light grey band for the ethanol market price range
+(ETHANOL_MARKET_RANGE) spanning the typical corn ethanol biorefinery TCI
+(TYPICAL_CORN_ETHANOL_TCI), the MPSP-TCI Pareto frontier of the samples
+(lower-left, both minimized) as a red dashed staircase, and dark grey dashed
+lines at the ends of the gasoline price range (GASOLINE_PRICE_RANGE).
 
 Sim-safe: pure pandas/matplotlib/scipy, never imports biorefineries.
 
@@ -60,9 +68,18 @@ DEFAULT_OUT_DIR = os.path.join(RESULTS_DIR, 'publication', 'Uncertainty')
 
 MPSP_COL = ('Biorefinery', 'Purity-adjusted ethanol MPSP [$/kg]')
 TCI_COL = ('Biorefinery', 'Total capital investment [10^6 $]')
+ETOH_TITER_COL = ('Fermentation', 'Et OH titer [g-EtOH/L-water]')
+ETOH_YIELD_COL = ('Fermentation', 'Et OH yield [g-EtOH/g-sugars-added]')
+SALES_COL = ('Biorefinery', 'Annual product sale (excl. electricity) [10^6 $/yr]')
+DDGS_REVENUE_COL = ('Coproducts', 'DDGS sale revenue [$/y]')
+# every product sale revenue other than ethanol's; ethanol's = SALES_COL
+# minus these
+COPRODUCT_REVENUE_COLS = (DDGS_REVENUE_COL,
+                          ('Coproducts', 'Crude oil sale revenue [$/y]'),
+                          ('Coproducts', 'Isobutanol sale revenue [$/y]'))
 
 FONT_FAMILY = 'Arial'
-FONTS = {'tick': 12, 'axis_title': 12}
+FONTS = {'tick': 12, 'axis_title': 12, 'panel_letter': 14}
 TICK_LEN = {'major': 4.0, 'minor': 2.0} # pt; left/bottom ticks extend this far in AND out
 
 # the MPSP-TCI Pareto frontier: dashed, in the red of the hue palette of
@@ -146,6 +163,26 @@ GASOLINE_LINE_COLOR = _mix(BASELINE_GRAY, 'black', 0.45)
 GASOLINE_LINE_STYLE = dict(lw=1.0, ls=(0, (5, 3)))
 BOX_PERCENTILES = {'whis': (5, 95), 'dots': (1, 99)}
 
+# the joint panels of the 2 x 2 grid, row-major (the fourth cell is left empty
+# for now): (x outcome, y outcome) keyed by _outcomes' names, axis titles, and
+# fixed axis ticks / limits (neither = 'nice' ticks enclosing the samples and
+# the baseline)
+PANELS = (
+    dict(x='TCI', y='MPSP',
+         xlabel='Total capital investment [MM\\$]',
+         ylabel=r'Minimum ethanol selling price [$\mathrm{\$·GGE}^{-1}$]',
+         xticks=np.arange(TCI_AXIS_LIMITS[0], TCI_AXIS_LIMITS[1] + TCI_TICK_STEP/2,
+                          TCI_TICK_STEP),
+         ylim=MPSP_AXIS_LIMITS, market=True, pareto=True),
+    dict(x='EtOH yield', y='EtOH titer',
+         xlabel=r'Ethanol yield [$\mathrm{g·g}^{-1}$ sugars]',
+         ylabel=r'Ethanol titer [$\mathrm{g·L}^{-1}$]'),
+    dict(x='DDGS revenue', y='EtOH revenue',
+         xlabel=r'DDGS sale revenue [$\mathrm{MM\$·yr}^{-1}$]',
+         ylabel=r'Ethanol sale revenue [$\mathrm{MM\$·yr}^{-1}$]'),
+)
+GRID_SHAPE = (2, 2)
+
 
 def apply_font_rcparams():
     plt.rcParams['font.family'] = 'sans-serif'
@@ -183,18 +220,29 @@ def newest_results_file(scenario='A'):
     return max(files, key=os.path.getmtime)
 
 
+def _outcomes(df):
+    """The plotted outcomes of a TEA-results frame, as float Series, keyed by
+    the names used in PANELS."""
+    col = lambda c: df[c].astype(float)
+    return {
+        'TCI': col(TCI_COL),
+        'MPSP': col(MPSP_COL) * USD_PER_KG_TO_USD_PER_GGE,
+        'EtOH titer': col(ETOH_TITER_COL),
+        'EtOH yield': col(ETOH_YIELD_COL),
+        'DDGS revenue': col(DDGS_REVENUE_COL) / 1e6,
+        'EtOH revenue': col(SALES_COL) - sum(col(c) for c in COPRODUCT_REVENUE_COLS) / 1e6,
+    }
+
+
 def load_samples(results_file):
     df = pd.read_excel(results_file, sheet_name='TEA results',
                        header=[0, 1], index_col=0)
-    xy = df[[TCI_COL, MPSP_COL]].astype(float)
-    finite = np.isfinite(xy.values).all(axis=1)
-    return xy.values[finite, 0], xy.values[finite, 1], int((~finite).sum())
+    return pd.DataFrame(_outcomes(df))
 
 
 def load_baseline(baseline_file):
     df = pd.read_excel(baseline_file, header=[0, 1], index_col=0)
-    row = df.loc['initial']
-    return float(row[TCI_COL]), float(row[MPSP_COL])
+    return {k: float(v.iloc[0]) for k, v in _outcomes(df.loc[['initial']]).items()}
 
 
 #%% Drawing
@@ -268,6 +316,67 @@ def draw_box(ax, values, orientation):
     ax.set_axis_off()
 
 
+def _panel_ticks(panel, axis, values):
+    """Major ticks of one axis of a panel: the fixed `<axis>ticks`, 'nice'
+    ticks spanning the fixed `<axis>lim`, or 'nice' ticks enclosing `values`.
+    Fixed ticks that would clip a sample raise."""
+    ticks = panel.get(f'{axis}ticks')
+    if ticks is None and panel.get(f'{axis}lim') is not None:
+        ticks = nice_ticks(np.array(panel[f'{axis}lim']))
+    if ticks is None:
+        return nice_ticks(values, nbins=6)
+    if not (ticks[0] <= values.min() and values.max() <= ticks[-1]):
+        raise ValueError(f'{panel[axis]} axis {ticks[0]:.4g}-{ticks[-1]:.4g} clips '
+                         f'samples ({values.min():.4g}-{values.max():.4g})')
+    return np.asarray(ticks)
+
+
+def draw_joint_panel(fig, cell, panel, samples, base, letter):
+    """One joint panel (samples, KDE contours, baseline, marginal boxes) in
+    the grid cell `cell`; returns the joint axes."""
+    gs = cell.subgridspec(2, 2, width_ratios=(4.2, 0.55), height_ratios=(0.55, 4.2),
+                          wspace=0.03, hspace=0.03)
+    ax = fig.add_subplot(gs[1, 0])
+    ax_top = fig.add_subplot(gs[0, 0], sharex=ax)
+    ax_right = fig.add_subplot(gs[1, 1], sharey=ax)
+    x, y = samples[panel['x']].values, samples[panel['y']].values
+
+    with_base = lambda k, v: np.append(v, base[panel[k]]) if base else v
+    xticks = _panel_ticks(panel, 'x', with_base('x', x))
+    yticks = _panel_ticks(panel, 'y', with_base('y', y))
+    if panel.get('market'):
+        ax.fill_between(TYPICAL_CORN_ETHANOL_TCI, *ETHANOL_MARKET_RANGE,
+                        color=MARKET_BAND_COLOR, lw=0, zorder=0)
+        for price in GASOLINE_PRICE_RANGE:
+            ax.axhline(price, color=GASOLINE_LINE_COLOR, zorder=1, **GASOLINE_LINE_STYLE)
+    draw_samples(ax, x, y)
+    draw_hdr_contours(ax, x, y)
+    if panel.get('pareto'):
+        fx, fy = draw_pareto_frontier(ax, x, y)
+        print(f'  Pareto frontier: {fx.size} non-dominated samples, '
+              f"{panel['x']} {fx[0]:.4g}-{fx[-1]:.4g}, {panel['y']} {fy[0]:.4g}-{fy[-1]:.4g}")
+    if base:
+        ax.plot(base[panel['x']], base[panel['y']], 'D', ms=8, mfc='w', mec=INK,
+                mew=1.2, zorder=5)
+    ax.set_xticks(xticks)
+    ax.set_yticks(yticks)
+    ax.set_xlim(xticks[0], xticks[-1])
+    ax.set_ylim(yticks[0], yticks[-1])
+    ax.set_xlabel(panel['xlabel'], fontsize=FONTS['axis_title'])
+    ax.set_ylabel(panel['ylabel'], fontsize=FONTS['axis_title'])
+    ax.xaxis.set_minor_locator(AutoMinorLocator(N_MINOR_PER_MAJOR + 1))
+    ax.yaxis.set_minor_locator(AutoMinorLocator(N_MINOR_PER_MAJOR + 1))
+
+    draw_box(ax_top, x, 'horizontal')
+    draw_box(ax_right, y, 'vertical')
+    ax_top.set_ylim(0.4, 1.6)
+    ax_right.set_xlim(0.4, 1.6)
+    # panel letter in the cell's top-left corner, above the y-axis title
+    ax_top.text(-0.22, 1.0, letter, transform=ax_top.transAxes, ha='left', va='top',
+                fontsize=FONTS['panel_letter'], fontweight='bold')
+    return ax
+
+
 def plot_uncertainty_MPSP_vs_TCI(results_file=None, baseline_file=None,
                                  out_dir=DEFAULT_OUT_DIR, stem=None, dpi=600):
     results_file = results_file or newest_results_file('A')
@@ -277,79 +386,45 @@ def plot_uncertainty_MPSP_vs_TCI(results_file=None, baseline_file=None,
     print(f'Results:  {results_file}')
     print(f'Baseline: {baseline_file}')
 
-    tci, mpsp_kg, n_dropped = load_samples(results_file)
-    mpsp = mpsp_kg * USD_PER_KG_TO_USD_PER_GGE
-    rho, p = stats.spearmanr(tci, mpsp)
+    samples = load_samples(results_file)
+    used = list(dict.fromkeys(panel[k] for panel in PANELS for k in ('x', 'y')))
+    finite = np.isfinite(samples[used].values).all(axis=1)
+    n_dropped = int((~finite).sum())
+    samples = samples[finite]
     base = load_baseline(baseline_file) if baseline_file else None
-    if base:
-        base = (base[0], base[1] * USD_PER_KG_TO_USD_PER_GGE)
-    print(f'{tci.size} samples ({n_dropped} non-finite dropped); '
-          f'Spearman rho = {rho:.3f} (p = {p:.1e})')
+    print(f'{len(samples)} samples ({n_dropped} with a non-finite plotted outcome dropped)')
     print(f'MPSP conversion: {KG_PER_GAL:.4f} kg/gal / {GGE_PER_GAL} GGE/gal = '
           f'{USD_PER_KG_TO_USD_PER_GGE:.4f} ($/GGE)/($/kg); market range '
           + ' - '.join(f'{v:.3f}' for v in ETHANOL_MARKET_RANGE) + ' $/GGE')
-    for name, v in (('TCI [MM$]', tci), ('MPSP [$/GGE]', mpsp)):
-        q = np.percentile(v, [1, 5, 25, 50, 75, 95, 99])
+    for name in used:
+        q = np.percentile(samples[name], [1, 5, 25, 50, 75, 95, 99])
         print(f'  {name}: percentiles 1/5/25/50/75/95/99 = '
-              + ' / '.join(f'{i:.4g}' for i in q))
-    if base:
-        print(f'  baseline: TCI {base[0]:.4g} MM$, MPSP {base[1]:.5g} $/GGE')
+              + ' / '.join(f'{i:.4g}' for i in q)
+              + (f'; baseline {base[name]:.5g}' if base else ''))
 
     apply_font_rcparams()
-    fig = plt.figure(figsize=(5.6, 5.4))
-    gs = fig.add_gridspec(2, 2, width_ratios=(4.2, 0.55), height_ratios=(0.55, 4.2),
-                          wspace=0.03, hspace=0.03,
-                          left=0.19, right=0.96, bottom=0.15, top=0.97)
-    ax = fig.add_subplot(gs[1, 0])
-    ax_top = fig.add_subplot(gs[0, 0], sharex=ax)
-    ax_right = fig.add_subplot(gs[1, 1], sharey=ax)
-
-    # fixed MPSP axis (spans the market band, the gasoline lines and every sample)
-    xticks = np.arange(TCI_AXIS_LIMITS[0], TCI_AXIS_LIMITS[1] + TCI_TICK_STEP/2,
-                       TCI_TICK_STEP)
-    yticks = nice_ticks(np.array(MPSP_AXIS_LIMITS))
-    if not (xticks[0] <= tci.min() and tci.max() <= xticks[-1]):
-        raise ValueError(f'TCI_AXIS_LIMITS {TCI_AXIS_LIMITS} clip samples '
-                         f'({tci.min():.4g}-{tci.max():.4g} MM$)')
-    if not (yticks[0] <= mpsp.min() and mpsp.max() <= yticks[-1]):
-        raise ValueError(f'MPSP_AXIS_LIMITS {MPSP_AXIS_LIMITS} clip samples '
-                         f'({mpsp.min():.3g}-{mpsp.max():.3g} $/GGE)')
-    xlim, ylim = (xticks[0], xticks[-1]), (yticks[0], yticks[-1])
-    ax.fill_between(TYPICAL_CORN_ETHANOL_TCI, *ETHANOL_MARKET_RANGE,
-                    color=MARKET_BAND_COLOR, lw=0, zorder=0)
-    for price in GASOLINE_PRICE_RANGE:
-        ax.axhline(price, color=GASOLINE_LINE_COLOR, zorder=1, **GASOLINE_LINE_STYLE)
-    draw_samples(ax, tci, mpsp)
-    draw_hdr_contours(ax, tci, mpsp)
-    fx, fy = draw_pareto_frontier(ax, tci, mpsp)
-    print(f'Pareto frontier: {fx.size} non-dominated samples, TCI '
-          f'{fx[0]:.4g}-{fx[-1]:.4g} MM$, MPSP {fy[0]:.4g}-{fy[-1]:.4g} $/GGE')
-    if base:
-        ax.plot(*base, 'D', ms=8, mfc='w', mec=INK, mew=1.2, zorder=5)
-    ax.set_xticks(xticks)
-    ax.set_yticks(yticks)
-    ax.set_xlim(*xlim)
-    ax.set_ylim(*ylim)
-    ax.set_xlabel('Total capital investment [MM\\$]',
-                  fontsize=FONTS['axis_title'])
-    ax.set_ylabel('Minimum ethanol selling price '
-                  r'[$\mathrm{\$·GGE}^{-1}$]', fontsize=FONTS['axis_title'])
-    ax.xaxis.set_minor_locator(AutoMinorLocator(N_MINOR_PER_MAJOR + 1))
-    ax.yaxis.set_minor_locator(AutoMinorLocator(N_MINOR_PER_MAJOR + 1))
-
-    draw_box(ax_top, tci, 'horizontal')
-    draw_box(ax_right, mpsp, 'vertical')
-    ax_top.set_ylim(0.4, 1.6)
-    ax_right.set_xlim(0.4, 1.6)
+    n_rows, n_cols = GRID_SHAPE
+    fig = plt.figure(figsize=(5.6*n_cols, 5.4*n_rows))
+    grid = fig.add_gridspec(n_rows, n_cols, wspace=0.38, hspace=0.26,
+                            left=0.1, right=0.98, bottom=0.075, top=0.985)
+    axes = []
+    for i, panel in enumerate(PANELS):
+        letter = chr(ord('A') + i)
+        rho, p = stats.spearmanr(samples[panel['x']], samples[panel['y']])
+        print(f"Panel {letter}: {panel['y']} vs {panel['x']}, "
+              f'Spearman rho = {rho:.3f} (p = {p:.1e})')
+        axes.append(draw_joint_panel(fig, grid[divmod(i, n_cols)], panel,
+                                     samples, base, letter))
 
     fig.canvas.draw()
-    style_ticks(ax)
+    for ax in axes:
+        style_ticks(ax)
 
     os.makedirs(out_dir, exist_ok=True)
     if stem is None:
         tag = os.path.basename(results_file).split('_A_1_full_evaluation')[0]
         tag = tag.lstrip('_').replace("['A']_", '').replace('IBO_', '')
-        stem = f'MPSP_vs_TCI_A_{tag}'
+        stem = f'uncertainty_bivariate_A_{tag}'
     paths = []
     for ext in ('png', 'pdf'):
         path = os.path.join(out_dir, f'{stem}.{ext}')
