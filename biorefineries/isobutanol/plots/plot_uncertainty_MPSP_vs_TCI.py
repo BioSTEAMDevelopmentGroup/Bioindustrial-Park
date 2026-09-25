@@ -20,8 +20,10 @@ written by analyses/full/uncertainties_IBO_EtOH.py):
      revenues (exact: the model's tea.sales is the sum of those four)
   D  empty (a fourth distribution will be added)
 
-Every joint panel, in its own hue (A teal, B purple, C yellow): every Monte
-Carlo sample as a dot at 35 % opacity,
+Every joint panel, in its own hue (A teal, B purple, C yellow): the
+Gaussian-KDE density of the Monte Carlo samples as filled contours (one
+sequential ramp of the hue, light = sparse to dark = dense; the lowest band is
+left unfilled, so the panel background stays white),
 the baseline (the 'initial' row of the companion *_0_baseline.xlsx) as a
 white diamond (unlabelled: name it in the caption), contour lines of a
 Gaussian KDE enclosing 5 / 25 / 50 / 75 / 95 % of the samples (the
@@ -56,7 +58,7 @@ import pandas as pd
 import matplotlib
 matplotlib.use('Agg')
 from matplotlib import pyplot as plt
-from matplotlib.colors import to_hex, to_rgb
+from matplotlib.colors import LinearSegmentedColormap, to_hex, to_rgb
 from matplotlib.lines import TICKDOWN, TICKLEFT
 from matplotlib.ticker import AutoMinorLocator, MaxNLocator
 from scipy import stats
@@ -95,8 +97,6 @@ TEAL = '#0B6E7A'
 # figure's hue palette (HUE_COLORS[4], HUE_COLORS[5])
 PURPLE = '#a280b9'
 YELLOW = '#f3c354'
-SAMPLE_ALPHA = 0.35   # joint-panel samples: 65 % transparent
-SAMPLE_SIZE = 6 # pt^2
 
 
 def _mix(color, other, t):
@@ -109,6 +109,13 @@ def _mix(color, other, t):
 # and the KDE contour lines in a dark shade of it (dark_shade)
 dark_shade = lambda color: _mix(color, 'black', 0.5)
 BOX_MEDIAN = 'black'
+# filled KDE: N_DENSITY_LEVELS equal steps from 0 to the peak density, coloured
+# on ONE sequential ramp of the panel's hue (white-mixed tints up to the hue
+# itself, then darker shades of it)
+density_ramp = lambda color: tuple(
+    [_mix(color, 'white', t) for t in (0.94, 0.78, 0.58, 0.36, 0.16)]
+    + [color] + [_mix(color, 'black', t) for t in (0.35, 0.65)])
+N_DENSITY_LEVELS = 10
 # KDE contour lines: share of samples each encloses
 CONTOUR_SHARES = (0.05, 0.25, 0.50, 0.75, 0.95)
 CONTOUR_LW = 1.0
@@ -261,11 +268,18 @@ def nice_ticks(values, nbins=7):
                  (ticks >= values.max()).nonzero()[0][0] + 1]
 
 
-def draw_samples(ax, x, y, color):
-    # every sample; rasterized so the PDF stays small (axes, text and the
-    # baseline marker stay vector)
-    ax.scatter(x, y, s=SAMPLE_SIZE, color=color, alpha=SAMPLE_ALPHA, lw=0,
-               rasterized=True, zorder=2)
+def draw_density(ax, x, y, xlim, ylim, color, n_grid=300):
+    kde = stats.gaussian_kde(np.vstack([x, y]))
+    GX, GY = np.meshgrid(np.linspace(*xlim, n_grid), np.linspace(*ylim, n_grid))
+    Z = kde(np.vstack([GX.ravel(), GY.ravel()])).reshape(GX.shape)
+    # the lowest band (0 to the first level) would fill the whole panel; it
+    # is left unfilled so the background (and panel A's market band) stays
+    # visible, the other bands keep their ramp colours
+    levels = np.linspace(0, Z.max(), N_DENSITY_LEVELS + 1)
+    cmap = LinearSegmentedColormap.from_list('density', density_ramp(color))
+    colors = ['none'] + [cmap(i/(N_DENSITY_LEVELS - 1))
+                         for i in range(1, N_DENSITY_LEVELS)]
+    ax.contourf(GX, GY, Z, levels=levels, colors=colors, antialiased=True, zorder=2)
 
 
 def pareto_frontier(x, y):
@@ -355,7 +369,8 @@ def draw_joint_panel(fig, cell, panel, samples, base, letter):
                         color=MARKET_BAND_COLOR, lw=0, zorder=0)
         for price in GASOLINE_PRICE_RANGE:
             ax.axhline(price, color=GASOLINE_LINE_COLOR, zorder=1, **GASOLINE_LINE_STYLE)
-    draw_samples(ax, x, y, panel['color'])
+    draw_density(ax, x, y, (xticks[0], xticks[-1]), (yticks[0], yticks[-1]),
+                 panel['color'])
     draw_hdr_contours(ax, x, y, panel['color'])
     if panel.get('pareto'):
         fx, fy = draw_pareto_frontier(ax, x, y)
