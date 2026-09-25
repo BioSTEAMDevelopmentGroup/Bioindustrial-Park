@@ -147,8 +147,10 @@ def slice_summary(param, x, PI, Y, n_total):
 #: spine, and the hurdle rate the PI is computed at (NPV at 15 % = 0 <=> IRR =
 #: 15 %, so the IRR axis is scaled to put 15 % on the PI = 0 line)
 IRR_COLOR = '#6A3D9A'
-IRR_KW = dict(color=IRR_COLOR, lw=1.2, ls=(0, (4, 1.5)), marker='^', ms=2.2,
-              zorder=3)
+IRR_KW = dict(color=IRR_COLOR, lw=1.2, ls=(0, (4, 1.5)), zorder=3)
+#: the --param figure's curves are plain lines (only the optimum is marked)
+PI_LINE_KW = {**k13p.PI_KW, 'marker': None}
+YIELD_LINE_KW = {**k13p.YIELD_KW, 'marker': None}
 IRR_AXIS_GAP_IN = 0.82
 HURDLE_PCT = 15.0
 
@@ -356,11 +358,11 @@ def plot_param(param, dpi, stem=None, product='isobutanol', irr=True):
         ax.axvline(x_derate, **k13p.DERATE_KW)
     ax.axhline(0.0, **k13p.BREAKEVEN_KW)
 
-    ax_r.plot(x, Y, **k13p.YIELD_KW)
+    ax_r.plot(x, Y, **YIELD_LINE_KW)
     ax_r.plot([x_opt], [Y[i_opt]], **k13p.RING_KW)
     if irr:   # no ring at the optimum: it would sit on the yield ring
         ax_irr.plot(x, IRR, **IRR_KW)
-    ax.plot(x, PI, **k13p.PI_KW)
+    ax.plot(x, PI, **PI_LINE_KW)
     ax.plot([x_opt], [PI[i_opt]], **k13p.STAR_KW)
 
     if log:
