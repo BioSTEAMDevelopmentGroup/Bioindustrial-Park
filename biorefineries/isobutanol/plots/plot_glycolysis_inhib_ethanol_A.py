@@ -52,8 +52,8 @@ SPEC_2 = np.linspace(1e-3, 2.0, SWEEP_STEPS[1])  # inhib_ethanol multiplier [-]
 # for the current sweep; retune them if the optima move.
 OPTIMA = [
     ('EtOH Titer',        'max', 'titer',        '^', 'white',   10, (10, 20),   -0.3),
-    ('Cell loading',      'max', 'cell density', 'o', 'white',   10, (22, 24),   -0.3),
-    ('EtOH Productivity', 'max', 'productivity', 's', 'white',    9, (18, -4),    0.3),
+    ('Cell loading',      'max', 'cell density', 'o', 'white',   10, (22, 42),    0.3),
+    ('EtOH Productivity', 'max', 'productivity', 's', 'white',    9, (0, 12),    -0.2),
     ('Combined Yield',    'max', 'yield',        'p', 'white',   10, (-14, 16),   0.3),
     ('TCI',               'min', 'TCI',          'p', '#33ccff', 10, (30, 10),   -0.2),
     ('MPSP',              'min', 'MESP',         '*', '#33ccff', 14, (12, 24),   -0.3),
@@ -73,11 +73,13 @@ FIGURE = ksf.SweepFigure(
     xlim=(0., 4.), ylim=(0., 2.),
     x_major=1., x_minor_div=4, y_major=0.5, y_minor_div=5,
     label_color=LABEL_COLOR,
-    # MESP axis 3-10 $/GGE (the sweep spans 3.79-16.1; past 10 = over-colour),
-    # 70 levels of 0.1 to stay under the colormap's 90 colours
-    mesp_levels=np.arange(3., 10.00001, 0.1),
-    mesp_cbar_ticks=np.arange(3., 10.00001, 1.),
-    mesp_cbar_minor_step=0.2,
+    # productivity: centred above its optimum, on the orange plateau
+    label_ha={'productivity': 'center'},
+    # MESP axis 3.5-8 $/GGE (the sweep spans 3.79-16.1; past 8 = over-colour),
+    # 45 levels of 0.1
+    mesp_levels=np.arange(3.5, 8.00001, 0.1),
+    mesp_cbar_ticks=np.arange(3.5, 8.00001, 0.5),
+    mesp_cbar_minor_step=0.1,
     # hatched: MESP within the ethanol market price range (2.31-5.15 $/GGE)
     comparison_range=ksf.ETHANOL_MARKET_RANGE,
 )

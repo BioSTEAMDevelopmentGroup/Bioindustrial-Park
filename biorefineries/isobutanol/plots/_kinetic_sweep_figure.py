@@ -49,8 +49,8 @@ OUTPUT_DIR = os.path.join(RESULTS_DIR, 'publication', 'Kinetic-sweeps')
 
 # Default colour scale (MESP, $/GGE): the feeding-strategy figure's levels, so
 # the figures read on one scale; values past the top take the over-colour. A
-# figure may override all three (SweepFigure.mesp_*); keep the number of
-# levels below the colormap's 90 colours.
+# figure may override all three (SweepFigure.mesp_*); the colormap is sized to
+# the levels (at least 90 colours).
 MESP_LEVELS = fs.MESP_LEVELS
 MESP_CBAR_TICKS = fs.MESP_CBAR_TICKS
 MESP_CBAR_MINOR_STEP = fs.MESP_CBAR_MINOR_STEP
@@ -154,7 +154,9 @@ def draw_panel(figure, fig, ax, cax):
     levels = MESP_LEVELS if figure.mesp_levels is None else figure.mesp_levels
     cbar_ticks = MESP_CBAR_TICKS if figure.mesp_cbar_ticks is None else figure.mesp_cbar_ticks
     minor_step = figure.mesp_cbar_minor_step or MESP_CBAR_MINOR_STEP
-    cmap = fs.JBEI_UCB_colormap()
+    # at least one colour per band plus the over-colour (BoundaryNorm with
+    # extend='max'); the default 90 unless a figure's levels need more
+    cmap = fs.JBEI_UCB_colormap(max(90, len(levels)))
     norm = BoundaryNorm(levels, cmap.N, extend='max')
     cs = ax.contourf(figure.spec_1, figure.spec_2, mesp, levels=levels,
                      cmap=cmap, norm=norm, extend='max', zorder=1)
