@@ -75,7 +75,7 @@ DENSITY_RAMP = tuple([_mix(TEAL, 'white', t) for t in (0.94, 0.78, 0.58, 0.36, 0
 N_DENSITY_LEVELS = 10
 BOX_FACE = TEAL
 BOX_EDGE = _mix(TEAL, 'black', 0.5)
-BOX_MEDIAN = 'white'
+BOX_MEDIAN = 'black'
 INK = '#0b0b0b'
 BOX_PERCENTILES = {'whis': (5, 95), 'dots': (1, 99)}
 
