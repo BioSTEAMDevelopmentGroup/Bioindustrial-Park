@@ -78,7 +78,7 @@ __all__ = ('make_figure',)
 MM = 1 / 25.4            # inch per mm
 PT_PER_MM = 72 / 25.4
 FIG_W = 180.0            # mm (double-column width)
-FIG_H = 158.0            # mm
+FIG_H = 152.0            # mm
 
 # Palette sampled from the reference block flow diagram.
 C_FERM_BOX = '#F8E1A9'   # fermentation process / unit fill
@@ -234,7 +234,7 @@ def panel_title(ax, y1, letter, title):
 # Panel a — fermentation process
 # --------------------------------------------------------------------------
 
-A_Y0, A_Y1 = 93.5, 158.0     # panel a vertical extent (mm)
+A_Y0, A_Y1 = 93.5, 152.0     # panel a vertical extent (mm)
 
 
 def draw_panel_a(d):
@@ -243,13 +243,13 @@ def draw_panel_a(d):
     panel_title(ax, A_Y1, 'A.', 'Fermentation process')
 
     fill = C_FERM_BOX
-    y_top, y_bot = 132.0, 110.0          # the two feed trains
+    y_top, y_bot = 128.0, 102.0          # the two feed trains
     y_mid = (y_top + y_bot) / 2
     bh = 10.0
 
-    d.label(12.0, y_mid, 'saccharified\nslurry (from\ncorn dry-grind\nprocess)')
-    spl = d.box(32, y_mid, 14, bh, 'splitter', fill)
-    d.stream([(22.0, y_mid), (spl['l'], y_mid)])
+    d.label(10.5, y_mid, 'saccharified\nslurry (from\ncorn dry-grind\nprocess)')
+    spl = d.box(34.5, y_mid, 14, bh, 'splitter', fill)
+    d.stream([(20.0, y_mid), (spl['l'], y_mid)])
 
     ev1 = d.box(55, y_top, 22, bh, 'multi-effect\nevaporation', fill)
     ev2 = d.box(55, y_bot, 22, bh, 'multi-effect\nevaporation', fill)
@@ -262,24 +262,22 @@ def draw_panel_a(d):
     d.stream([(ev1['r'], y_top), (mx1['l'], y_top)])
     d.stream([(ev2['r'], y_bot), (mx2['l'], y_bot)])
 
-    # evaporator vapours and dilution water (boundary streams)
-    gap = 4.5
-    d.stream([(ev1['cx'], ev1['t']), (ev1['cx'], ev1['t'] + gap)])
-    d.boundary_label(ev1['cx'], ev1['t'] + gap + 0.8,
-                     'water & other\nvolatiles (to WWT)', va='bottom')
-    d.stream([(ev2['cx'], ev2['b']), (ev2['cx'], ev2['b'] - gap)])
-    d.boundary_label(ev2['cx'], ev2['b'] - gap - 0.8,
-                     'water & other\nvolatiles (to WWT)', va='top')
-    d.stream([(mx1['cx'], mx1['t'] + gap), (mx1['cx'], mx1['t'])])
-    d.boundary_label(mx1['cx'], mx1['t'] + gap + 0.8, 'dilution water',
-                     va='bottom')
-    d.stream([(mx2['cx'], mx2['b'] - gap), (mx2['cx'], mx2['b'])])
-    d.boundary_label(mx2['cx'], mx2['b'] - gap - 0.8, 'dilution water',
-                     va='top')
+    # evaporator vapours and dilution water (boundary streams), each shared
+    # by the two parallel trains through one label between them: vapours
+    # point into their label, dilution water fans out from its label
+    # arrow ends measured from the label centre (mm); the lower ones sit
+    # further off to clear the underline rule
+    d.stream([(ev1['cx'], ev1['b']), (ev1['cx'], y_mid + 3.4)])
+    d.stream([(ev2['cx'], ev2['t']), (ev2['cx'], y_mid - 3.7)])
+    d.boundary_label(ev1['cx'], y_mid, 'water & other\nvolatiles (to WWT)')
+    d.stream([(mx1['cx'], y_mid + 2.4), (mx1['cx'], mx1['b'])])
+    d.stream([(mx2['cx'], y_mid - 2.5), (mx2['cx'], mx2['t'])])
+    d.boundary_label(mx1['cx'], y_mid, 'dilution water')
 
     # fermentation: initial feed straight into the left side, spike feed
     # from below
-    fe = d.box(116, 126.0, 25, 16, 'fermentation\n(fed-batch\nor batch)', fill)
+    fe = d.box(116, y_top - 6.0, 25, 16, 'fermentation\n(fed-batch\nor batch)',
+               fill)
     d.stream([(mx1['r'], y_top), (fe['l'], y_top)])
     d.label((mx1['r'] + fe['l']) / 2, y_top + 1.9, 'initial feed')
     x_spike = fe['l'] + 5.0
@@ -290,7 +288,7 @@ def draw_panel_a(d):
     d.boundary_label(x_yeast, fe['b'] - 6.3, 'yeast', va='top')
 
     # aeration
-    y_aux = 143.5
+    y_aux = 138.5
     co = d.box(fe['l'] + 6.5, y_aux, 19, 8, 'compression', fill)
     d.stream([(co['cx'], co['t'] + 4.0), (co['cx'], co['t'])])
     d.boundary_label(co['cx'], co['t'] + 4.8, 'air', va='bottom')
