@@ -147,7 +147,7 @@ def slice_summary(param, x, PI, Y, n_total):
 #: spine, and the hurdle rate the PI is computed at (NPV at 15 % = 0 <=> IRR =
 #: 15 %, so the IRR axis is scaled to put 15 % on the PI = 0 line)
 IRR_COLOR = '#6A3D9A'
-IRR_KW = dict(color=IRR_COLOR, lw=1.2, ls=(0, (4, 1.5)), zorder=3)
+IRR_KW = dict(color=IRR_COLOR, lw=1.2, zorder=3)
 #: the --param figure's curves are plain lines (only the optimum is marked)
 PI_LINE_KW = {**k13p.PI_KW, 'marker': None}
 YIELD_LINE_KW = {**k13p.YIELD_KW, 'marker': None}
