@@ -86,6 +86,8 @@ OPTIMA = [
 # right; TCI: right-aligned just right of its optimum, so the label sits
 # wholly in the white (threshold > target) region
 LABEL_HA = {'productivity': 'center', 'TCI': 'right'}
+# label text colour (default black); titer sits on the dark high-MPSP band
+LABEL_COLOR = {'titer': 'white'}
 
 # Both batch / fed-batch labels: anchored on the boundary line at threshold
 # 150 g/L, then shifted by this many points (x, y)
@@ -307,6 +309,7 @@ def draw_panel_A(fig, ax, cax):
                 markeredgewidth=0.8, zorder=10, clip_on=False)
         ax.annotate(label, xy=(ox, oy), xytext=offset,
                     textcoords='offset points', fontsize=FONTS['annotation'],
+                    color=LABEL_COLOR.get(label, 'black'),
                     ha=LABEL_HA.get(label, 'left' if offset[0] >= 0 else 'right'),
                     va='bottom' if offset[1] >= 0 else 'top', zorder=11,
                     annotation_clip=False,
