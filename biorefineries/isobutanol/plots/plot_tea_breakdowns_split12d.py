@@ -11,7 +11,7 @@ optima (spec docs/superpowers/specs/2026-09-24-tea-breakdowns-split12d-design.md
 stage 1, which simulates, is analyses/collect_tea_breakdowns_split12d.py).
 
 A 3x3 grid of cost & utility breakdowns, one panel per scenario (LAYOUT):
-the scenario-A baseline, the profitability and flagship (relay) campaigns,
+the scenario-A baseline, the uninformed and TRY-informed (relay) profitability campaigns,
 then the isobutanol and the ethanol yield / titer / productivity campaigns,
 each at its objective-optimum trial. Every panel has five 100 %-stacked bars
 (the unit groups' installed equipment cost, cooling duty, heating duty,
@@ -66,7 +66,8 @@ DEFAULT_STEM = 'tea_breakdowns_split12d_figure'
 
 #: panel grid: rows by theme (baseline + the two profitability campaigns;
 #: isobutanol; ethanol), columns yield / titer / productivity below row 1
-LAYOUT = (('baseline', 'profitability', 'flagship'),
+LAYOUT = (('baseline', 'profitability_uninformed',
+           'profitability_try_informed'),
           ('ibo_yield', 'ibo_titer', 'ibo_productivity'),
           ('etoh_yield', 'etoh_titer', 'etoh_productivity'))
 

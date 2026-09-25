@@ -7,23 +7,23 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 """Profitability index, IRR and ethanol yield along 1-D sweeps of any
-metabolic_split_12d decision variable through the flagship profitability
+metabolic_split_12d decision variable through the TRY-informed profitability
 campaign's optimum (trial #1912).
 
 Two modes:
 
 * --param NAME (default k_3) -- the figure: a single panel of a
-  full-resolution sweep (results/evaluate_axis_flagship_optimum_<NAME>.csv),
-  in the layout of plot_k13_flagship_sweep.py: PI on the left axis, the
+  full-resolution sweep (results/evaluate_axis_try_informed_optimum_<NAME>.csv),
+  in the layout of plot_k13_try_informed_sweep.py: PI on the left axis, the
   ethanol yield on the right, the PI = 0 line drawn, any part beyond the
   campaign band shaded, the onset of burden derating marked. A third,
   outboard y axis carries the IRR (%) (--no-irr drops it), raised into the
   upper part of the panel (IRR_BAND) so it does not sit on the PI curve it
   tracks. Plain lines, no point or optimum markers; each y axis is coloured
   like its curve; a legend appears only for the conditional reference items.
-  Output <NAME>_flagship_sweep_etoh_yield.png / .pdf.
+  Output <NAME>_try_informed_sweep_etoh_yield.png / .pdf.
 * --screen -- the slice-selection diagnostic: ranks the coarse slices of results/
-  evaluate_axis_flagship_optimum_screen.csv (plus the in-band part of the
+  evaluate_axis_try_informed_optimum_screen.csv (plus the in-band part of the
   full k_13 sweep, subsampled to the screen's density, as a reference) by how
   rough PI is against how smooth the isobutanol yield is, prints the table
   and draws a small-multiples overview (one twin-axis panel per variable).
@@ -35,14 +35,14 @@ Two modes:
   since the screen picked the slice for the PI-rough / isobutanol-smooth
   contrast.
 
-Data: written by analyses/evaluate_axis_flagship_optimum.py (the simulation
+Data: written by analyses/evaluate_axis_try_informed_optimum.py (the simulation
 stage, ask-first). Sim-safe: reads CSV / JSON only; reuses the typeface and
-tick helpers of plot_k13_flagship_sweep.py by file path; never imports the
+tick helpers of plot_k13_try_informed_sweep.py by file path; never imports the
 biorefineries package.
 
 Usage:
-    python plot_axis_flagship_sweep.py [--param k_3] [--no-irr] [--dpi 300]
-    python plot_axis_flagship_sweep.py --screen [--dpi 300]
+    python plot_axis_try_informed_sweep.py [--param k_3] [--no-irr] [--dpi 300]
+    python plot_axis_try_informed_sweep.py --screen [--dpi 300]
 """
 import os
 import json
@@ -61,13 +61,13 @@ from matplotlib.ticker import (FuncFormatter, LogLocator, MultipleLocator,
 
 _here = os.path.dirname(os.path.abspath(__file__))
 _spec = importlib.util.spec_from_file_location(
-    '_k13_sweep_plot', os.path.join(_here, 'plot_k13_flagship_sweep.py'))
+    '_k13_sweep_plot', os.path.join(_here, 'plot_k13_try_informed_sweep.py'))
 k13p = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(k13p)
 
 RESULTS_DIR = k13p.RESULTS_DIR
-SWEEP_STEM = 'evaluate_axis_flagship_optimum'
-K13_SWEEP_CSV = os.path.join(RESULTS_DIR, 'evaluate_k13_flagship_optimum.csv')
+SWEEP_STEM = 'evaluate_axis_try_informed_optimum'
+K13_SWEEP_CSV = os.path.join(RESULTS_DIR, 'evaluate_k13_try_informed_optimum.csv')
 OUT_DIR = os.path.join(RESULTS_DIR, 'publication', 'Objective-landscape')
 FONTS = k13p.FONTS
 PI_COLOR, YIELD_COLOR = k13p.PI_COLOR, k13p.YIELD_COLOR
@@ -282,7 +282,7 @@ def screen(dpi):
     fig.text(0.99, 0.5, r'Isobutanol yield [$\mathrm{g·g}^{-1}$]',
              color=YIELD_COLOR, rotation=270, va='center', ha='right',
              fontsize=11)
-    out = os.path.join(OUT_DIR, 'axis_flagship_screen')
+    out = os.path.join(OUT_DIR, 'axis_try_informed_screen')
     os.makedirs(OUT_DIR, exist_ok=True)
     for ext in ('png', 'pdf'):
         fig.savefig(f'{out}.{ext}', dpi=dpi)
@@ -420,7 +420,7 @@ def plot_param(param, dpi, stem=None, irr=True):
                    fontsize=FONTS['legend'], handlelength=2.2,
                    bbox_to_anchor=((left_in + axes_w/2)/fig_w, 0.0))  # under the axes
 
-    out = os.path.join(OUT_DIR, stem or f'{param}_flagship_sweep{stem_suffix}')
+    out = os.path.join(OUT_DIR, stem or f'{param}_try_informed_sweep{stem_suffix}')
     os.makedirs(OUT_DIR, exist_ok=True)
     for ext in ('png', 'pdf'):
         fig.savefig(f'{out}.{ext}', dpi=dpi)

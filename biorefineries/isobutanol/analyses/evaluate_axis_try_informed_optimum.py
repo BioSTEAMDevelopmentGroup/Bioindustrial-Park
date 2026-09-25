@@ -7,10 +7,10 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 """1-D sweeps of any metabolic_split_12d decision variable through the
-flagship profitability campaign's optimum.
+TRY-informed profitability campaign's optimum.
 
-The generalization of evaluate_k13_flagship_optimum.py: every decision
-variable is held at the flagship (relay) campaign's best trial
+The generalization of evaluate_k13_try_informed_optimum.py: every decision
+variable is held at the TRY-informed (relay) campaign's best trial
 (`..._pi_log-tail_gp_rb0.001-4_ib0.75-1.5_aA_rl15c111dc_burden` #1912: PI
 0.808, IRR 0.273, 1 glucose spike) EXCEPT the swept one(s). Two run modes,
 chosen by IBO_AXIS_SWEEP (or --sweep; supervise_sweep.py passes no arguments,
@@ -22,7 +22,7 @@ so the environment variable is the way to configure a supervised run):
   every integer on the max_n_spikes axis when there are at most 2N of them),
   plus the trial's own value. Output results/<stem>_screen.csv (one row per
   point, 'param' / 'value' columns). Feeds the slice ranking in
-  plots/plot_axis_flagship_sweep.py --screen: which slice makes PI spiky
+  plots/plot_axis_try_informed_sweep.py --screen: which slice makes PI spiky
   while the isobutanol yield stays smooth.
 * a variable name, e.g. 'threshold_conc' -- a FULL-resolution sweep of that
   variable alone (IBO_AXIS_N_POINTS, default 160) over its campaign band, or
@@ -47,20 +47,20 @@ hide a spike. An over-cap point is logged INFEASIBLE, a raising simulation
 
 SIMULATES: ask-first (the screen approved by the user 2026-09-24). Run it in
 a fresh process, from this directory, with the hensmith pin used for the
-rs350 / flagship campaigns (PYTHONPATH from the session scratchpad's
+rs350 / TRY-informed campaigns (PYTHONPATH from the session scratchpad's
 PINNED_PYTHONPATH.txt), under the supervisor with the matching stem:
 
     $env:IBO_AXIS_SWEEP = 'screen'
-    python supervise_sweep.py evaluate_axis_flagship_optimum.py \
-        --stem evaluate_axis_flagship_optimum_screen
+    python supervise_sweep.py evaluate_axis_try_informed_optimum.py \
+        --stem evaluate_axis_try_informed_optimum_screen
 
-The k_3 figure's data (plots/plot_axis_flagship_sweep.py) is the full campaign
+The k_3 figure's data (plots/plot_axis_try_informed_sweep.py) is the full campaign
 band 0.00581-23.24 at 218 log-spaced points (+ the trial's own value; the
 density of the earlier 160-point 0.0058-2.5 zoom), approved 2026-09-24:
 
     $env:IBO_AXIS_SWEEP = 'k_3'; $env:IBO_AXIS_N_POINTS = '218'
-    python supervise_sweep.py evaluate_axis_flagship_optimum.py \
-        --stem evaluate_axis_flagship_optimum_k_3
+    python supervise_sweep.py evaluate_axis_try_informed_optimum.py \
+        --stem evaluate_axis_try_informed_optimum_k_3
 
 Checkpoint + resume (the supervise_sweep.py convention, per run tag):
 results/<stem>_<tag>_checkpoint.csv (one flushed row per point) and

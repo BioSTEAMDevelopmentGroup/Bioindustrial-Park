@@ -62,14 +62,15 @@ metabolic_split_12d campaign with >= 2000 trials and the most recent relay
 variants (--variants selects a subset):
   irr            A  two IRR cells side by side on one value axis (one
                     shared value-axis title, no cell titles), each with the
-                    baseline reference line: the financial (Profitability)
+                    baseline reference line: the uninformed financial
                     campaign, solid, with the process-level campaigns'
                     incumbents dashed and every campaign's highest-IRR trial
-                    circled; and the flagship (relay) campaign alone, its
-                    highest-IRR simulated trial circled. The flagship cell's
-                    preload zone (trials 0..N-1, shaded light grey) shows the
-                    preloaded donor rows in their donor campaign's colour, in
-                    shuffled order, and also circles the seed (the best
+                    circled; and the TRY-informed (relay) campaign alone,
+                    its highest-IRR simulated trial circled. The
+                    TRY-informed cell's preload zone (trials 0..N-1, shaded
+                    light grey) shows the preloaded donor rows in their donor
+                    campaign's colour, in shuffled order, and also circles
+                    the seed (the best
                     preloaded row, the relay's incumbent when its first
                     simulated trial starts) and every process-level
                     campaign's highest-IRR trial that was preloaded; its
@@ -78,7 +79,7 @@ variants (--variants selects a subset):
   process        A  the six process-level outcomes (isobutanol yield /
                     titer / productivity, then ethanol) in a 2x3 grid: each
                     owning campaign's incumbent solid with its trial cloud,
-                    every other campaign's -- the financial and flagship
+                    every other campaign's -- the financial and TRY-informed
                     ones included -- dashed. No IRR cell;
                  B  as in irr;
   parameters     the final kinetic and process parameters of every set, the
@@ -150,7 +151,9 @@ DEFAULT_RELAY_CAMPAIGN = ('kin_opt_ethanol_isobutanol_metabolic_split_12d'
 # carries the '_rl<sha1-8>' tag (ko.relay_study_tag); relay studies are never
 # picked as one of the seven DEFAULT_OBJECTIVES campaigns.
 DEFAULT_RELAY_OBJECTIVE = 'PI (log-tail)'
-DEFAULT_RELAY_LABEL = 'Profitability (TRY-informed)'   # seeded with the titer / yield / productivity campaigns' trials
+# TRY-informed = seeded with the titer / yield / productivity (TRY) campaigns'
+# trials; the plain PI campaign is 'Profitability (uninformed)'
+DEFAULT_RELAY_LABEL = 'Profitability (TRY-informed)'
 DEFAULT_RELAY_MIN_TRIALS = 1000
 _RELAY_TAG_RE = re.compile(r'_rl[0-9a-f]{8}(?=_|$)')
 
@@ -433,8 +436,8 @@ PRELOAD_ZONE_COLOR = '0.96'
 PRELOAD_ZONE_ALPHA = 0.5
 # figure variants written by one run (main --variants; default all three):
 # the two two-panel figures -- panel A the IRR trajectories of the financial
-# and flagship (relay) campaigns, or the six process-level trajectories; panel
-# B the proteome allocation of every set -- and the standalone
+# and TRY-informed (relay) campaigns, or the six process-level trajectories;
+# panel B the proteome allocation of every set -- and the standalone
 # final-parameters figure (file stems <stem>_<variant>_<stamp>)
 FIGURE_VARIANTS = ('irr', 'process', 'parameters')
 # the longest output path savefig can open on this machine (Windows MAX_PATH
@@ -1654,7 +1657,7 @@ def draw_process_outcomes(fig, gs_cell, sets, colors, xmax):
     2x3 grid -- the isobutanol metrics (yield, titer, productivity) across
     row 1, the ethanol metrics across row 2, mirroring the campaign legend.
     Every cell draws every campaign's incumbent (the owner thick and solid
-    with its trial cloud, the rest dashed, the profitability and flagship
+    with its trial cloud, the rest dashed, the profitability and TRY-informed
     campaigns included)."""
     sub_gs = gs_cell.subgridspec(2, 3, wspace=PROCESS_GRID_WSPACE,
                                  hspace=PROCESS_GRID_HSPACE)
@@ -2070,13 +2073,13 @@ def plot(sets, band, out_stem, dpi=300, params_only=False,
                        campaign(s) (the regular sets owning the IRR cell),
                        solid, with the process-level campaigns' incumbents
                        dashed and every campaign's highest-IRR trial circled;
-                       and the relay (flagship) campaign(s) alone, its
+                       and the relay (TRY-informed) campaign(s) alone, its
                        highest-IRR trial circled and its preloaded donor rows
                        in their donor's colour. No other outcome.
       'process'        the six process-level outcomes (2x3: isobutanol row,
                        ethanol row), every campaign's incumbent in every cell
                        -- the owner solid with its trial cloud, the others
-                       (the profitability and flagship campaigns included)
+                       (the profitability and TRY-informed campaigns included)
                        dashed. No IRR cell.
 
     params_only: the standalone final-parameters figure
@@ -2097,8 +2100,8 @@ def plot(sets, band, out_stem, dpi=300, params_only=False,
     if view == 'irr':
         # the financial cell draws every regular set: the financial incumbent
         # solid with its trial cloud, the process-level campaigns' incumbents
-        # dashed, and every campaign's highest-IRR trial circled; the flagship
-        # cell draws the relay alone (its preload zone holds the donor rows)
+        # dashed, and every campaign's highest-IRR trial circled; the
+        # TRY-informed cell draws the relay alone (its preload zone holds the donor rows)
         cells = []
         if fin_sets:
             cells.append(a_sets)
@@ -2510,11 +2513,11 @@ def main(argv=None):
                     default=list(FIGURE_VARIANTS),
                     help='figure variants to write (default: all three): '
                          'irr = panel A the IRR trajectories of '
-                         'the financial and flagship (relay) campaigns + '
+                         'the financial and TRY-informed (relay) campaigns + '
                          'panel B the proteome allocation of every set; '
                          'process = panel A the six process-level '
                          'trajectories (every campaign, the financial and '
-                         'flagship ones dashed) + the same panel B; '
+                         'TRY-informed ones dashed) + the same panel B; '
                          'parameters = the final kinetic and process '
                          'parameters of every set, relay included')
     ap.add_argument('--params-only', action='store_true',

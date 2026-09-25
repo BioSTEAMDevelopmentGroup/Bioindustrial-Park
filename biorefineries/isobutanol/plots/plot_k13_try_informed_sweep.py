@@ -7,11 +7,11 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 """Profitability index and isobutanol yield along a 1-D k_13 sweep through
-the flagship profitability campaign's optimum.
+the TRY-informed profitability campaign's optimum.
 
 One panel over a log k_13 (ALS capacity) axis: the profitability index PI
 (left y-axis) and the isobutanol yield (right y-axis) of every sweep point,
-all other decision variables held at the flagship (relay) campaign's best
+all other decision variables held at the TRY-informed (relay) campaign's best
 trial #1912 (k_13 = 4.0 g/L/h, the top of the campaign band). Marked: the
 trial itself, PI = 0 (break-even at the 15 % hurdle rate), the region beyond
 the campaign's k_13 band, and the k_13 above which the enzyme burden derates
@@ -19,12 +19,12 @@ growth. Points that did not simulate (INFEASIBLE / ERROR / LOST) leave gaps
 and are counted in the legend. The console prints a roughness summary of both
 curves along the sweep (normalized total variation, number of local maxima).
 
-Data: results/evaluate_k13_flagship_optimum.csv + _anchor.json, written by
-analyses/evaluate_k13_flagship_optimum.py (the simulation stage, ask-first).
+Data: results/evaluate_k13_try_informed_optimum.csv + _anchor.json, written by
+analyses/evaluate_k13_try_informed_optimum.py (the simulation stage, ask-first).
 Sim-safe: reads the CSV / JSON only; never imports the biorefineries package.
 
 Usage:
-    python plot_k13_flagship_sweep.py [--csv PATH] [--out-dir DIR]
+    python plot_k13_try_informed_sweep.py [--csv PATH] [--out-dir DIR]
         [--stem STEM] [--dpi 300]
 """
 import os
@@ -41,7 +41,7 @@ from matplotlib.patches import Patch
 
 PKG_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RESULTS_DIR = os.path.join(PKG_DIR, 'analyses', 'results')
-SWEEP_STEM = 'evaluate_k13_flagship_optimum'
+SWEEP_STEM = 'evaluate_k13_try_informed_optimum'
 
 # -----------------------------------------------------------------------------
 # Typeface, font sizes, tick style (the package's publication conventions)
@@ -184,7 +184,7 @@ def plot(frame, anchor, out_stem, dpi):
         Line2D([], [], **{k_: v for k_, v in YIELD_KW.items() if k_ != 'zorder'},
                label='Isobutanol yield (right axis)'),
         Line2D([], [], **{k_: v for k_, v in STAR_KW.items() if k_ != 'zorder'},
-               label=f"Flagship optimum (#{anchor['trial_number']}, "
+               label=f"TRY-informed optimum (#{anchor['trial_number']}, "
                      f"PI {PI[i_opt]:.2f})"),
         Line2D([], [], **BREAKEVEN_KW, label='PI = 0 (break-even at a '
                                              '15 % hurdle rate)'),
@@ -233,7 +233,7 @@ def main(argv=None):
                                                   SWEEP_STEM + '.csv'))
     ap.add_argument('--out-dir', default=os.path.join(
         RESULTS_DIR, 'publication', 'Objective-landscape'))
-    ap.add_argument('--stem', default='k13_flagship_sweep')
+    ap.add_argument('--stem', default='k13_try_informed_sweep')
     ap.add_argument('--dpi', type=int, default=300)
     args = ap.parse_args(argv)
     frame, anchor = load(args.csv)

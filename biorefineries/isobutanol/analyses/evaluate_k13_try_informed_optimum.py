@@ -6,9 +6,9 @@
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
-"""1-D k_13 sweep through the flagship profitability campaign's optimum.
+"""1-D k_13 sweep through the TRY-informed profitability campaign's optimum.
 
-Every decision variable is held at the flagship (relay) campaign's best trial
+Every decision variable is held at the TRY-informed (relay) campaign's best trial
 (`..._pi_log-tail_gp_rb0.001-4_ib0.75-1.5_aA_rl15c111dc_burden` #1912: PI
 0.808, IRR 0.273, k_13 = 4.0 g/L/h = the top of the campaign band) EXCEPT the
 ALS capacity k_13, which is swept log-uniformly over [K13_LOW, K13_HIGH]. The
@@ -16,7 +16,7 @@ upper end sits just below the A-referenced enzyme-burden cap at this point
 (Phi_M = F_flex at k_13 ~ 24.5; growth is derated from k_13 ~ 4.8, where
 F_flex - Phi_M falls below phi_T). The recorded k_13 of the trial is added to
 the grid, so the sweep passes exactly through the optimum. Feeds the
-sim-safe figure plots/plot_k13_flagship_sweep.py (PI and isobutanol yield vs
+sim-safe figure plots/plot_k13_try_informed_sweep.py (PI and isobutanol yield vs
 k_13).
 
 Set-up = the read-only trial reproduction (ko.reproduce_split12d_trial's
@@ -36,11 +36,11 @@ logged INFEASIBLE, a raising simulation ERROR.
 
 SIMULATES (one load + the anchor + len(grid) points, ~15-25 min): ask-first
 (approved by the user 2026-09-24). Run it in a fresh process, from this
-directory, with the hensmith pin used for the rs350 / flagship campaigns
+directory, with the hensmith pin used for the rs350 / TRY-informed campaigns
 (PYTHONPATH from the session scratchpad's PINNED_PYTHONPATH.txt), ideally
 under the supervisor:
 
-    python supervise_sweep.py evaluate_k13_flagship_optimum.py
+    python supervise_sweep.py evaluate_k13_try_informed_optimum.py
 
 Checkpoint + resume (the supervise_sweep.py convention): one flushed row per
 point in results/<stem>_checkpoint.csv; results/<stem>_inflight.json written

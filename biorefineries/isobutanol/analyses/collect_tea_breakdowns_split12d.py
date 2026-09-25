@@ -14,8 +14,8 @@ SIMULATES (ask-first; one fresh process, never next to another simulation on
 a cold cache): one load() (default both-trains build, S201 split 1.0, as the
 campaigns ran), the scenario-A baseline, then the objective-optimum trial of
 each of the eight most recent ethanol_isobutanol x metabolic_split_12d
-campaigns (CAMPAIGNS: the seven seed-350 `_rs350` campaigns and the flagship
-PI (log-tail) relay `_rl15c111dc`), each re-simulated with
+campaigns (CAMPAIGNS: the seven seed-350 `_rs350` campaigns and the
+TRY-informed PI (log-tail) relay `_rl15c111dc`), each re-simulated with
 ko.reproduce_split12d_trial (anchor A, A-referenced burden ON, restore=True;
 it leaves the flowsheet at the trial, so the unit groups read the trial).
 
@@ -64,9 +64,10 @@ _RELAY = ('kin_opt_ethanol_isobutanol_metabolic_split_12d_pi_log-tail_gp'
 #: (best 0.504) sit below its simulated best, and a donor row could not be
 #: reproduced under the relay's name anyway.
 CAMPAIGNS = (
-    ('profitability', 'Profitability', _RS350.format('pi_log-tail'),
+    ('profitability_uninformed', 'Profitability (uninformed)',
+     _RS350.format('pi_log-tail'), 'PI (log-tail)'),
+    ('profitability_try_informed', 'Profitability (TRY-informed)', _RELAY,
      'PI (log-tail)'),
-    ('flagship', 'Profitability (flagship)', _RELAY, 'PI (log-tail)'),
     ('ibo_yield', 'Isobutanol yield', _RS350.format('ibo_yield'), 'IBO yield'),
     ('ibo_titer', 'Isobutanol titer', _RS350.format('ibo_titer'), 'IBO titer'),
     ('ibo_productivity', 'Isobutanol productivity',
