@@ -7,20 +7,22 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 """
-Multi-panel bivariate uncertainty figure (2 x 2 grid, fourth cell reserved)
+Multi-panel bivariate uncertainty figure (2 x 2 grid)
 from an uncertainty-analysis results workbook (*_1_full_evaluation.xlsx as
 written by analyses/full/uncertainties_IBO_EtOH.py):
 
   A  purity-adjusted ethanol MPSP (y, converted from the workbook's $/kg to
      $/GGE, see USD_PER_KG_TO_USD_PER_GGE) vs total capital investment (x)
-  B  ethanol titer (y, g/L-water) vs ethanol yield (x, g/g sugars added)
-  C  ethanol sale revenue (y) vs DDGS sale revenue (x), MM$/y at the default
+  B  ethanol production (y, million gal of pure ethanol per year: the
+     purity-adjusted production rate / ETHANOL_DENSITY_KG_PER_L / L_PER_GAL)
+     vs total capital investment (x)
+  C  ethanol titer (y, g/L-water) vs ethanol yield (x, g/g sugars added)
+  D  ethanol sale revenue (y) vs DDGS sale revenue (x), MM$/y at the default
      product prices; ethanol revenue is not a workbook column and is derived
      as the annual product sale minus the DDGS, crude-oil and isobutanol sale
      revenues (exact: the model's tea.sales is the sum of those four)
-  D  empty (a fourth distribution will be added)
 
-Every joint panel, in its own hue (A teal, B purple, C yellow): the
+Every joint panel, in its own hue (A teal, B green, C purple, D yellow): the
 Gaussian-KDE density of the Monte Carlo samples as filled contours (one
 sequential ramp of the hue, light = sparse to dark = dense; the lowest band is
 left unfilled, so the panel background stays white),
@@ -75,6 +77,7 @@ MPSP_COL = ('Biorefinery', 'Purity-adjusted ethanol MPSP [$/kg]')
 TCI_COL = ('Biorefinery', 'Total capital investment [10^6 $]')
 ETOH_TITER_COL = ('Fermentation', 'Et OH titer [g-EtOH/L-water]')
 ETOH_YIELD_COL = ('Fermentation', 'Et OH yield [g-EtOH/g-sugars-added]')
+ETOH_PRODUCTION_COL = ('Biorefinery', 'Adjusted production rate [10^6 kg/yr]') # pure ethanol
 SALES_COL = ('Biorefinery', 'Annual product sale (excl. electricity) [10^6 $/yr]')
 DDGS_REVENUE_COL = ('Coproducts', 'DDGS sale revenue [$/y]')
 # every product sale revenue other than ethanol's; ethanol's = SALES_COL
@@ -95,8 +98,9 @@ PARETO_LS = '-'
 # the TRY-informed profitability campaign's teal (RELAY_COLOR in
 # plots/plot_kin_opt_parameter_sets.py)
 TEAL = '#0B6E7A'
-# panels B and C: the ethanol-yield purple and ethanol-titer yellow of that
-# figure's hue palette (HUE_COLORS[4], HUE_COLORS[5])
+# panels B, C and D: the isobutanol-titer green, ethanol-yield purple and
+# ethanol-titer yellow of that figure's hue palette (HUE_COLORS[2], [4], [5])
+GREEN = '#79bf82'
 PURPLE = '#a280b9'
 YELLOW = '#f3c354'
 
@@ -174,21 +178,25 @@ GASOLINE_LINE_COLOR = _mix(BASELINE_GRAY, 'black', 0.45)
 GASOLINE_LINE_STYLE = dict(lw=1.0, ls=(0, (5, 3)))
 BOX_PERCENTILES = {'whis': (5, 95), 'dots': (0, 100)} # dots: min and max
 
-# the joint panels of the 2 x 2 grid, row-major (the fourth cell is left empty
-# for now): (x outcome, y outcome) keyed by _outcomes' names, axis titles, and
+# the joint panels of the 2 x 2 grid, row-major: (x outcome, y outcome) keyed by _outcomes' names, axis titles, and
 # panel hue, Pareto sense per axis ('min' / 'max', x then y), fixed axis
 # ticks / limits (neither = 'nice' ticks enclosing the samples and
 # the baseline)
-# panel C: ethanol revenue 60-180, DDGS revenue 0-30 MM$/y
+# panel D: ethanol revenue 60-180, DDGS revenue 0-30 MM$/y
 ETOH_REVENUE_TICKS = np.arange(60.0, 181.0, 20.0) # MM$/y
 DDGS_REVENUE_TICKS = np.arange(0.0, 31.0, 5.0) # MM$/y
+TCI_TICKS = np.arange(TCI_AXIS_LIMITS[0], TCI_AXIS_LIMITS[1] + TCI_TICK_STEP/2,
+                      TCI_TICK_STEP)
 PANELS = (
     dict(x='TCI', y='MPSP',
          xlabel='Total capital investment [MM\\$]',
          ylabel=r'Minimum ethanol selling price [$\mathrm{\$·GGE}^{-1}$]',
-         xticks=np.arange(TCI_AXIS_LIMITS[0], TCI_AXIS_LIMITS[1] + TCI_TICK_STEP/2,
-                          TCI_TICK_STEP),
+         xticks=TCI_TICKS,
          ylim=MPSP_AXIS_LIMITS, market=True, pareto=('min', 'min'), color=TEAL),
+    dict(x='TCI', y='EtOH production', color=GREEN, pareto=('min', 'max'),
+         xlabel='Total capital investment [MM\\$]',
+         ylabel=r'Ethanol production [$\mathrm{MM\ gal·y}^{-1}$]',
+         xticks=TCI_TICKS),
     dict(x='EtOH yield', y='EtOH titer', color=PURPLE, pareto=('max', 'max'),
          xlabel=r'Ethanol yield [$\mathrm{g·g}^{-1}$ sugars]',
          ylabel=r'Ethanol titer [$\mathrm{g·L}^{-1}$]',
@@ -247,6 +255,7 @@ def _outcomes(df):
         'EtOH titer': col(ETOH_TITER_COL),
         'EtOH yield': col(ETOH_YIELD_COL),
         'DDGS revenue': col(DDGS_REVENUE_COL) / 1e6,
+        'EtOH production': col(ETOH_PRODUCTION_COL) / ETHANOL_DENSITY_KG_PER_L / L_PER_GAL, # MM gal/y
         'EtOH revenue': col(SALES_COL) - sum(col(c) for c in COPRODUCT_REVENUE_COLS) / 1e6,
     }
 
