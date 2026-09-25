@@ -63,7 +63,7 @@ FIGURE = ksf.SweepFigure(
     csv_prefix=f'ibo_{SWEEP_STEPS}_k_1e_inhib_Spike_opt=False_max_n=16_',
     spec_1=SPEC_1, spec_2=SPEC_2,
     xlabel=r'$\bf{Glycolytic\ capacity}$, $k_{\mathrm{1e}}$' + f' [{ksf.G_PER_L_PER_H}]',
-    ylabel=r'$\bf{Ethanol\ inhibition\ multiplier}$',
+    ylabel=r'$\bf{Ethanol\ inhibition}$ [× baseline]',
     optima=OPTIMA,
     x_major=50., x_minor_div=2, y_major=0.25, y_minor_div=5,
     label_ha={'productivity': 'center'},

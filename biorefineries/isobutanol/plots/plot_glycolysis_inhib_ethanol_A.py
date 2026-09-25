@@ -68,8 +68,8 @@ FIGURE = ksf.SweepFigure(
     csv_prefix=(f'ibo_{SWEEP_STEPS}_glyco_inhib_Spike_rb0.001-4_ib0.001-2'
                 '_opt=False_max_n=16_'),
     spec_1=SPEC_1, spec_2=SPEC_2,
-    xlabel=r'$\bf{Glycolysis\ capacity\ multiplier}$',
-    ylabel=r'$\bf{Ethanol\ inhibition\ multiplier}$',
+    xlabel=r'$\bf{Glycolysis\ capacity}$ [× baseline]',
+    ylabel=r'$\bf{Ethanol\ inhibition}$ [× baseline]',
     optima=OPTIMA,
     xlim=(0., 4.), ylim=(0., 2.),
     x_major=1., x_minor_div=4, y_major=0.5, y_minor_div=5,
