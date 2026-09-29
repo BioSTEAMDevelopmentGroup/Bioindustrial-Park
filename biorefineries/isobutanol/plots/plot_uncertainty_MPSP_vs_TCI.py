@@ -631,7 +631,7 @@ def plot_uncertainty_MPSP_vs_TCI(results_file=None, baseline_file=None,
         print(f"Panel {letter}: {panel['y']} vs {panel['x']}, "
               f'Spearman rho = {rho:.3f} (p = {p:.1e})')
         ax = draw_joint_panel(fig, grid[divmod(i, n_cols)], panel, samples, base, letter)
-        ax.text(*RHO_XY, rf"Spearman's $\rho$ = {rho:.2f}".replace('-', '−'),
+        ax.text(*RHO_XY, rf"$\rho$ = {rho:.2f}".replace('-', '−'),
                 transform=ax.transAxes, ha='right', va='top',
                 fontsize=CALLOUT_FONTSIZE, color=INK, bbox=RHO_BOX, zorder=6)
         axes.append(ax)
