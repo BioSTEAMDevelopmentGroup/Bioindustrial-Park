@@ -7,22 +7,25 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 """
-Multi-panel bivariate uncertainty figure (2 x 2 grid)
+Multi-panel bivariate uncertainty figure (2 x 3 grid)
 from an uncertainty-analysis results workbook (*_1_full_evaluation.xlsx as
-written by analyses/full/uncertainties_IBO_EtOH.py):
+written by analyses/full/uncertainties_IBO_EtOH.py). MESP = the
+purity-adjusted ethanol MPSP, converted from the workbook's $/kg to $/GGE (see
+USD_PER_KG_TO_USD_PER_GGE):
 
-  A  purity-adjusted ethanol MPSP (y, converted from the workbook's $/kg to
-     $/GGE, see USD_PER_KG_TO_USD_PER_GGE) vs total capital investment (x)
+  A  MESP (y) vs total capital investment (x)
   B  total capital investment (y) vs ethanol production (x, million gal of
      pure ethanol per year: the purity-adjusted production rate /
      ETHANOL_DENSITY_KG_PER_L / L_PER_GAL)
-  C  ethanol titer (y, g/L-water) vs ethanol yield (x, g/g sugars added)
-  D  ethanol sale revenue (y) vs DDGS sale revenue (x), MM$/y at the default
-     product prices; ethanol revenue is not a workbook column and is derived
-     as the annual product sale minus the DDGS, crude-oil and isobutanol sale
-     revenues (exact: the model's tea.sales is the sum of those four)
+  C  MESP (y) vs feed corn starch content (x, kg/kg dry corn; a sampled
+     parameter, read from the workbook's 'Parameters' sheet; its baseline from
+     the scenario's parameter-distribution workbook, PARAMETER_DISTRIBUTIONS)
+  D  MESP (y) vs ethanol yield (x, g/g sugars added)
+  E  MESP (y) vs ethanol titer (x, g/L-water)
+  F  MESP (y) vs ethanol productivity (x, g/L-water/h)
 
-Every joint panel, in its own hue (A teal, B green, C purple, D yellow): the
+Every joint panel, in its own hue (A teal, B green, C orange, D purple,
+E yellow, F blue): the
 Gaussian-KDE density of the Monte Carlo samples as filled contours (one
 sequential ramp of the hue, light = sparse to dark = dense; the lowest band is
 left unfilled, so the panel background stays white),
@@ -39,14 +42,12 @@ Panel A also carries a light grey band for the ethanol market price range
 gasoline price range (GASOLINE_PRICE_RANGE). Panel B carries a box in the
 same grey spanning a typical corn ethanol biorefinery's ethanol production
 (TYPICAL_CORN_ETHANOL_PRODUCTION) and TCI (TYPICAL_CORN_ETHANOL_TCI), also
-unlabelled. Panel C carries one spanning the ethanol yield and titer
-reported for very-high-gravity fermentation (VHG_ETHANOL_YIELD,
-VHG_ETHANOL_TITER).
+unlabelled.
 
 Every panel also carries the Pareto frontier of its samples as a solid red
-staircase, in the sense set by the panel's `pareto` entry: A lower-left (MPSP
-and TCI minimized), B and C upper-right (titer and yield, and both revenues,
-maximized).
+staircase, in the sense set by the panel's `pareto` entry: A lower-left (MESP
+and TCI minimized), B lower-right (production maximized, TCI minimized), C-F
+lower-right (the x outcome maximized, MESP minimized).
 
 Sim-safe: pure pandas/matplotlib/scipy, never imports biorefineries.
 
@@ -82,14 +83,17 @@ MPSP_COL = ('Biorefinery', 'Purity-adjusted ethanol MPSP [$/kg]')
 TCI_COL = ('Biorefinery', 'Total capital investment [10^6 $]')
 ETOH_TITER_COL = ('Fermentation', 'Et OH titer [g-EtOH/L-water]')
 ETOH_YIELD_COL = ('Fermentation', 'Et OH yield [g-EtOH/g-sugars-added]')
+ETOH_PRODUCTIVITY_COL = ('Fermentation', 'Et OH productivity [g-EtOH/L-water/h]')
 ETOH_PRODUCTION_COL = ('Biorefinery', 'Adjusted production rate [10^6 kg/yr]') # pure ethanol
-SALES_COL = ('Biorefinery', 'Annual product sale (excl. electricity) [10^6 $/yr]')
-DDGS_REVENUE_COL = ('Coproducts', 'DDGS sale revenue [$/y]')
-# every product sale revenue other than ethanol's; ethanol's = SALES_COL
-# minus these
-COPRODUCT_REVENUE_COLS = (DDGS_REVENUE_COL,
-                          ('Coproducts', 'Crude oil sale revenue [$/y]'),
-                          ('Coproducts', 'Isobutanol sale revenue [$/y]'))
+# the feed corn starch content is a sampled parameter, not a metric: the
+# samples are in the results workbook's 'Parameters' sheet, and the baseline
+# workbook (metrics only) lacks it, so its baseline comes from the Baseline
+# column of the scenario's parameter-distribution workbook
+STARCH_COL = ('Feedstock', 'Feedstock starch content [kg/dry-kg]') # 'Parameters' sheet
+STARCH_PARAMETER_NAME = 'Feedstock starch content'
+PARAMETER_DISTRIBUTIONS = os.path.join(
+    os.path.dirname(HERE), 'analyses', 'full', 'parameter_distributions',
+    'parameter-distributions_corn_IBO_EtOH_A.xlsx')
 
 FONT_FAMILY = 'Arial'
 FONTS = {'tick': 12, 'axis_title': 12, 'panel_letter': 14}
@@ -103,11 +107,15 @@ PARETO_LS = '-'
 # the TRY-informed profitability campaign's teal (RELAY_COLOR in
 # plots/plot_kin_opt_parameter_sets.py)
 TEAL = '#0B6E7A'
-# panels B, C and D: the isobutanol-titer green, ethanol-yield purple and
-# ethanol-titer yellow of that figure's hue palette (HUE_COLORS[2], [4], [5])
+# panels B-F, from that figure's hue palette: B the isobutanol-titer green
+# (HUE_COLORS[2]), C the isobutanol-yield orange ([1]), and D-F the
+# ethanol-yield purple, ethanol-titer yellow and ethanol-productivity blue
+# ([4], [5], [6]), so each ethanol metric keeps its hue across figures
 GREEN = '#79bf82'
+ORANGE = '#f98f60'
 PURPLE = '#a280b9'
 YELLOW = '#f3c354'
+BLUE = '#5a6bcc'
 
 
 def _mix(color, other, t):
@@ -175,21 +183,6 @@ TYPICAL_CORN_ETHANOL_TCI = tuple(
     for v, year in TYPICAL_CORN_ETHANOL_TCI_SOURCE) # MM$ (2023$): ~110.3, ~195.6
 # typical dry-grind corn ethanol biorefinery capacity, for panel B's box
 TYPICAL_CORN_ETHANOL_PRODUCTION = (40.0, 60.0) # MM gal/y
-# ethanol yield and titer reported for (very) high-gravity S. cerevisiae
-# fermentation, for panel C's box:
-# - Gomes, D. et al. Very High Gravity Bioethanol Revisited: Main Challenges
-#   and Advances. Fermentation 7, 38 (2021).
-# - Deparis, Q., Claes, A., Foulquie-Moreno, M. R. & Thevelein, J. M.
-#   Engineering tolerance to industrially relevant stress factors in yeast
-#   cell factories. FEMS Yeast Res. 17 (2017).
-# - Tsegaye, K. N., Alemnew, M. & Berhane, N. Saccharomyces cerevisiae for
-#   lignocellulosic ethanol production: a look at key attributes and genome
-#   shuffling. Front. Bioeng. Biotechnol. 12, 1466644 (2024).
-# - Devantier, R. et al. Metabolite profiling for analysis of yeast stress
-#   response during very high gravity ethanol fermentations. Appl. Microbiol.
-#   Biotechnol. 68, 622-629 (2005). https://doi.org/10.1007/s00253-005-1902-9
-VHG_ETHANOL_YIELD = (0.42, 0.48) # g/g
-VHG_ETHANOL_TITER = (100.0, 142.0) # g/L
 # the ethanol range is a band in a light shade of the baseline grey of
 # plots/plot_kin_opt_parameter_sets.py (BASELINE_COLOR); the gasoline range,
 # which almost coincides with it, is two dashed lines in a dark shade of the
@@ -200,19 +193,22 @@ GASOLINE_LINE_COLOR = _mix(BASELINE_GRAY, 'black', 0.45)
 GASOLINE_LINE_STYLE = dict(lw=1.0, ls=(0, (5, 3)))
 BOX_PERCENTILES = {'whis': (5, 95), 'dots': (0, 100)} # dots: min and max
 
-# the joint panels of the 2 x 2 grid, row-major: (x outcome, y outcome) keyed by _outcomes' names, axis titles, and
-# panel hue, Pareto sense per axis ('min' / 'max', x then y), fixed axis
-# ticks / limits (neither = 'nice' ticks enclosing the samples and
-# the baseline)
-# panel D: ethanol revenue 60-180, DDGS revenue 0-30 MM$/y
-ETOH_REVENUE_TICKS = np.arange(60.0, 181.0, 20.0) # MM$/y
-DDGS_REVENUE_TICKS = np.arange(0.0, 31.0, 5.0) # MM$/y
+# the joint panels of the 2 x 3 grid, row-major: (x outcome, y outcome) keyed
+# by _outcomes' names, axis titles, and panel hue, Pareto sense per axis
+# ('min' / 'max', x then y), fixed axis ticks / limits (neither = 'nice' ticks
+# enclosing the samples and the baseline)
 TCI_TICKS = np.arange(TCI_AXIS_LIMITS[0], TCI_AXIS_LIMITS[1] + TCI_TICK_STEP/2,
                       TCI_TICK_STEP)
+MESP_LABEL = r'Minimum ethanol selling price [$\mathrm{\$·GGE}^{-1}$]'
+# panels C-F: MESP (y, the fixed panel-A axis) vs one driver (x), the driver
+# maximized and MESP minimized by the Pareto frontier
+_mesp_panel = lambda x, xlabel, color, **kw: dict(
+    x=x, y='MPSP', xlabel=xlabel, ylabel=MESP_LABEL, ylim=MPSP_AXIS_LIMITS,
+    pareto=('max', 'min'), color=color, **kw)
 PANELS = (
     dict(x='TCI', y='MPSP',
          xlabel='Total capital investment [MM\\$]',
-         ylabel=r'Minimum ethanol selling price [$\mathrm{\$·GGE}^{-1}$]',
+         ylabel=MESP_LABEL,
          xticks=TCI_TICKS,
          ylim=MPSP_AXIS_LIMITS, market=True, pareto=('min', 'min'), color=TEAL),
     dict(x='EtOH production', y='TCI', color=GREEN, pareto=('max', 'min'),
@@ -220,19 +216,22 @@ PANELS = (
          ylabel='Total capital investment [MM\\$]',
          yticks=TCI_TICKS,
          box=(TYPICAL_CORN_ETHANOL_PRODUCTION, TYPICAL_CORN_ETHANOL_TCI)),
-    dict(x='EtOH yield', y='EtOH titer', color=PURPLE, pareto=('max', 'max'),
-         xlabel=r'Ethanol yield [$\mathrm{g·g}^{-1}$ sugars]',
-         ylabel=r'Ethanol titer [$\mathrm{g·L}^{-1}$]',
-         xlim=(0.40, 0.50), ylim=(80.0, 150.0),
-         box=(VHG_ETHANOL_YIELD, VHG_ETHANOL_TITER)),
-    dict(x='DDGS revenue', y='EtOH revenue', color=YELLOW, pareto=('max', 'max'),
-         xlabel=r'DDGS sale revenue [$\mathrm{MM\$·y}^{-1}$]',
-         ylabel=r'Ethanol sale revenue [$\mathrm{MM\$·y}^{-1}$]',
-         xticks=DDGS_REVENUE_TICKS, yticks=ETOH_REVENUE_TICKS),
+    _mesp_panel('Starch content',
+                r'Corn starch content [$\mathrm{kg·kg}^{-1}$ dry corn]', ORANGE),
+    _mesp_panel('EtOH yield', r'Ethanol yield [$\mathrm{g·g}^{-1}$ sugars]',
+                PURPLE, xlim=(0.40, 0.50)),
+    _mesp_panel('EtOH titer', r'Ethanol titer [$\mathrm{g·L}^{-1}$]',
+                YELLOW, xlim=(80.0, 150.0)),
+    _mesp_panel('EtOH productivity',
+                r'Ethanol productivity [$\mathrm{g·L}^{-1}\mathrm{·h}^{-1}$]', BLUE),
 )
-GRID_SHAPE = (2, 2)
-# gaps between grid cells (fractions of the mean cell width / height) and the
-# panel letter's position in its joint axes' coordinates
+GRID_SHAPE = (2, 3)
+# figure size per grid cell and the figure margins (inches, so the cells keep
+# their size and spacing whatever the grid shape), gaps between grid cells
+# (fractions of the mean cell width / height), and the panel letter's
+# position in its joint axes' coordinates
+CELL_SIZE = (5.6, 5.4) # in
+MARGINS_IN = {'left': 1.12, 'right': 0.224, 'bottom': 0.81, 'top': 0.162}
 GRID_SPACE = {'w': 0.26, 'h': 0.16}
 PANEL_LETTER_XY = (-0.15, 1.12)
 
@@ -282,29 +281,38 @@ def newest_results_file(scenario='A'):
 
 
 def _outcomes(df):
-    """The plotted outcomes of a TEA-results frame, as float Series, keyed by
-    the names used in PANELS."""
+    """The plotted metrics of a TEA-results frame, as float Series, keyed by
+    the names used in PANELS (the sampled starch content is added by
+    load_samples / load_baseline)."""
     col = lambda c: df[c].astype(float)
     return {
         'TCI': col(TCI_COL),
         'MPSP': col(MPSP_COL) * USD_PER_KG_TO_USD_PER_GGE,
         'EtOH titer': col(ETOH_TITER_COL),
         'EtOH yield': col(ETOH_YIELD_COL),
-        'DDGS revenue': col(DDGS_REVENUE_COL) / 1e6,
+        'EtOH productivity': col(ETOH_PRODUCTIVITY_COL),
         'EtOH production': col(ETOH_PRODUCTION_COL) / ETHANOL_DENSITY_KG_PER_L / L_PER_GAL, # MM gal/y
-        'EtOH revenue': col(SALES_COL) - sum(col(c) for c in COPRODUCT_REVENUE_COLS) / 1e6,
     }
 
 
 def load_samples(results_file):
-    df = pd.read_excel(results_file, sheet_name='TEA results',
-                       header=[0, 1], index_col=0)
-    return pd.DataFrame(_outcomes(df))
+    sheets = pd.read_excel(results_file, sheet_name=['TEA results', 'Parameters'],
+                           header=[0, 1], index_col=0)
+    samples = pd.DataFrame(_outcomes(sheets['TEA results']))
+    samples['Starch content'] = sheets['Parameters'][STARCH_COL].astype(float)
+    return samples
 
 
-def load_baseline(baseline_file):
+def load_baseline(baseline_file, parameter_distributions=PARAMETER_DISTRIBUTIONS):
     df = pd.read_excel(baseline_file, header=[0, 1], index_col=0)
-    return {k: float(v.iloc[0]) for k, v in _outcomes(df.loc[['initial']]).items()}
+    base = {k: float(v.iloc[0]) for k, v in _outcomes(df.loc[['initial']]).items()}
+    dist = pd.read_excel(parameter_distributions)
+    row = dist[dist['Parameter name'] == STARCH_PARAMETER_NAME]
+    if len(row) != 1:
+        raise ValueError(f'{len(row)} {STARCH_PARAMETER_NAME!r} rows in '
+                         f'{parameter_distributions}')
+    base['Starch content'] = float(row['Baseline'].iloc[0])
+    return base
 
 
 #%% Drawing
@@ -464,9 +472,12 @@ def plot_uncertainty_MPSP_vs_TCI(results_file=None, baseline_file=None,
 
     apply_font_rcparams()
     n_rows, n_cols = GRID_SHAPE
-    fig = plt.figure(figsize=(5.6*n_cols, 5.4*n_rows))
+    width, height = CELL_SIZE[0]*n_cols, CELL_SIZE[1]*n_rows
+    fig = plt.figure(figsize=(width, height))
+    m = MARGINS_IN
     grid = fig.add_gridspec(n_rows, n_cols, wspace=GRID_SPACE['w'], hspace=GRID_SPACE['h'],
-                            left=0.1, right=0.98, bottom=0.075, top=0.985)
+                            left=m['left']/width, right=1 - m['right']/width,
+                            bottom=m['bottom']/height, top=1 - m['top']/height)
     axes = []
     for i, panel in enumerate(PANELS):
         letter = chr(ord('A') + i)
