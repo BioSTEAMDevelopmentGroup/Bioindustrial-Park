@@ -294,6 +294,8 @@ CALLOUT_FONTSIZE = 12.0
 # Spearman's rank correlation of each panel's x and y, top-right of the joint
 # axes (axes fraction)
 RHO_XY = (0.97, 0.97)
+# its tight white box with a thin dark outline (pad in font-size units)
+RHO_BOX = dict(boxstyle='square,pad=0.25', facecolor='white', edgecolor=INK, lw=0.8)
 CALLOUT_ARROW = dict(arrowstyle='-|>', lw=1.0, mutation_scale=12, shrinkA=2)
 # `tip` (points) moves the arrow head past the annotated point so it overlaps
 # the item slightly; the baseline arrow instead stops `shrinkB` points short
@@ -631,7 +633,7 @@ def plot_uncertainty_MPSP_vs_TCI(results_file=None, baseline_file=None,
         ax = draw_joint_panel(fig, grid[divmod(i, n_cols)], panel, samples, base, letter)
         ax.text(*RHO_XY, rf"Spearman's $\rho$ = {rho:.2f}".replace('-', '−'),
                 transform=ax.transAxes, ha='right', va='top',
-                fontsize=CALLOUT_FONTSIZE, color=INK, zorder=6)
+                fontsize=CALLOUT_FONTSIZE, color=INK, bbox=RHO_BOX, zorder=6)
         axes.append(ax)
 
     fig.canvas.draw()
