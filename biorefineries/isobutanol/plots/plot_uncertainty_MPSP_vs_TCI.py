@@ -304,8 +304,9 @@ BASELINE_CALLOUT = dict(text='baseline', offset=(24, 22), rad=0.35, shrinkB=2.5)
 PARETO_CALLOUT = dict(text='Pareto frontier', at=0.55, offset=(12, -22), rad=-0.35,
                       tip=(0, 1.5))
 GASOLINE_CALLOUT = dict(text='gasoline market price range', x=105.0, tip=1.5)
-CONVENTIONAL_CALLOUT = dict(text='conventional', at=(118.0, None), # None = box top
-                            offset=(18, 14), rad=0.35, ha='left', tip=(0, -2.0))
+CONVENTIONAL_CALLOUT = dict(text='conventional corn ethanol ranges', at=(176.0, None), # None = box top
+                            offset=(-14, 12), rad=-0.4, ha='right', tip=(0, -2.0),
+                            relpos=(1.0, 0.3)) # arrow leaves the text's right end
 # marginal box axes: size relative to the joint axes' 4.2, box width in its axes
 MARGINAL_RATIO = 0.45
 BOX_WIDTH = 0.55
@@ -550,11 +551,11 @@ def _nudged(ax, dx, dy):
     return ax.transData + ScaledTranslation(dx/72, dy/72, ax.figure.dpi_scale_trans)
 
 
-def _callout(ax, text, xy, offset, rad, color, shrinkB=0, tip=(0, 0), **kw):
+def _callout(ax, text, xy, offset, rad, color, shrinkB=0, tip=(0, 0), relpos=(0.5, 0.5), **kw):
     return ax.annotate(text, xy=xy, xycoords=_nudged(ax, *tip), xytext=offset,
                        textcoords='offset points',
                        fontsize=CALLOUT_FONTSIZE, fontweight='bold', color=color,
-                       arrowprops=dict(**CALLOUT_ARROW, color=color, shrinkB=shrinkB,
+                       arrowprops=dict(**CALLOUT_ARROW, color=color, shrinkB=shrinkB, relpos=relpos,
                                        connectionstyle=f'arc3,rad={rad}'),
                        zorder=6, **kw)
 
@@ -578,7 +579,7 @@ def draw_panel_callouts(ax, panel, base, fx, fy):
         c = CONVENTIONAL_CALLOUT
         cx, cy = c['at']
         _callout(ax, c['text'], (cx, ETHANOL_MARKET_RANGE[1] if cy is None else cy),
-                 c['offset'], c['rad'], GASOLINE_LINE_COLOR, tip=c['tip'],
+                 c['offset'], c['rad'], GASOLINE_LINE_COLOR, tip=c['tip'], relpos=c['relpos'],
                  ha=c['ha'], va='bottom')
         c = GASOLINE_CALLOUT
         lo, hi = GASOLINE_PRICE_RANGE
