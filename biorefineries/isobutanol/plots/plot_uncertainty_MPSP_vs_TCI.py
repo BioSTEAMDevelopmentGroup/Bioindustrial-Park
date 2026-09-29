@@ -44,11 +44,17 @@ same grey spanning a typical corn ethanol biorefinery's ethanol production
 (TYPICAL_CORN_ETHANOL_PRODUCTION) and TCI (TYPICAL_CORN_ETHANOL_TCI), also
 unlabelled.
 
-Every panel also carries the Pareto frontier of its samples as a solid red
-staircase, in the sense set by the panel's `pareto` entry: A and C
-lower-left (TCI or starch content and MESP minimized), B lower-right
-(production maximized, TCI minimized), D-F lower-right (the x outcome
-maximized, MESP minimized).
+Panels A and B also carry the Pareto frontier of their samples as a solid red
+staircase, in the sense set by the panel's `pareto` entry: A lower-left (TCI
+and MESP minimized), B lower-right (production maximized, TCI minimized).
+Panels C-F carry a binned-median trend line instead (`trend`): the samples
+split into N_TREND_BINS equal-count bins of x, a black line through each
+bin's median x and median MESP. Their x is not a design choice that trades
+against MESP (starch content is a feedstock property; yield, titer and
+productivity are outcomes of the uncertain kinetics, and all four go WITH
+lower MESP), so a frontier would only trace the lucky corn-price / starch /
+capacity draws that happen to sit at high x; the binned medians show how much
+MESP actually moves with x.
 
 Sim-safe: pure pandas/matplotlib/scipy, never imports biorefineries.
 
@@ -69,6 +75,7 @@ import pandas as pd
 import matplotlib
 matplotlib.use('Agg')
 from matplotlib import pyplot as plt
+from matplotlib import patheffects
 from matplotlib.colors import LinearSegmentedColormap, to_hex, to_rgb
 from matplotlib.lines import TICKDOWN, TICKLEFT
 from matplotlib.ticker import AutoMinorLocator, MaxNLocator
@@ -105,6 +112,13 @@ TICK_LEN = {'major': 4.0, 'minor': 2.0} # pt; left/bottom ticks extend this far 
 PARETO_COLOR = '#ED586F'
 PARETO_LW = 1.5
 PARETO_LS = '-'
+# panels C-F: binned-median trend line, black with a white halo so it reads
+# over the darkest density bands, with a dot at each bin's medians
+N_TREND_BINS = 10 # equal-count bins of x (deciles)
+TREND_COLOR = '#0b0b0b'
+TREND_LW = 1.5
+TREND_MS = 4.0
+TREND_HALO_LW = TREND_LW + 2.0
 # the TRY-informed profitability campaign's teal (RELAY_COLOR in
 # plots/plot_kin_opt_parameter_sets.py)
 TEAL = '#0B6E7A'
@@ -196,8 +210,9 @@ BOX_PERCENTILES = {'whis': (5, 95), 'dots': (0, 100)} # dots: min and max
 
 # the joint panels of the 2 x 3 grid, row-major: (x outcome, y outcome) keyed
 # by _outcomes' names, axis titles, and panel hue, Pareto sense per axis
-# ('min' / 'max', x then y), fixed axis ticks / limits (neither = 'nice' ticks
-# enclosing the samples and the baseline)
+# ('min' / 'max', x then y; None = no frontier), binned-median trend line
+# (`trend`), fixed axis ticks / limits (neither = 'nice' ticks enclosing the
+# samples and the baseline)
 TCI_TICKS = np.arange(TCI_AXIS_LIMITS[0], TCI_AXIS_LIMITS[1] + TCI_TICK_STEP/2,
                       TCI_TICK_STEP)
 MESP_LABEL = r'Minimum ethanol selling price [$\mathrm{\$·GGE}^{-1}$]'
@@ -210,12 +225,11 @@ MESP_TICKS = np.round(np.linspace(3.3, 4.9, 9), 10) # $/GGE, every 0.2
 ETOH_YIELD_TICKS = np.round(np.linspace(0.41, 0.48, 8), 10) # g/g, every 0.01
 ETOH_TITER_TICKS = np.linspace(90.0, 130.0, 5) # g/L, every 10
 ETOH_PRODUCTIVITY_TICKS = np.round(np.linspace(0.8, 4.0, 9), 10) # g/L/h, every 0.4
-# panels C-F: MESP (y, MESP_TICKS) vs one driver (x); by default the Pareto
-# frontier maximizes the driver and minimizes MESP (a `pareto` keyword
-# overrides it)
+# panels C-F: MESP (y, MESP_TICKS) vs one driver (x), with a binned-median
+# trend line and no Pareto frontier (see the module docstring)
 _mesp_panel = lambda x, xlabel, color, **kw: {
     **dict(x=x, y='MPSP', xlabel=xlabel, ylabel=MESP_LABEL, yticks=MESP_TICKS,
-           pareto=('max', 'min'), color=color),
+           pareto=None, trend=True, color=color),
     **kw}
 PANELS = (
     dict(x='TCI', y='MPSP',
@@ -228,12 +242,8 @@ PANELS = (
          ylabel='Total capital investment [MM\\$]',
          yticks=TCI_TICKS,
          box=(TYPICAL_CORN_ETHANOL_PRODUCTION, TYPICAL_CORN_ETHANOL_TCI)),
-    # starch content is a feedstock property, not a target: its frontier is
-    # the lower-left one, as panel A's (the lowest MESP reachable at a given
-    # starch content, descending from low-starch to high-starch samples)
     _mesp_panel('Starch content',
-                r'Corn starch content [$\mathrm{kg·kg}^{-1}$ dry corn]', ORANGE,
-                pareto=('min', 'min')),
+                r'Corn starch content [$\mathrm{kg·kg}^{-1}$ dry corn]', ORANGE),
     _mesp_panel('EtOH yield', r'Ethanol yield [$\mathrm{g·g}^{-1}$ sugars]',
                 PURPLE, xticks=ETOH_YIELD_TICKS),
     _mesp_panel('EtOH titer', r'Ethanol titer [$\mathrm{g·L}^{-1}$]',
@@ -381,6 +391,24 @@ def draw_pareto_frontier(ax, x, y, sense):
     return fx, fy
 
 
+def binned_medians(x, y, n_bins=N_TREND_BINS):
+    """Median x and median y of each of `n_bins` equal-count bins of x (split
+    at its quantiles), in increasing x."""
+    edges = np.quantile(x, np.linspace(0, 1, n_bins + 1))
+    bins = np.digitize(x, edges[1:-1]) # 0 .. n_bins - 1
+    bx = np.array([np.median(x[bins == i]) for i in range(n_bins)])
+    by = np.array([np.median(y[bins == i]) for i in range(n_bins)])
+    return bx, by
+
+
+def draw_binned_medians(ax, x, y):
+    bx, by = binned_medians(x, y)
+    ax.plot(bx, by, '-o', color=TREND_COLOR, lw=TREND_LW, ms=TREND_MS, zorder=4,
+            path_effects=[patheffects.withStroke(linewidth=TREND_HALO_LW,
+                                                 foreground='white')])
+    return bx, by
+
+
 def draw_box(ax, values, orientation, color):
     edge = dark_shade(color)
     lo_w, hi_w = BOX_PERCENTILES['whis']
@@ -439,6 +467,11 @@ def draw_joint_panel(fig, cell, panel, samples, base, letter):
         fx, fy = draw_pareto_frontier(ax, x, y, panel['pareto'])
         print(f'  Pareto frontier: {fx.size} non-dominated samples, '
               f"{panel['x']} {fx[0]:.4g}-{fx[-1]:.4g}, {panel['y']} {fy[0]:.4g}-{fy[-1]:.4g}")
+    if panel.get('trend'):
+        bx, by = draw_binned_medians(ax, x, y)
+        print(f'  binned medians ({bx.size} equal-count bins): '
+              f"{panel['x']} {bx[0]:.4g} -> {bx[-1]:.4g}, "
+              f"{panel['y']} {by[0]:.4g} -> {by[-1]:.4g} ({by[-1] - by[0]:+.3f})")
     if base:
         ax.plot(base[panel['x']], base[panel['y']], 'D', ms=8, mfc='w', mec=INK,
                 mew=1.2, zorder=5)
