@@ -77,6 +77,7 @@ matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap, to_hex, to_rgb
 from matplotlib.lines import TICKDOWN, TICKLEFT
+from matplotlib.transforms import ScaledTranslation
 from matplotlib.ticker import AutoMinorLocator, MaxNLocator
 from scipy import stats
 
@@ -265,11 +266,15 @@ PANEL_LETTER_XY = (-0.15, 1.12)
 # figure; offsets in points from the annotated point
 CALLOUT_FONTSIZE = 12.0
 CALLOUT_ARROW = dict(arrowstyle='-|>', lw=1.0, mutation_scale=12, shrinkA=2)
-BASELINE_CALLOUT = dict(text='baseline', offset=(24, 22), rad=0.35)
-PARETO_CALLOUT = dict(text='Pareto frontier', at=0.55, offset=(22, -34), rad=-0.35)
-GASOLINE_CALLOUT = dict(text='gasoline market price range', x=105.0)
+# `tip` (points) moves the arrow head past the annotated point so it overlaps
+# the item slightly; the baseline arrow instead stops `shrinkB` points short
+# of the diamond's centre, just inside its edge
+BASELINE_CALLOUT = dict(text='baseline', offset=(24, 22), rad=0.35, shrinkB=2.5)
+PARETO_CALLOUT = dict(text='Pareto frontier', at=0.55, offset=(12, -22), rad=-0.35,
+                      tip=(0, 1.5))
+GASOLINE_CALLOUT = dict(text='gasoline market price range', x=105.0, tip=1.5)
 CONVENTIONAL_CALLOUT = dict(text='conventional', at=(185.0, None), # None = box top
-                            offset=(-34, 22), rad=-0.35)
+                            offset=(-20, 14), rad=-0.35, tip=(0, -2.0))
 # marginal box axes: size relative to the joint axes' 4.2, box width in its axes
 MARGINAL_RATIO = 0.45
 BOX_WIDTH = 0.55
@@ -509,8 +514,14 @@ def draw_joint_panel(fig, cell, panel, samples, base, letter):
     return ax
 
 
-def _callout(ax, text, xy, offset, rad, color, shrinkB=2, **kw):
-    return ax.annotate(text, xy=xy, xytext=offset, textcoords='offset points',
+def _nudged(ax, dx, dy):
+    """Data coordinates shifted by (dx, dy) points."""
+    return ax.transData + ScaledTranslation(dx/72, dy/72, ax.figure.dpi_scale_trans)
+
+
+def _callout(ax, text, xy, offset, rad, color, shrinkB=0, tip=(0, 0), **kw):
+    return ax.annotate(text, xy=xy, xycoords=_nudged(ax, *tip), xytext=offset,
+                       textcoords='offset points',
                        fontsize=CALLOUT_FONTSIZE, fontweight='bold', color=color,
                        arrowprops=dict(**CALLOUT_ARROW, color=color, shrinkB=shrinkB,
                                        connectionstyle=f'arc3,rad={rad}'),
@@ -524,23 +535,24 @@ def draw_panel_callouts(ax, panel, base, fx, fy):
     if base:
         c = BASELINE_CALLOUT
         _callout(ax, c['text'], (base[panel['x']], base[panel['y']]), c['offset'],
-                 c['rad'], INK, shrinkB=7, ha='left', va='bottom')
+                 c['rad'], INK, shrinkB=c['shrinkB'], ha='left', va='bottom')
     if fx is not None:
         c = PARETO_CALLOUT
         # a point on the staircase, a fraction `at` along its x span
         xs = fx[0] + c['at']*(fx[-1] - fx[0])
         ys = fy[np.searchsorted(fx, xs, side='right') - 1]
-        _callout(ax, c['text'], (xs, ys), c['offset'], c['rad'], PARETO_COLOR,
+        _callout(ax, c['text'], (xs, ys), c['offset'], c['rad'], PARETO_COLOR, tip=c['tip'],
                  ha='left', va='top')
     if panel.get('market'):
         c = CONVENTIONAL_CALLOUT
         cx, cy = c['at']
         _callout(ax, c['text'], (cx, ETHANOL_MARKET_RANGE[1] if cy is None else cy),
-                 c['offset'], c['rad'], GASOLINE_LINE_COLOR, shrinkB=0,
+                 c['offset'], c['rad'], GASOLINE_LINE_COLOR, tip=c['tip'],
                  ha='right', va='bottom')
         c = GASOLINE_CALLOUT
         lo, hi = GASOLINE_PRICE_RANGE
-        ax.annotate('', xy=(c['x'], hi), xytext=(c['x'], lo),
+        ax.annotate('', xy=(c['x'], hi), xycoords=_nudged(ax, 0, c['tip']),
+                    xytext=(c['x'], lo), textcoords=_nudged(ax, 0, -c['tip']),
                     arrowprops=dict(**{**CALLOUT_ARROW, 'arrowstyle': '<|-|>', 'shrinkA': 0},
                                     shrinkB=0, color=GASOLINE_LINE_COLOR), zorder=2)
         ax.text(c['x'], 0.5*(lo + hi), c['text'], rotation=90, ha='center', va='center',
