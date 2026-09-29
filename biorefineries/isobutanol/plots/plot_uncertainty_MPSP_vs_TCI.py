@@ -103,7 +103,7 @@ PARAMETER_DISTRIBUTIONS = os.path.join(
     'parameter-distributions_corn_IBO_EtOH_A.xlsx')
 
 FONT_FAMILY = 'Arial'
-FONTS = {'tick': 12, 'axis_title': 12, 'panel_letter': 14}
+FONTS = {'tick': 13.8, 'axis_title': 13.8, 'panel_letter': 16.1} # 1.15 x (12, 12, 14) since 2026-09-29
 TICK_LEN = {'major': 4.0, 'minor': 2.0} # pt; left/bottom ticks extend this far in AND out
 
 # the Pareto frontiers: solid, in the red of the hue palette of
@@ -256,8 +256,11 @@ GRID_SHAPE = (2, 3)
 # position in its joint axes' coordinates
 CELL_SIZE = (5.6, 5.4) # in
 MARGINS_IN = {'left': 1.12, 'right': 0.224, 'bottom': 0.81, 'top': 0.162}
-GRID_SPACE = {'w': 0.26, 'h': 0.16}
+GRID_SPACE = {'w': 0.18, 'h': 0.145}
 PANEL_LETTER_XY = (-0.15, 1.12)
+# marginal box axes: size relative to the joint axes' 4.2, box width in its axes
+MARGINAL_RATIO = 0.45
+BOX_WIDTH = 0.55
 
 
 def apply_font_rcparams():
@@ -408,7 +411,7 @@ def draw_box(ax, values, orientation, color):
     edge = dark_shade(color)
     lo_w, hi_w = BOX_PERCENTILES['whis']
     ax.boxplot(values, whis=[lo_w, hi_w], orientation=orientation,
-               widths=0.6, showfliers=False, patch_artist=True,
+               widths=BOX_WIDTH, showfliers=False, patch_artist=True,
                boxprops={'facecolor': color, 'edgecolor': edge, 'linewidth': 1.0},
                medianprops={'color': BOX_MEDIAN, 'linewidth': 1.4},
                whiskerprops={'color': edge, 'linewidth': 0.8},
@@ -438,7 +441,7 @@ def _panel_ticks(panel, axis, values):
 def draw_joint_panel(fig, cell, panel, samples, base, letter):
     """One joint panel (samples, KDE contours, baseline, marginal boxes) in
     the grid cell `cell`; returns the joint axes."""
-    gs = cell.subgridspec(2, 2, width_ratios=(4.2, 0.55), height_ratios=(0.55, 4.2),
+    gs = cell.subgridspec(2, 2, width_ratios=(4.2, MARGINAL_RATIO), height_ratios=(MARGINAL_RATIO, 4.2),
                           wspace=0.03, hspace=0.03)
     ax = fig.add_subplot(gs[1, 0])
     ax_top = fig.add_subplot(gs[0, 0], sharex=ax)
