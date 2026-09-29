@@ -196,6 +196,24 @@ TYPICAL_CORN_ETHANOL_TCI = tuple(
     for v, year in TYPICAL_CORN_ETHANOL_TCI_SOURCE) # MM$ (2023$): ~110.3, ~195.6
 # typical dry-grind corn ethanol biorefinery capacity, for panel B's box
 TYPICAL_CORN_ETHANOL_PRODUCTION = (40.0, 60.0) # MM gal/y
+# ethanol yield, titer and productivity reported for high-gravity fermentation
+# in U.S. corn dry-grind facilities, for the boxes of panels D-F (each x the
+# ethanol market price range, as panel A's box):
+# - Gomes, D. et al. Very High Gravity Bioethanol Revisited: Main Challenges
+#   and Advances. Fermentation 7, 38 (2021).
+# - Deparis, Q., Claes, A., Foulquie-Moreno, M. R. & Thevelein, J. M.
+#   Engineering tolerance to industrially relevant stress factors in yeast
+#   cell factories. FEMS Yeast Res. 17 (2017).
+# - Tsegaye, K. N., Alemnew, M. & Berhane, N. Saccharomyces cerevisiae for
+#   lignocellulosic ethanol production: a look at key attributes and genome
+#   shuffling. Front. Bioeng. Biotechnol. 12, 1466644 (2024).
+# - Devantier, R., Pedersen, S. & Olsson, L. Characterization of very high
+#   gravity ethanol fermentation of corn mash. Effect of glucoamylase dosage,
+#   pre-saccharification and yeast strain. Appl. Microbiol. Biotechnol. 68,
+#   622-629 (2005).
+HIGH_GRAVITY_ETHANOL_YIELD = (0.42, 0.48) # g/g
+HIGH_GRAVITY_ETHANOL_TITER = (100.0, 142.0) # g/L
+HIGH_GRAVITY_ETHANOL_PRODUCTIVITY = (2.0, 4.4) # g/L/h
 # the ethanol range is a band in a light shade of the baseline grey of
 # plots/plot_kin_opt_parameter_sets.py (BASELINE_COLOR); the gasoline range,
 # which almost coincides with it, is two dashed lines in a dark shade of the
@@ -217,16 +235,16 @@ MESP_LABEL = r'Minimum ethanol selling price [$\mathrm{\$·GGE}^{-1}$]'
 # panels C-F: axes fitted closely to the samples, so the marginal boxes'
 # min / max dots sit near the limits (6000-sim scenario-A run, min - max:
 # MESP 3.350-4.851 $/GGE, yield 0.4167-0.4707 g/g, titer 93.89-129.8 g/L,
-# productivity 0.832-3.812 g/L/h); panel A keeps MPSP_AXIS_LIMITS for its
-# gasoline lines
-MESP_TICKS = np.round(np.linspace(3.3, 4.9, 9), 10) # $/GGE, every 0.2
+# productivity 0.832-3.812 g/L/h); since 2026-09-29 their MESP axes are
+# panel A's MPSP_AXIS_LIMITS (3.3-4.9 every 0.2 before), so the ethanol
+# market-price rows of the D-F boxes show
 ETOH_YIELD_TICKS = np.round(np.linspace(0.41, 0.48, 8), 10) # g/g, every 0.01
 ETOH_TITER_TICKS = np.linspace(90.0, 130.0, 5) # g/L, every 10
 ETOH_PRODUCTIVITY_TICKS = np.round(np.linspace(0.8, 4.0, 9), 10) # g/L/h, every 0.4
-# panels C-F: MESP (y, MESP_TICKS) vs one driver (x), with a binned-median
+# panels C-F: MESP (y, MPSP_AXIS_LIMITS as panel A) vs one driver (x), with a binned-median
 # trend line and no Pareto frontier (see the module docstring)
 _mesp_panel = lambda x, xlabel, color, **kw: {
-    **dict(x=x, y='MPSP', xlabel=xlabel, ylabel=MESP_LABEL, yticks=MESP_TICKS,
+    **dict(x=x, y='MPSP', xlabel=xlabel, ylabel=MESP_LABEL, ylim=MPSP_AXIS_LIMITS,
            pareto=None, trend=True, color=color),
     **kw}
 PANELS = (
@@ -244,12 +262,15 @@ PANELS = (
     _mesp_panel('Starch content',
                 r'Corn starch content [$\mathrm{kg·kg}^{-1}$ dry corn]', ORANGE),
     _mesp_panel('EtOH yield', r'Ethanol yield [$\mathrm{g·g}^{-1}$ sugars]',
-                PURPLE, xticks=ETOH_YIELD_TICKS),
+                PURPLE, xticks=ETOH_YIELD_TICKS,
+                box=(HIGH_GRAVITY_ETHANOL_YIELD, ETHANOL_MARKET_RANGE)),
     _mesp_panel('EtOH titer', r'Ethanol titer [$\mathrm{g·L}^{-1}$]',
-                YELLOW, xticks=ETOH_TITER_TICKS),
+                YELLOW, xticks=ETOH_TITER_TICKS,
+                box=(HIGH_GRAVITY_ETHANOL_TITER, ETHANOL_MARKET_RANGE)),
     _mesp_panel('EtOH productivity',
                 r'Ethanol productivity [$\mathrm{g·L}^{-1}\mathrm{·h}^{-1}$]', BLUE,
-                xticks=ETOH_PRODUCTIVITY_TICKS),
+                xticks=ETOH_PRODUCTIVITY_TICKS,
+                box=(HIGH_GRAVITY_ETHANOL_PRODUCTIVITY, ETHANOL_MARKET_RANGE)),
 )
 GRID_SHAPE = (2, 3)
 # figure size per grid cell and the figure margins (inches, so the cells keep
