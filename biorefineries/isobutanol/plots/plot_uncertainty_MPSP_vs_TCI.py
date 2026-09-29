@@ -233,7 +233,8 @@ PANELS = (
          xlabel='Total capital investment [MM\\$]',
          ylabel=MESP_LABEL,
          xticks=TCI_TICKS,
-         ylim=MPSP_AXIS_LIMITS, market=True, pareto=('min', 'min'), color=TEAL),
+         ylim=MPSP_AXIS_LIMITS, market=True, pareto=('min', 'min'), color=TEAL,
+         callouts=True),
     dict(x='EtOH production', y='TCI', color=GREEN, pareto=('max', 'min'),
          xlabel=r'Ethanol production [$\mathrm{MM\ gal·y}^{-1}$]',
          ylabel='Total capital investment [MM\\$]',
@@ -258,6 +259,17 @@ CELL_SIZE = (5.6, 5.4) # in
 MARGINS_IN = {'left': 1.12, 'right': 0.224, 'bottom': 0.81, 'top': 0.162}
 GRID_SPACE = {'w': 0.18, 'h': 0.145}
 PANEL_LETTER_XY = (-0.15, 1.12)
+
+# callouts (panel A, `callouts` in PANELS): bold labels with curved arrows,
+# after the reference layout of the former 2x2
+# figure; offsets in points from the annotated point
+CALLOUT_FONTSIZE = 12.0
+CALLOUT_ARROW = dict(arrowstyle='-|>', lw=1.0, mutation_scale=12, shrinkA=2)
+BASELINE_CALLOUT = dict(text='baseline', offset=(24, 22), rad=0.35)
+PARETO_CALLOUT = dict(text='Pareto frontier', at=0.55, offset=(22, -34), rad=-0.35)
+GASOLINE_CALLOUT = dict(text='gasoline market price range', x=105.0)
+CONVENTIONAL_CALLOUT = dict(text='conventional', at=(185.0, None), # None = box top
+                            offset=(-34, 22), rad=-0.35)
 # marginal box axes: size relative to the joint axes' 4.2, box width in its axes
 MARGINAL_RATIO = 0.45
 BOX_WIDTH = 0.55
@@ -461,6 +473,7 @@ def draw_joint_panel(fig, cell, panel, samples, base, letter):
         ax.fill_between((x0, x1), y0, y1, color=MARKET_BAND_COLOR, lw=0, zorder=0)
     draw_density(ax, x, y, (xticks[0], xticks[-1]), (yticks[0], yticks[-1]),
                  panel['color'])
+    fx = fy = None
     if panel.get('pareto'):
         fx, fy = draw_pareto_frontier(ax, x, y, panel['pareto'])
         print(f'  Pareto frontier: {fx.size} non-dominated samples, '
@@ -482,6 +495,9 @@ def draw_joint_panel(fig, cell, panel, samples, base, letter):
     ax.xaxis.set_minor_locator(AutoMinorLocator(N_MINOR_PER_MAJOR + 1))
     ax.yaxis.set_minor_locator(AutoMinorLocator(N_MINOR_PER_MAJOR + 1))
 
+    if panel.get('callouts'):
+        draw_panel_callouts(ax, panel, base, fx, fy)
+
     draw_box(ax_top, x, 'horizontal', panel['color'])
     draw_box(ax_right, y, 'vertical', panel['color'])
     ax_top.set_ylim(0.4, 1.6)
@@ -491,6 +507,45 @@ def draw_joint_panel(fig, cell, panel, samples, base, letter):
             ha='left', va='top',
                 fontsize=FONTS['panel_letter'], fontweight='bold')
     return ax
+
+
+def _callout(ax, text, xy, offset, rad, color, shrinkB=2, **kw):
+    return ax.annotate(text, xy=xy, xytext=offset, textcoords='offset points',
+                       fontsize=CALLOUT_FONTSIZE, fontweight='bold', color=color,
+                       arrowprops=dict(**CALLOUT_ARROW, color=color, shrinkB=shrinkB,
+                                       connectionstyle=f'arc3,rad={rad}'),
+                       zorder=6, **kw)
+
+
+def draw_panel_callouts(ax, panel, base, fx, fy):
+    """Panel-A callouts: the baseline diamond, the Pareto frontier, the grey
+    conventional-facility box and the gasoline price range between its two
+    dashed lines."""
+    if base:
+        c = BASELINE_CALLOUT
+        _callout(ax, c['text'], (base[panel['x']], base[panel['y']]), c['offset'],
+                 c['rad'], INK, shrinkB=7, ha='left', va='bottom')
+    if fx is not None:
+        c = PARETO_CALLOUT
+        # a point on the staircase, a fraction `at` along its x span
+        xs = fx[0] + c['at']*(fx[-1] - fx[0])
+        ys = fy[np.searchsorted(fx, xs, side='right') - 1]
+        _callout(ax, c['text'], (xs, ys), c['offset'], c['rad'], PARETO_COLOR,
+                 ha='left', va='top')
+    if panel.get('market'):
+        c = CONVENTIONAL_CALLOUT
+        cx, cy = c['at']
+        _callout(ax, c['text'], (cx, ETHANOL_MARKET_RANGE[1] if cy is None else cy),
+                 c['offset'], c['rad'], GASOLINE_LINE_COLOR, shrinkB=0,
+                 ha='right', va='bottom')
+        c = GASOLINE_CALLOUT
+        lo, hi = GASOLINE_PRICE_RANGE
+        ax.annotate('', xy=(c['x'], hi), xytext=(c['x'], lo),
+                    arrowprops=dict(**{**CALLOUT_ARROW, 'arrowstyle': '<|-|>', 'shrinkA': 0},
+                                    shrinkB=0, color=GASOLINE_LINE_COLOR), zorder=2)
+        ax.text(c['x'], 0.5*(lo + hi), c['text'], rotation=90, ha='center', va='center',
+                fontsize=CALLOUT_FONTSIZE, fontweight='bold', color=GASOLINE_LINE_COLOR,
+                bbox=dict(facecolor='white', edgecolor='none', pad=2), zorder=3)
 
 
 def plot_uncertainty_MPSP_vs_TCI(results_file=None, baseline_file=None,
