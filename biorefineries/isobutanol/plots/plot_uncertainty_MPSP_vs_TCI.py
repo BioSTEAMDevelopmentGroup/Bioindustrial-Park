@@ -291,6 +291,9 @@ PANEL_LETTER_XY = (-0.15, 1.12)
 # after the reference layout of the former 2x2
 # figure; offsets in points from the annotated point
 CALLOUT_FONTSIZE = 12.0
+# Spearman's rank correlation of each panel's x and y, top-right of the joint
+# axes (axes fraction)
+RHO_XY = (0.97, 0.97)
 CALLOUT_ARROW = dict(arrowstyle='-|>', lw=1.0, mutation_scale=12, shrinkA=2)
 # `tip` (points) moves the arrow head past the annotated point so it overlaps
 # the item slightly; the baseline arrow instead stops `shrinkB` points short
@@ -299,8 +302,8 @@ BASELINE_CALLOUT = dict(text='baseline', offset=(24, 22), rad=0.35, shrinkB=2.5)
 PARETO_CALLOUT = dict(text='Pareto frontier', at=0.55, offset=(12, -22), rad=-0.35,
                       tip=(0, 1.5))
 GASOLINE_CALLOUT = dict(text='gasoline market price range', x=105.0, tip=1.5)
-CONVENTIONAL_CALLOUT = dict(text='conventional', at=(185.0, None), # None = box top
-                            offset=(-20, 14), rad=-0.35, tip=(0, -2.0))
+CONVENTIONAL_CALLOUT = dict(text='conventional', at=(118.0, None), # None = box top
+                            offset=(18, 14), rad=0.35, ha='left', tip=(0, -2.0))
 # marginal box axes: size relative to the joint axes' 4.2, box width in its axes
 MARGINAL_RATIO = 0.45
 BOX_WIDTH = 0.55
@@ -574,7 +577,7 @@ def draw_panel_callouts(ax, panel, base, fx, fy):
         cx, cy = c['at']
         _callout(ax, c['text'], (cx, ETHANOL_MARKET_RANGE[1] if cy is None else cy),
                  c['offset'], c['rad'], GASOLINE_LINE_COLOR, tip=c['tip'],
-                 ha='right', va='bottom')
+                 ha=c['ha'], va='bottom')
         c = GASOLINE_CALLOUT
         lo, hi = GASOLINE_PRICE_RANGE
         ax.annotate('', xy=(c['x'], hi), xycoords=_nudged(ax, 0, c['tip']),
@@ -625,8 +628,11 @@ def plot_uncertainty_MPSP_vs_TCI(results_file=None, baseline_file=None,
         rho, p = stats.spearmanr(samples[panel['x']], samples[panel['y']])
         print(f"Panel {letter}: {panel['y']} vs {panel['x']}, "
               f'Spearman rho = {rho:.3f} (p = {p:.1e})')
-        axes.append(draw_joint_panel(fig, grid[divmod(i, n_cols)], panel,
-                                     samples, base, letter))
+        ax = draw_joint_panel(fig, grid[divmod(i, n_cols)], panel, samples, base, letter)
+        ax.text(*RHO_XY, rf"Spearman's $\rho$ = {rho:.2f}".replace('-', '−'),
+                transform=ax.transAxes, ha='right', va='top',
+                fontsize=CALLOUT_FONTSIZE, color=INK, zorder=6)
+        axes.append(ax)
 
     fig.canvas.draw()
     for ax in axes:
