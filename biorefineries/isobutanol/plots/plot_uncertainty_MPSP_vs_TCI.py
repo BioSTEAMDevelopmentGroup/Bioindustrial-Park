@@ -160,7 +160,7 @@ ETHANOL_MARKET_RANGE = tuple(v / GGE_PER_GAL for v in ETHANOL_MARKET_RANGE_PER_G
 # (a gallon of gasoline is 1 GGE by definition)
 GASOLINE_PRICE_RANGE = (2.16, 4.84) # $/GGE
 MPSP_AXIS_LIMITS = (2.0, 6.0) # $/GGE
-TCI_AXIS_LIMITS = (75.0, 200.0) # MM$
+TCI_AXIS_LIMITS = (100.0, 200.0) # MM$
 TCI_TICK_STEP = 25.0 # MM$
 N_MINOR_PER_MAJOR = 4 # minor ticks between adjacent major ticks, both axes
 # the ethanol market band spans only the typical total capital investment of a
