@@ -238,9 +238,11 @@ MESP_LABEL = r'Minimum ethanol selling price [$\mathrm{\$·GGE}^{-1}$]'
 # productivity 0.832-3.812 g/L/h); since 2026-09-29 their MESP axes are
 # panel A's MPSP_AXIS_LIMITS (3.3-4.9 every 0.2 before), so the ethanol
 # market-price rows of the D-F boxes show
-ETOH_YIELD_TICKS = np.round(np.linspace(0.41, 0.48, 8), 10) # g/g, every 0.01
-ETOH_TITER_TICKS = np.linspace(90.0, 130.0, 5) # g/L, every 10
-ETOH_PRODUCTIVITY_TICKS = np.round(np.linspace(0.8, 4.0, 9), 10) # g/L/h, every 0.4
+# and their x axes reach the tops of the high-gravity ranges (yield 0.50,
+# titer 150, productivity 4.4; 0.48 / 130 / 4.0 before)
+ETOH_YIELD_TICKS = np.round(np.linspace(0.41, 0.50, 10), 10) # g/g, every 0.01
+ETOH_TITER_TICKS = np.linspace(90.0, 150.0, 7) # g/L, every 10
+ETOH_PRODUCTIVITY_TICKS = np.round(np.linspace(0.8, 4.4, 10), 10) # g/L/h, every 0.4
 # panels C-F: MESP (y, MPSP_AXIS_LIMITS as panel A) vs one driver (x), with a binned-median
 # trend line and no Pareto frontier (see the module docstring)
 _mesp_panel = lambda x, xlabel, color, **kw: {
