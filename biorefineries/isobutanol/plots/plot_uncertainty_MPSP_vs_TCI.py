@@ -201,11 +201,20 @@ BOX_PERCENTILES = {'whis': (5, 95), 'dots': (0, 100)} # dots: min and max
 TCI_TICKS = np.arange(TCI_AXIS_LIMITS[0], TCI_AXIS_LIMITS[1] + TCI_TICK_STEP/2,
                       TCI_TICK_STEP)
 MESP_LABEL = r'Minimum ethanol selling price [$\mathrm{\$·GGE}^{-1}$]'
-# panels C-F: MESP (y, the fixed panel-A axis) vs one driver (x); by default
-# the Pareto frontier maximizes the driver and minimizes MESP (a `pareto`
-# keyword overrides it)
+# panels C-F: axes fitted closely to the samples, so the marginal boxes'
+# min / max dots sit near the limits (6000-sim scenario-A run, min - max:
+# MESP 3.350-4.851 $/GGE, yield 0.4167-0.4707 g/g, titer 93.89-129.8 g/L,
+# productivity 0.832-3.812 g/L/h); panel A keeps MPSP_AXIS_LIMITS for its
+# gasoline lines
+MESP_TICKS = np.round(np.linspace(3.3, 4.9, 9), 10) # $/GGE, every 0.2
+ETOH_YIELD_TICKS = np.round(np.linspace(0.41, 0.48, 8), 10) # g/g, every 0.01
+ETOH_TITER_TICKS = np.linspace(90.0, 130.0, 5) # g/L, every 10
+ETOH_PRODUCTIVITY_TICKS = np.round(np.linspace(0.8, 4.0, 9), 10) # g/L/h, every 0.4
+# panels C-F: MESP (y, MESP_TICKS) vs one driver (x); by default the Pareto
+# frontier maximizes the driver and minimizes MESP (a `pareto` keyword
+# overrides it)
 _mesp_panel = lambda x, xlabel, color, **kw: {
-    **dict(x=x, y='MPSP', xlabel=xlabel, ylabel=MESP_LABEL, ylim=MPSP_AXIS_LIMITS,
+    **dict(x=x, y='MPSP', xlabel=xlabel, ylabel=MESP_LABEL, yticks=MESP_TICKS,
            pareto=('max', 'min'), color=color),
     **kw}
 PANELS = (
@@ -226,11 +235,12 @@ PANELS = (
                 r'Corn starch content [$\mathrm{kg·kg}^{-1}$ dry corn]', ORANGE,
                 pareto=('min', 'min')),
     _mesp_panel('EtOH yield', r'Ethanol yield [$\mathrm{g·g}^{-1}$ sugars]',
-                PURPLE, xlim=(0.40, 0.50)),
+                PURPLE, xticks=ETOH_YIELD_TICKS),
     _mesp_panel('EtOH titer', r'Ethanol titer [$\mathrm{g·L}^{-1}$]',
-                YELLOW, xlim=(80.0, 150.0)),
+                YELLOW, xticks=ETOH_TITER_TICKS),
     _mesp_panel('EtOH productivity',
-                r'Ethanol productivity [$\mathrm{g·L}^{-1}\mathrm{·h}^{-1}$]', BLUE),
+                r'Ethanol productivity [$\mathrm{g·L}^{-1}\mathrm{·h}^{-1}$]', BLUE,
+                xticks=ETOH_PRODUCTIVITY_TICKS),
 )
 GRID_SHAPE = (2, 3)
 # figure size per grid cell and the figure margins (inches, so the cells keep
