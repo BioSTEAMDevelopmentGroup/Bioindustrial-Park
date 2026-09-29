@@ -45,9 +45,10 @@ same grey spanning a typical corn ethanol biorefinery's ethanol production
 unlabelled.
 
 Every panel also carries the Pareto frontier of its samples as a solid red
-staircase, in the sense set by the panel's `pareto` entry: A lower-left (MESP
-and TCI minimized), B lower-right (production maximized, TCI minimized), C-F
-lower-right (the x outcome maximized, MESP minimized).
+staircase, in the sense set by the panel's `pareto` entry: A and C
+lower-left (TCI or starch content and MESP minimized), B lower-right
+(production maximized, TCI minimized), D-F lower-right (the x outcome
+maximized, MESP minimized).
 
 Sim-safe: pure pandas/matplotlib/scipy, never imports biorefineries.
 
@@ -200,11 +201,13 @@ BOX_PERCENTILES = {'whis': (5, 95), 'dots': (0, 100)} # dots: min and max
 TCI_TICKS = np.arange(TCI_AXIS_LIMITS[0], TCI_AXIS_LIMITS[1] + TCI_TICK_STEP/2,
                       TCI_TICK_STEP)
 MESP_LABEL = r'Minimum ethanol selling price [$\mathrm{\$·GGE}^{-1}$]'
-# panels C-F: MESP (y, the fixed panel-A axis) vs one driver (x), the driver
-# maximized and MESP minimized by the Pareto frontier
-_mesp_panel = lambda x, xlabel, color, **kw: dict(
-    x=x, y='MPSP', xlabel=xlabel, ylabel=MESP_LABEL, ylim=MPSP_AXIS_LIMITS,
-    pareto=('max', 'min'), color=color, **kw)
+# panels C-F: MESP (y, the fixed panel-A axis) vs one driver (x); by default
+# the Pareto frontier maximizes the driver and minimizes MESP (a `pareto`
+# keyword overrides it)
+_mesp_panel = lambda x, xlabel, color, **kw: {
+    **dict(x=x, y='MPSP', xlabel=xlabel, ylabel=MESP_LABEL, ylim=MPSP_AXIS_LIMITS,
+           pareto=('max', 'min'), color=color),
+    **kw}
 PANELS = (
     dict(x='TCI', y='MPSP',
          xlabel='Total capital investment [MM\\$]',
@@ -216,8 +219,12 @@ PANELS = (
          ylabel='Total capital investment [MM\\$]',
          yticks=TCI_TICKS,
          box=(TYPICAL_CORN_ETHANOL_PRODUCTION, TYPICAL_CORN_ETHANOL_TCI)),
+    # starch content is a feedstock property, not a target: its frontier is
+    # the lower-left one, as panel A's (the lowest MESP reachable at a given
+    # starch content, descending from low-starch to high-starch samples)
     _mesp_panel('Starch content',
-                r'Corn starch content [$\mathrm{kg·kg}^{-1}$ dry corn]', ORANGE),
+                r'Corn starch content [$\mathrm{kg·kg}^{-1}$ dry corn]', ORANGE,
+                pareto=('min', 'min')),
     _mesp_panel('EtOH yield', r'Ethanol yield [$\mathrm{g·g}^{-1}$ sugars]',
                 PURPLE, xlim=(0.40, 0.50)),
     _mesp_panel('EtOH titer', r'Ethanol titer [$\mathrm{g·L}^{-1}$]',
