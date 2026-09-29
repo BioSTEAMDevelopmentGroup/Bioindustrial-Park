@@ -48,7 +48,7 @@ Panels A and B also carry the Pareto frontier of their samples as a solid red
 staircase, in the sense set by the panel's `pareto` entry: A lower-left (TCI
 and MESP minimized), B lower-right (production maximized, TCI minimized).
 Panels C-F carry a binned-median trend line instead (`trend`): the samples
-split into N_TREND_BINS equal-count bins of x, a dashed black line through each
+split into N_TREND_BINS equal-count bins of x, a solid black line through each
 bin's median x and median MESP. Their x is not a design choice that trades
 against MESP (starch content is a feedstock property; yield, titer and
 productivity are outcomes of the uncertain kinetics, and all four go WITH
@@ -111,11 +111,11 @@ TICK_LEN = {'major': 4.0, 'minor': 2.0} # pt; left/bottom ticks extend this far 
 PARETO_COLOR = '#ED586F'
 PARETO_LW = 1.5
 PARETO_LS = '-'
-# panels C-F: binned-median trend line, dashed black (no markers, no halo)
+# panels C-F: binned-median trend line, solid black (no markers, no halo)
 N_TREND_BINS = 10 # equal-count bins of x (deciles)
 TREND_COLOR = '#0b0b0b'
 TREND_LW = 1.5
-TREND_LS = (0, (4, 2))
+TREND_LS = '-'
 # the TRY-informed profitability campaign's teal (RELAY_COLOR in
 # plots/plot_kin_opt_parameter_sets.py)
 TEAL = '#0B6E7A'
