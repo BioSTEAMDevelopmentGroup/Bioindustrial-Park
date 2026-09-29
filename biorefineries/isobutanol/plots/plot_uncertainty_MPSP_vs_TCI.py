@@ -171,7 +171,8 @@ ETHANOL_MARKET_RANGE = tuple(v / GGE_PER_GAL for v in ETHANOL_MARKET_RANGE_PER_G
 # Gasoline and Diesel Fuel Update, https://www.eia.gov/petroleum/gasdiesel/
 # (a gallon of gasoline is 1 GGE by definition)
 GASOLINE_PRICE_RANGE = (2.16, 4.84) # $/GGE
-MPSP_AXIS_LIMITS = (2.0, 6.0) # $/GGE
+MPSP_AXIS_LIMITS = (2.0, 5.5) # $/GGE, every panel's MESP axis (2-6 until 2026-09-29)
+MPSP_TICK_STEP = 0.5 # $/GGE
 TCI_AXIS_LIMITS = (100.0, 200.0) # MM$
 TCI_TICK_STEP = 25.0 # MM$
 N_MINOR_PER_MAJOR = 4 # minor ticks between adjacent major ticks, both axes
@@ -231,22 +232,24 @@ BOX_PERCENTILES = {'whis': (5, 95), 'dots': (0, 100)} # dots: min and max
 # samples and the baseline)
 TCI_TICKS = np.arange(TCI_AXIS_LIMITS[0], TCI_AXIS_LIMITS[1] + TCI_TICK_STEP/2,
                       TCI_TICK_STEP)
+MPSP_TICKS = np.round(np.arange(MPSP_AXIS_LIMITS[0], MPSP_AXIS_LIMITS[1] + MPSP_TICK_STEP/2,
+                                MPSP_TICK_STEP), 10)
 MESP_LABEL = r'Minimum ethanol selling price [$\mathrm{\$·GGE}^{-1}$]'
 # panels C-F: axes fitted closely to the samples, so the marginal boxes'
 # min / max dots sit near the limits (6000-sim scenario-A run, min - max:
 # MESP 3.350-4.851 $/GGE, yield 0.4167-0.4707 g/g, titer 93.89-129.8 g/L,
 # productivity 0.832-3.812 g/L/h); since 2026-09-29 their MESP axes are
-# panel A's MPSP_AXIS_LIMITS (3.3-4.9 every 0.2 before), so the ethanol
+# MPSP_TICKS as panel A (3.3-4.9 every 0.2 before), so the ethanol
 # market-price rows of the D-F boxes show
 # and their x axes reach the tops of the high-gravity ranges (yield 0.50,
-# titer 150, productivity 4.4; 0.48 / 130 / 4.0 before)
-ETOH_YIELD_TICKS = np.round(np.linspace(0.41, 0.50, 10), 10) # g/g, every 0.01
+# titer 150, productivity 4.5; 0.48 / 130 / 4.0 before)
+ETOH_YIELD_TICKS = np.round(np.linspace(0.40, 0.50, 6), 10) # g/g, every 0.02
 ETOH_TITER_TICKS = np.linspace(90.0, 150.0, 7) # g/L, every 10
-ETOH_PRODUCTIVITY_TICKS = np.round(np.linspace(0.8, 4.4, 10), 10) # g/L/h, every 0.4
-# panels C-F: MESP (y, MPSP_AXIS_LIMITS as panel A) vs one driver (x), with a binned-median
+ETOH_PRODUCTIVITY_TICKS = np.round(np.linspace(0.5, 4.5, 9), 10) # g/L/h, every 0.5
+# panels C-F: MESP (y, MPSP_TICKS as panel A) vs one driver (x), with a binned-median
 # trend line and no Pareto frontier (see the module docstring)
 _mesp_panel = lambda x, xlabel, color, **kw: {
-    **dict(x=x, y='MPSP', xlabel=xlabel, ylabel=MESP_LABEL, ylim=MPSP_AXIS_LIMITS,
+    **dict(x=x, y='MPSP', xlabel=xlabel, ylabel=MESP_LABEL, yticks=MPSP_TICKS,
            pareto=None, trend=True, color=color),
     **kw}
 PANELS = (
@@ -254,7 +257,7 @@ PANELS = (
          xlabel='Total capital investment [MM\\$]',
          ylabel=MESP_LABEL,
          xticks=TCI_TICKS,
-         ylim=MPSP_AXIS_LIMITS, market=True, pareto=('min', 'min'), color=TEAL,
+         yticks=MPSP_TICKS, market=True, pareto=('min', 'min'), color=TEAL,
          callouts=True),
     dict(x='EtOH production', y='TCI', color=GREEN, pareto=('max', 'min'),
          xlabel=r'Ethanol production [$\mathrm{MM\ gal·y}^{-1}$]',
