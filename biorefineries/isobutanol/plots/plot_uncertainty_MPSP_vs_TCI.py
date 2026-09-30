@@ -97,7 +97,9 @@ ETOH_PRODUCTION_COL = ('Biorefinery', 'Adjusted production rate [10^6 kg/yr]') #
 DDGS_REVENUE_COL = ('Coproducts', 'DDGS sale revenue [$/y]')
 
 FONT_FAMILY = 'Arial'
-FONTS = {'tick': 13.8, 'axis_title': 13.8, 'panel_letter': 16.1} # 1.15 x (12, 12, 14) since 2026-09-29
+# tick / panel letter 1.15 x (12, 14) since 2026-09-29; axis titles 1.4 x 13.8
+# since 2026-09-30 (13.8 = 1.15 x 12 before)
+FONTS = {'tick': 13.8, 'axis_title': 19.32, 'panel_letter': 16.1}
 TICK_LEN = {'major': 4.0, 'minor': 2.0} # pt; left/bottom ticks extend this far in AND out
 
 # the Pareto frontiers: solid, in the red of the hue palette of
@@ -308,8 +310,8 @@ GRID_SHAPE = (2, 3)
 # cell, left margin 1.12 in); the panel letter's position in its joint axes'
 # coordinates (A and D sit between the y-axis title and the tick labels)
 CELL_IN = (4.60, 4.58)
-GAP_IN = {'w': 0.50, 'h': 0.664}
-MARGINS_IN = {'left': 0.75, 'right': 0.224, 'bottom': 0.81, 'top': 0.162}
+GAP_IN = {'w': 0.50, 'h': 0.85}
+MARGINS_IN = {'left': 0.90, 'right': 0.224, 'bottom': 0.95, 'top': 0.162}
 Y_TITLE_X_IN = 0.06
 PANEL_LETTER_XY = (-0.10, 1.12)
 
