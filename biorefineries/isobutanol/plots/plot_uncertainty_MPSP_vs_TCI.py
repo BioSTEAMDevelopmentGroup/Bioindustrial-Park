@@ -333,7 +333,10 @@ CALLOUT_ARROW = dict(arrowstyle='-|>', lw=1.0, mutation_scale=12, shrinkA=2)
 BASELINE_CALLOUT = dict(text='baseline', offset=(24, 22), rad=0.35, shrinkB=2.5)
 PARETO_CALLOUT = dict(text='Pareto frontier', at=0.55, offset=(12, -22), rad=-0.35,
                       tip=(0, 1.5))
-GASOLINE_CALLOUT = dict(text='gasoline market price range', x=105.0, tip=1.5)
+# white on the gasoline band (dark grey on a white box until 2026-09-30); the
+# arrow heads end at the band's edges (tip 0; 1.5 pt past the former dashed lines)
+GASOLINE_CALLOUT = dict(text='gasoline market price range', x=105.0, tip=0.0,
+                        color='white')
 CONVENTIONAL_CALLOUT = dict(text='conventional corn ethanol ranges', at=(176.0, None), # None = box top
                             offset=(-14, 12), rad=-0.4, ha='right', tip=(0, -2.0),
                             relpos=(1.0, 0.3)) # arrow leaves the text's right end
@@ -606,10 +609,11 @@ def draw_panel_callouts(ax, panel, base, fx, fy):
         ax.annotate('', xy=(c['x'], hi), xycoords=_nudged(ax, 0, c['tip']),
                     xytext=(c['x'], lo), textcoords=_nudged(ax, 0, -c['tip']),
                     arrowprops=dict(**{**CALLOUT_ARROW, 'arrowstyle': '<|-|>', 'shrinkA': 0},
-                                    shrinkB=0, color=CALLOUT_GRAY), zorder=2)
+                                    shrinkB=0, color=c['color']), zorder=2)
+        # the text's box, in the band's own grey, hides the arrow shaft behind it
         ax.text(c['x'], 0.5*(lo + hi), c['text'], rotation=90, ha='center', va='center',
-                fontsize=CALLOUT_FONTSIZE, fontweight='bold', color=CALLOUT_GRAY,
-                bbox=dict(facecolor='white', edgecolor='none', pad=2), zorder=3)
+                fontsize=CALLOUT_FONTSIZE, fontweight='bold', color=c['color'],
+                bbox=dict(facecolor=GASOLINE_BAND_COLOR, edgecolor='none', pad=2), zorder=3)
 
 
 def plot_uncertainty_MPSP_vs_TCI(results_file=None, baseline_file=None,
