@@ -36,8 +36,9 @@ outlying samples (minimum and maximum).
 
 Panel A also carries a light grey band for the ethanol market price range
 (ETHANOL_MARKET_RANGE) spanning the typical corn ethanol biorefinery TCI
-(TYPICAL_CORN_ETHANOL_TCI) and dark grey dashed lines at the ends of the
-gasoline price range (GASOLINE_PRICE_RANGE). Panels B-F carry a box in the
+(TYPICAL_CORN_ETHANOL_TCI). Every MESP panel (A-F) carries dark grey dashed
+lines at the ends of the gasoline price range (GASOLINE_PRICE_RANGE), named
+by a callout on panel A only. Panels B-F carry a box in the
 same grey spanning the ethanol market price range and a conventional range of
 their x (B: a typical corn ethanol biorefinery's ethanol production,
 TYPICAL_CORN_ETHANOL_PRODUCTION; C: its DDGS sale revenue at industry DDGS
@@ -513,6 +514,7 @@ def draw_joint_panel(fig, cell, panel, samples, base, letter):
     if panel.get('market'):
         ax.fill_between(TYPICAL_CORN_ETHANOL_TCI, *ETHANOL_MARKET_RANGE,
                         color=MARKET_BAND_COLOR, lw=0, zorder=0)
+    if panel['y'] == 'MPSP': # every MESP panel; the callout is panel A's only
         for price in GASOLINE_PRICE_RANGE:
             ax.axhline(price, color=GASOLINE_LINE_COLOR, zorder=1, **GASOLINE_LINE_STYLE)
     if panel.get('box'):
