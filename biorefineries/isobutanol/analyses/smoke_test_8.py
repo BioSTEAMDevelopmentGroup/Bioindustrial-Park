@@ -24,7 +24,9 @@ leaves via the rectifier (D303) bottoms to WWT unrecovered
 EACH simulation. Gates (a violation exits non-zero exactly like a
 traceback):
 
-- purity-adjusted ethanol MPSP within 1% of 1.6693 (was 1.6625 before the
+- purity-adjusted ethanol MPSP within 1% of 1.6271 (was 1.6693 before the
+  2026-09-29 hensmith 2b5b27d -> 6d4776f re-pin (heat-exchanger-network
+  synthesis only; model unchanged), 1.6625 before the
   2026-09-15 nskinetics r16/r17 Ehrlich split re-pin -- r16 Aro10-only + r17
   Adh6 with the cross-product exponentials on r17 -- 1.6814 before the
   2026-09-13 P508 detach re-pin -- corn's orphaned rectifier-bottoms pump P508
@@ -87,7 +89,7 @@ def load_simulate_baseline(stream_IDs=('ethanol', 'isobutanol'),
     model_specification = bundle['model_specification']
     solve_TEA = bundle['solve_TEA']
     feeding_kwargs = bundle['feeding_kwargs']
-    expected_MPSPs = {'ethanol': 1.6693, 'isobutanol': math.nan}
+    expected_MPSPs = {'ethanol': 1.6271, 'isobutanol': math.nan}
 
     all_results = []
     for i in range(n_sims):

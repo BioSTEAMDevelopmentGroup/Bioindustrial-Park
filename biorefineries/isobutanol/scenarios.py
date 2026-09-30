@@ -72,12 +72,12 @@ SCENARIOS = {
         name='A',
         workbook='parameter-distributions_corn_IBO_EtOH_A.xlsx',
         max_n_spikes=16, threshold_conc=217.125, target_conc=221.25,
-        expected={'ethanol': 0.86233, 'isobutanol': math.nan}),
+        expected={'ethanol': 0.86021, 'isobutanol': math.nan}),
     'B': ScenarioSpec(
         name='B',
         workbook='parameter-distributions_corn_IBO_EtOH_B.xlsx',
         max_n_spikes=0, threshold_conc=34.25, target_conc=140.0,
-        expected={'ethanol': 0.60042, 'isobutanol': 1.2847},
+        expected={'ethanol': 0.59530, 'isobutanol': 1.2800},
         burden_default=False),
     # opt_* scenarios reproduce the best-objective trial of a
     # kinetic-optimization study. opt_IBO_titer / opt_IBO_yield /
@@ -202,12 +202,22 @@ SCENARIOS = {
     # workbooks still bake k_17 = 44 (infeasible against k_17,ref = 0.1077;
     # load_scenario raises) and the RE-PINNED history above describes
     # opt_IRR's PREVIOUS point.
+    # RE-PINNED 2026-09-29 for hensmith 2b5b27d -> 6d4776f (the local clone on
+    # PYTHONPATH; 28 commits incl. the MER-planner rewrite): only the
+    # HXN1001 heat-exchanger-network synthesis changed, the model did not
+    # (under the 2b5b27d export smoke 1 still gives 0.862326). A ethanol
+    # 0.86233 -> 0.86021 (IRR 0.1260 -> 0.1279); B 0.60042 -> 0.59530 /
+    # isobutanol 1.2847 -> 1.2800 (IRR 0.2161 -> 0.2176); ethanol-only /
+    # re-gated A 0.83855 -> 0.83971, B 1.6693 -> 1.6271 (smoke 5-8 pins);
+    # opt_IRR ethanol 0.35881 -> 0.33856 / isobutanol 1.1635 -> 1.1492, IRR
+    # 0.27299 -> 0.28019. The four k_17 = 44 opt_* scenarios still raise in
+    # load_scenario (burden-infeasible) and keep their old pins.
     'opt_IRR': ScenarioSpec(
         name='opt_IRR',
         workbook='parameter-distributions_corn_IBO_EtOH_opt_IRR.xlsx',
         max_n_spikes=50, threshold_conc=170.90680171931479, target_conc=175.90680171931479,
-        expected={'ethanol': 0.35880679653731856, 'isobutanol': 1.1635401445494427},
-        objective_name='IRR', objective_value=0.27299062792466855),
+        expected={'ethanol': 0.3385612921038618, 'isobutanol': 1.149187193943148},
+        objective_name='IRR', objective_value=0.2801868595938332),
     'opt_IBO_titer': ScenarioSpec(
         name='opt_IBO_titer',
         workbook='parameter-distributions_corn_IBO_EtOH_opt_IBO_titer.xlsx',
