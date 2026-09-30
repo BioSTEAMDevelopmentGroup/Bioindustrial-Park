@@ -14,7 +14,7 @@ purity-adjusted ethanol MPSP, converted from the workbook's $/kg to $/GGE (see
 USD_PER_KG_TO_USD_PER_GGE):
 
   A  MESP (y) vs total capital investment (x)
-  B  total capital investment (y) vs ethanol production (x, million gal of
+  B  MESP (y) vs ethanol production (x, million gal of
      pure ethanol per year: the purity-adjusted production rate /
      ETHANOL_DENSITY_KG_PER_L / L_PER_GAL)
   C  MESP (y) vs DDGS sale revenue (x, MM$/y)
@@ -37,22 +37,23 @@ outlying samples (minimum and maximum).
 Panel A also carries a light grey band for the ethanol market price range
 (ETHANOL_MARKET_RANGE) spanning the typical corn ethanol biorefinery TCI
 (TYPICAL_CORN_ETHANOL_TCI) and dark grey dashed lines at the ends of the
-gasoline price range (GASOLINE_PRICE_RANGE). Panel B carries a box in the
-same grey spanning a typical corn ethanol biorefinery's ethanol production
-(TYPICAL_CORN_ETHANOL_PRODUCTION) and TCI (TYPICAL_CORN_ETHANOL_TCI), also
+gasoline price range (GASOLINE_PRICE_RANGE). Panels B and D-F carry a box in
+the same grey spanning the ethanol market price range and a conventional
+range of their x (B: a typical corn ethanol biorefinery's ethanol production,
+TYPICAL_CORN_ETHANOL_PRODUCTION; D-F: high-gravity fermentation), also
 unlabelled.
 
-Panels A and B also carry the Pareto frontier of their samples as a solid red
-staircase, in the sense set by the panel's `pareto` entry: A lower-left (TCI
-and MESP minimized), B lower-right (production maximized, TCI minimized).
-Panels C-F carry a binned-median trend line instead (`trend`): the samples
-split into N_TREND_BINS equal-count bins of x, a solid black line through each
-bin's median x and median MESP. Their x is not a design choice that trades
-against MESP (DDGS revenue is a coproduct credit set by the DDGS price and
-output; yield, titer and productivity are outcomes of the uncertain kinetics,
-and all four go WITH lower MESP), so a frontier would only trace the lucky
-corn-price / capacity draws that happen to sit at high x; the binned medians show how much
-MESP actually moves with x.
+Panel A also carries the Pareto frontier of its samples as a solid red
+staircase, in the sense set by the panel's `pareto` entry (lower-left: TCI and
+MESP minimized). Panels B-F carry a binned-median trend line instead
+(`trend`): the samples split into N_TREND_BINS equal-count bins of x, a solid
+black line through each bin's median x and median MESP. Their x is not a
+design choice that trades against MESP (ethanol production follows the sampled
+plant capacity, with economies of scale; DDGS revenue is a coproduct credit
+set by the DDGS price and output; yield, titer and productivity are outcomes
+of the uncertain kinetics; all five go WITH lower MESP), so a frontier would
+only trace the lucky corn-price / capacity draws that happen to sit at high x;
+the binned medians show how much MESP actually moves with x.
 
 Sim-safe: pure pandas/matplotlib/scipy, never imports biorefineries.
 
@@ -102,7 +103,7 @@ TICK_LEN = {'major': 4.0, 'minor': 2.0} # pt; left/bottom ticks extend this far 
 PARETO_COLOR = '#ED586F'
 PARETO_LW = 1.5
 PARETO_LS = '-'
-# panels C-F: binned-median trend line, solid black (no markers, no halo)
+# panels B-F: binned-median trend line, solid black (no markers, no halo)
 N_TREND_BINS = 10 # equal-count bins of x (deciles)
 TREND_COLOR = '#0b0b0b'
 TREND_LW = 1.5
@@ -185,7 +186,8 @@ TYPICAL_CORN_ETHANOL_TCI_SOURCE = ((83.95, 2019), # MM$, Kurambhatti et al.
 TYPICAL_CORN_ETHANOL_TCI = tuple(
     v * CEPCI_ANNUAL[TCI_COST_YEAR] / CEPCI_ANNUAL[year]
     for v, year in TYPICAL_CORN_ETHANOL_TCI_SOURCE) # MM$ (2023$): ~110.3, ~195.6
-# typical dry-grind corn ethanol biorefinery capacity, for panel B's box
+# typical dry-grind corn ethanol biorefinery capacity, for panel B's box (x
+# the ethanol market price range, as the D-F boxes)
 TYPICAL_CORN_ETHANOL_PRODUCTION = (40.0, 60.0) # MM gal/y
 # ethanol yield, titer and productivity reported for high-gravity fermentation
 # in U.S. corn dry-grind facilities, for the boxes of panels D-F (each x the
@@ -236,7 +238,7 @@ MESP_LABEL = r'Minimum ethanol selling price [$\mathrm{\$·GGE}^{-1}$]'
 ETOH_YIELD_TICKS = np.round(np.linspace(0.40, 0.50, 6), 10) # g/g, every 0.02
 ETOH_TITER_TICKS = np.linspace(90.0, 150.0, 7) # g/L, every 10
 ETOH_PRODUCTIVITY_TICKS = np.round(np.linspace(0.5, 4.5, 9), 10) # g/L/h, every 0.5
-# panels C-F: MESP (y, MPSP_TICKS as panel A) vs one driver (x), with a binned-median
+# panels B-F: MESP (y, MPSP_TICKS as panel A) vs one driver (x), with a binned-median
 # trend line and no Pareto frontier (see the module docstring)
 _mesp_panel = lambda x, xlabel, color, **kw: {
     **dict(x=x, y='MPSP', xlabel=xlabel, ylabel=MESP_LABEL, yticks=MPSP_TICKS,
@@ -249,11 +251,8 @@ PANELS = (
          xticks=TCI_TICKS,
          yticks=MPSP_TICKS, market=True, pareto=('min', 'min'), color=TEAL,
          callouts=True),
-    dict(x='EtOH production', y='TCI', color=GREEN, pareto=('max', 'min'),
-         xlabel=r'Ethanol production [$\mathrm{MM\ gal·y}^{-1}$]',
-         ylabel='Total capital investment [MM\\$]',
-         yticks=TCI_TICKS,
-         box=(TYPICAL_CORN_ETHANOL_PRODUCTION, TYPICAL_CORN_ETHANOL_TCI)),
+    _mesp_panel('EtOH production', r'Ethanol production [$\mathrm{MM\ gal·y}^{-1}$]',
+                GREEN, box=(TYPICAL_CORN_ETHANOL_PRODUCTION, ETHANOL_MARKET_RANGE)),
     _mesp_panel('DDGS revenue',
                 r'DDGS revenue [$\mathrm{MM\$·y}^{-1}$]', ORANGE),
     _mesp_panel('EtOH yield', r'Ethanol yield [$\mathrm{g·g}^{-1}$ sugars]',
