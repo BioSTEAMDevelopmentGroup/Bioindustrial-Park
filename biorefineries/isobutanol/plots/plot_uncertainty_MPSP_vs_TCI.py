@@ -36,9 +36,9 @@ outlying samples (minimum and maximum).
 
 Panel A also carries a light grey band for the ethanol market price range
 (ETHANOL_MARKET_RANGE) spanning the typical corn ethanol biorefinery TCI
-(TYPICAL_CORN_ETHANOL_TCI). Every MESP panel (A-F) carries dark grey dashed
-lines at the ends of the gasoline price range (GASOLINE_PRICE_RANGE), named
-by a callout on panel A only. Panels B-F carry a box in the
+(TYPICAL_CORN_ETHANOL_TCI). Every MESP panel (A-F) carries a darker grey band
+across its whole x axis, behind the light grey boxes, for the gasoline price
+range (GASOLINE_PRICE_RANGE), named by a callout on panel A only. Panels B-F carry a box in the
 same grey spanning the ethanol market price range and a conventional range of
 their x (B: a typical corn ethanol biorefinery's ethanol production,
 TYPICAL_CORN_ETHANOL_PRODUCTION; C: its DDGS sale revenue at industry DDGS
@@ -238,12 +238,14 @@ HIGH_GRAVITY_ETHANOL_TITER = (100.0, 142.0) # g/L
 HIGH_GRAVITY_ETHANOL_PRODUCTIVITY = (2.0, 4.4) # g/L/h
 # the ethanol range is a band in a light shade of the baseline grey of
 # plots/plot_kin_opt_parameter_sets.py (BASELINE_COLOR); the gasoline range,
-# which almost coincides with it, is two dashed lines in a dark shade of the
-# same grey. Both unlabelled, named in the caption.
+# which almost coincides with it, is a band in that grey itself, spanning the
+# whole x axis behind the light boxes (two dark grey dashed lines until
+# 2026-09-30). Both unlabelled, named in the caption; the callouts use a dark
+# shade of the same grey.
 BASELINE_GRAY = '#90918e'
 MARKET_BAND_COLOR = _mix(BASELINE_GRAY, 'white', 0.7)
-GASOLINE_LINE_COLOR = _mix(BASELINE_GRAY, 'black', 0.45)
-GASOLINE_LINE_STYLE = dict(lw=1.0, ls=(0, (5, 3)))
+GASOLINE_BAND_COLOR = BASELINE_GRAY
+CALLOUT_GRAY = _mix(BASELINE_GRAY, 'black', 0.45)
 BOX_PERCENTILES = {'whis': (5, 95), 'dots': (0, 100)} # dots: min and max
 
 # the joint panels of the 2 x 3 grid, row-major: (x outcome, y outcome) keyed
@@ -521,9 +523,8 @@ def draw_joint_panel(fig, cell, panel, samples, base, letter):
     if panel.get('market'):
         ax.fill_between(TYPICAL_CORN_ETHANOL_TCI, *ETHANOL_MARKET_RANGE,
                         color=MARKET_BAND_COLOR, lw=0, zorder=0)
-    if panel['y'] == 'MPSP': # every MESP panel; the callout is panel A's only
-        for price in GASOLINE_PRICE_RANGE:
-            ax.axhline(price, color=GASOLINE_LINE_COLOR, zorder=1, **GASOLINE_LINE_STYLE)
+    if panel['y'] == 'MPSP': # every MESP panel, behind the light boxes; the callout is panel A's only
+        ax.axhspan(*GASOLINE_PRICE_RANGE, color=GASOLINE_BAND_COLOR, lw=0, zorder=-1)
     if panel.get('box'):
         (x0, x1), (y0, y1) = panel['box']
         ax.fill_between((x0, x1), y0, y1, color=MARKET_BAND_COLOR, lw=0, zorder=0)
@@ -581,8 +582,8 @@ def _callout(ax, text, xy, offset, rad, color, shrinkB=0, tip=(0, 0), relpos=(0.
 
 def draw_panel_callouts(ax, panel, base, fx, fy):
     """Panel-A callouts: the baseline diamond, the Pareto frontier, the grey
-    conventional-facility box and the gasoline price range between its two
-    dashed lines."""
+    conventional-facility box and the gasoline price range (a double arrow
+    spanning its band)."""
     if base:
         c = BASELINE_CALLOUT
         _callout(ax, c['text'], (base[panel['x']], base[panel['y']]), c['offset'],
@@ -598,16 +599,16 @@ def draw_panel_callouts(ax, panel, base, fx, fy):
         c = CONVENTIONAL_CALLOUT
         cx, cy = c['at']
         _callout(ax, c['text'], (cx, ETHANOL_MARKET_RANGE[1] if cy is None else cy),
-                 c['offset'], c['rad'], GASOLINE_LINE_COLOR, tip=c['tip'], relpos=c['relpos'],
+                 c['offset'], c['rad'], CALLOUT_GRAY, tip=c['tip'], relpos=c['relpos'],
                  ha=c['ha'], va='bottom')
         c = GASOLINE_CALLOUT
         lo, hi = GASOLINE_PRICE_RANGE
         ax.annotate('', xy=(c['x'], hi), xycoords=_nudged(ax, 0, c['tip']),
                     xytext=(c['x'], lo), textcoords=_nudged(ax, 0, -c['tip']),
                     arrowprops=dict(**{**CALLOUT_ARROW, 'arrowstyle': '<|-|>', 'shrinkA': 0},
-                                    shrinkB=0, color=GASOLINE_LINE_COLOR), zorder=2)
+                                    shrinkB=0, color=CALLOUT_GRAY), zorder=2)
         ax.text(c['x'], 0.5*(lo + hi), c['text'], rotation=90, ha='center', va='center',
-                fontsize=CALLOUT_FONTSIZE, fontweight='bold', color=GASOLINE_LINE_COLOR,
+                fontsize=CALLOUT_FONTSIZE, fontweight='bold', color=CALLOUT_GRAY,
                 bbox=dict(facecolor='white', edgecolor='none', pad=2), zorder=3)
 
 
