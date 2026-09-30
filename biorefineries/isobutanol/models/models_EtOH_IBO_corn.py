@@ -64,6 +64,26 @@ def create_model():
 
     _feedstock_factor = feedstock.F_mass / (feedstock.F_mass-feedstock.imass['Water'])
 
+    # Reference wet-basis corn composition, captured once at build (corn's
+    # default: 15 wt% moisture, starch 0.72 kg/dry-kg). The starch-content
+    # setter rebuilds the composition from it rather than from the stream's
+    # current state, so it is idempotent, keeps the moisture at the reference
+    # value, and commutes with the capacity setter (feedstock.F_mass = x).
+    _feedstock_z_ref = feedstock.mass.to_array() / feedstock.F_mass
+    _i_water = feedstock.chemicals.index('Water')
+    _i_starch = feedstock.chemicals.index('Starch')
+
+    def set_feedstock_starch_content(x):
+        """Set the feedstock starch content to x kg/dry-kg at the reference
+        moisture; the other dry components keep their reference proportions
+        and the total mass flow is unchanged."""
+        z = _feedstock_z_ref.copy()
+        dry = 1. - z[_i_water]
+        z *= (1. - x) * dry / (dry - z[_i_starch]) # non-starch dry solids
+        z[_i_water] = 1. - dry
+        z[_i_starch] = x * dry
+        feedstock.mass = feedstock.F_mass * z
+
     # Mass flow rate of the (denatured) ethanol product stream
     get_yield = lambda: product_stream.F_mass*get_annual_factor()/1e6
     # Purity (%) of ethanol in the final product
@@ -392,6 +412,7 @@ def create_model():
     namespace_dict.update({k:s.__getitem__(k) for k in s.__dir__() if not k in exclude_from_globals})
     namespace_dict.update({k:u.__getitem__(k) for k in u.__dir__() if not k in exclude_from_globals})
     namespace_dict['feedstock'] = feedstock
+    namespace_dict['set_feedstock_starch_content'] = set_feedstock_starch_content
     namespace_dict['product_stream'] = product_stream
     namespace_dict['IBO_tea'] = namespace_dict['tea'] = IBO_tea
     # namespace_dict['spec'] = spec
