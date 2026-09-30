@@ -313,7 +313,7 @@ GRID_SHAPE = (2, 3)
 # coordinates (A and D sit between the y-axis title and the tick labels)
 CELL_IN = (4.60, 4.58)
 GAP_IN = {'w': 0.50, 'h': 0.85}
-MARGINS_IN = {'left': 0.90, 'right': 0.224, 'bottom': 0.95, 'top': 0.162}
+MARGINS_IN = {'left': 1.00, 'right': 0.224, 'bottom': 0.95, 'top': 0.162}
 Y_TITLE_X_IN = 0.06
 PANEL_LETTER_XY = (-0.10, 1.12)
 
