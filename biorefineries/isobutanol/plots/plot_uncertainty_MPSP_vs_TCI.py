@@ -286,7 +286,8 @@ PANELS = (
          yticks=MPSP_TICKS, market=True, pareto=('min', 'min'), color=TEAL,
          callouts=True),
     _mesp_panel('EtOH production', r'Ethanol production [$\mathrm{MM\ gal·y}^{-1}$]',
-                GREEN, box=(TYPICAL_CORN_ETHANOL_PRODUCTION, ETHANOL_MARKET_RANGE)),
+                GREEN, box=(TYPICAL_CORN_ETHANOL_PRODUCTION, ETHANOL_MARKET_RANGE),
+                trend_callout=True),
     _mesp_panel('DDGS revenue',
                 r'DDGS revenue [$\mathrm{MM\$·y}^{-1}$]', ORANGE,
                 xticks=DDGS_REVENUE_TICKS,
@@ -331,6 +332,10 @@ CALLOUT_ARROW = dict(arrowstyle='-|>', lw=1.0, mutation_scale=12, shrinkA=2)
 # the item slightly; the baseline arrow instead stops `shrinkB` points short
 # of the diamond's centre, just inside its edge
 BASELINE_CALLOUT = dict(text='baseline', offset=(24, 22), rad=0.35, shrinkB=2.5)
+# panel B (`trend_callout` in PANELS): names the binned-median trend line, at
+# a point a fraction `at` along its x span (since 2026-09-30)
+TREND_CALLOUT = dict(text='binned median', at=0.8, offset=(8, -40), rad=-0.35,
+                     tip=(0, 1.5))
 PARETO_CALLOUT = dict(text='Pareto frontier', at=0.55, offset=(12, -22), rad=-0.35,
                       tip=(0, 1.5))
 # white on the gasoline band (dark grey on a white box until 2026-09-30); the
@@ -540,6 +545,11 @@ def draw_joint_panel(fig, cell, panel, samples, base, letter):
               f"{panel['x']} {fx[0]:.4g}-{fx[-1]:.4g}, {panel['y']} {fy[0]:.4g}-{fy[-1]:.4g}")
     if panel.get('trend'):
         bx, by = draw_binned_medians(ax, x, y)
+        if panel.get('trend_callout'):
+            c = TREND_CALLOUT
+            xs = bx[0] + c['at']*(bx[-1] - bx[0])
+            _callout(ax, c['text'], (xs, np.interp(xs, bx, by)), c['offset'], c['rad'],
+                     TREND_COLOR, tip=c['tip'], ha='left', va='top')
         print(f'  binned medians ({bx.size} equal-count bins): '
               f"{panel['x']} {bx[0]:.4g} -> {bx[-1]:.4g}, "
               f"{panel['y']} {by[0]:.4g} -> {by[-1]:.4g} ({by[-1] - by[0]:+.3f})")
