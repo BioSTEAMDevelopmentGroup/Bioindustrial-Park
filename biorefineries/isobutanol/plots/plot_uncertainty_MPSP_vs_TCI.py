@@ -264,8 +264,9 @@ MESP_LABEL = r'Minimum ethanol selling price [$\mathrm{\$·GGE}^{-1}$]'
 ETOH_YIELD_TICKS = np.round(np.linspace(0.40, 0.50, 6), 10) # g/g, every 0.02
 ETOH_TITER_TICKS = np.linspace(90.0, 150.0, 7) # g/L, every 10
 ETOH_PRODUCTIVITY_TICKS = np.round(np.linspace(0.5, 4.5, 9), 10) # g/L/h, every 0.5
-# panel C: DDGS revenue axis reaching the top of the conventional box (~48.6)
-DDGS_REVENUE_TICKS = np.arange(10.0, 51.0, 10.0) # MM$/y
+# panel C: DDGS revenue axis fitted to the samples (10.4-27.0); the
+# conventional box (~14.7-48.6) runs off its right edge (10-50 until 2026-09-30)
+DDGS_REVENUE_TICKS = np.arange(10.0, 31.0, 5.0) # MM$/y
 # panels B-F: MESP (y, MPSP_TICKS as panel A) vs one driver (x), with a binned-median
 # trend line and no Pareto frontier (see the module docstring)
 _mesp_panel = lambda x, xlabel, color, **kw: {
