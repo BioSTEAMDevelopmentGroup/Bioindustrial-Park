@@ -37,11 +37,12 @@ outlying samples (minimum and maximum).
 Panel A also carries a light grey band for the ethanol market price range
 (ETHANOL_MARKET_RANGE) spanning the typical corn ethanol biorefinery TCI
 (TYPICAL_CORN_ETHANOL_TCI) and dark grey dashed lines at the ends of the
-gasoline price range (GASOLINE_PRICE_RANGE). Panels B and D-F carry a box in
-the same grey spanning the ethanol market price range and a conventional
-range of their x (B: a typical corn ethanol biorefinery's ethanol production,
-TYPICAL_CORN_ETHANOL_PRODUCTION; D-F: high-gravity fermentation), also
-unlabelled.
+gasoline price range (GASOLINE_PRICE_RANGE). Panels B-F carry a box in the
+same grey spanning the ethanol market price range and a conventional range of
+their x (B: a typical corn ethanol biorefinery's ethanol production,
+TYPICAL_CORN_ETHANOL_PRODUCTION; C: its DDGS sale revenue at industry DDGS
+yields and market prices, TYPICAL_CORN_ETHANOL_DDGS_REVENUE; D-F:
+high-gravity fermentation), also unlabelled.
 
 Panel A also carries the Pareto frontier of its samples as a solid red
 staircase, in the sense set by the panel's `pareto` entry (lower-left: TCI and
@@ -189,6 +190,31 @@ TYPICAL_CORN_ETHANOL_TCI = tuple(
 # typical dry-grind corn ethanol biorefinery capacity, for panel B's box (x
 # the ethanol market price range, as the D-F boxes)
 TYPICAL_CORN_ETHANOL_PRODUCTION = (40.0, 60.0) # MM gal/y
+# DDGS sale revenue of a typical dry-grind corn ethanol biorefinery, for panel
+# C's box (x the ethanol market price range): TYPICAL_CORN_ETHANOL_PRODUCTION x
+# the industry DDGS yield per gallon x the DDGS market price range, low end
+# from the three lows and high end from the three highs, nominal dollars (as
+# the ethanol and gasoline ranges):
+# - DDGS yield: low 5.01 lb/gal = the 2025 U.S. industry annual average 15.18
+#   lb DDGS/bu / 3.03 gal ethanol/bu (Irwin, S. Trends in the Operational
+#   Efficiency of the U.S. Ethanol Industry: 2025 Update. farmdoc daily 16,
+#   Feb 18, 2026; USDA Grain Crushings and Co-Products Production + EIA);
+#   high 5.52 lb/gal = 16.00 lb/bu, the highest 2021-2025 DDGS rate of farmdoc
+#   daily's representative Iowa plant (Irwin, S. 2024 Ethanol Production
+#   Profits: Regression to the Mean. farmdoc daily 15, Mar 5, 2025; its 2022
+#   rate) / 2.90 gal/bu, the low end of the 2023-2024 industry conversion rate
+#   (Irwin 2026)
+# - DDGS price: the Jan 2021 - Dec 2025 monthly low and high of distillers
+#   dried grains, Central Illinois, 146.67 (Aug 2024) and 293.47 (Apr 2022)
+#   $/short ton (USDA ERS Feed Grains Database, Yearbook Table 16, updated
+#   2026-09-14)
+LB_PER_SHORT_TON = 2000.0
+DDGS_YIELD_LB_PER_GAL = (15.18/3.03, 16.00/2.90) # lb DDGS / gal ethanol
+DDGS_PRICE_RANGE = (146.67, 293.47) # $/short ton
+TYPICAL_CORN_ETHANOL_DDGS_REVENUE = tuple(
+    gal * lb_per_gal / LB_PER_SHORT_TON * price
+    for gal, lb_per_gal, price in zip(TYPICAL_CORN_ETHANOL_PRODUCTION,
+                                      DDGS_YIELD_LB_PER_GAL, DDGS_PRICE_RANGE)) # MM$/y: ~14.7, ~48.6
 # ethanol yield, titer and productivity reported for high-gravity fermentation
 # in U.S. corn dry-grind facilities, for the boxes of panels D-F (each x the
 # ethanol market price range, as panel A's box):
@@ -238,6 +264,8 @@ MESP_LABEL = r'Minimum ethanol selling price [$\mathrm{\$·GGE}^{-1}$]'
 ETOH_YIELD_TICKS = np.round(np.linspace(0.40, 0.50, 6), 10) # g/g, every 0.02
 ETOH_TITER_TICKS = np.linspace(90.0, 150.0, 7) # g/L, every 10
 ETOH_PRODUCTIVITY_TICKS = np.round(np.linspace(0.5, 4.5, 9), 10) # g/L/h, every 0.5
+# panel C: DDGS revenue axis reaching the top of the conventional box (~48.6)
+DDGS_REVENUE_TICKS = np.arange(10.0, 51.0, 10.0) # MM$/y
 # panels B-F: MESP (y, MPSP_TICKS as panel A) vs one driver (x), with a binned-median
 # trend line and no Pareto frontier (see the module docstring)
 _mesp_panel = lambda x, xlabel, color, **kw: {
@@ -254,7 +282,9 @@ PANELS = (
     _mesp_panel('EtOH production', r'Ethanol production [$\mathrm{MM\ gal·y}^{-1}$]',
                 GREEN, box=(TYPICAL_CORN_ETHANOL_PRODUCTION, ETHANOL_MARKET_RANGE)),
     _mesp_panel('DDGS revenue',
-                r'DDGS revenue [$\mathrm{MM\$·y}^{-1}$]', ORANGE),
+                r'DDGS revenue [$\mathrm{MM\$·y}^{-1}$]', ORANGE,
+                xticks=DDGS_REVENUE_TICKS,
+                box=(TYPICAL_CORN_ETHANOL_DDGS_REVENUE, ETHANOL_MARKET_RANGE)),
     _mesp_panel('EtOH yield', r'Ethanol yield [$\mathrm{g·g}^{-1}$ sugars]',
                 PURPLE, xticks=ETOH_YIELD_TICKS,
                 box=(HIGH_GRAVITY_ETHANOL_YIELD, ETHANOL_MARKET_RANGE)),
