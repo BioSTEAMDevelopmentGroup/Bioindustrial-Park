@@ -299,14 +299,19 @@ PANELS = (
                 box=(HIGH_GRAVITY_ETHANOL_PRODUCTIVITY, ETHANOL_MARKET_RANGE)),
 )
 GRID_SHAPE = (2, 3)
-# figure size per grid cell and the figure margins (inches, so the cells keep
-# their size and spacing whatever the grid shape), gaps between grid cells
-# (fractions of the mean cell width / height), and the panel letter's
-# position in its joint axes' coordinates
-CELL_SIZE = (5.6, 5.4) # in
-MARGINS_IN = {'left': 1.12, 'right': 0.224, 'bottom': 0.81, 'top': 0.162}
-GRID_SPACE = {'w': 0.18, 'h': 0.145}
-PANEL_LETTER_XY = (-0.15, 1.12)
+# grid cell size, gaps between cells and figure margins, all in inches, so the
+# cells keep their size and spacing whatever the grid shape (the figure size
+# follows); every panel shares the MESP y axis, so one y-axis title runs down
+# the far left of the figure (its left edge `Y_TITLE_X_IN` from the figure
+# edge, centred on the joint axes) instead of one per panel (until
+# 2026-09-30: 5.6 x 5.4 in per cell incl. margins, gaps 0.18 / 0.145 of a
+# cell, left margin 1.12 in); the panel letter's position in its joint axes'
+# coordinates (A and D sit between the y-axis title and the tick labels)
+CELL_IN = (4.60, 4.58)
+GAP_IN = {'w': 0.50, 'h': 0.664}
+MARGINS_IN = {'left': 0.75, 'right': 0.224, 'bottom': 0.81, 'top': 0.162}
+Y_TITLE_X_IN = 0.06
+PANEL_LETTER_XY = (-0.10, 1.12)
 
 # callouts (panel A, `callouts` in PANELS): bold labels with curved arrows,
 # after the reference layout of the former 2x2
@@ -540,7 +545,7 @@ def draw_joint_panel(fig, cell, panel, samples, base, letter):
     ax.set_xlim(xticks[0], xticks[-1])
     ax.set_ylim(yticks[0], yticks[-1])
     ax.set_xlabel(bold_title(panel['xlabel']), fontsize=FONTS['axis_title'])
-    ax.set_ylabel(bold_title(panel['ylabel']), fontsize=FONTS['axis_title'])
+    # no per-panel y-axis title: the figure's shared one (plot_uncertainty_MPSP_vs_TCI)
     ax.xaxis.set_minor_locator(AutoMinorLocator(N_MINOR_PER_MAJOR + 1))
     ax.yaxis.set_minor_locator(AutoMinorLocator(N_MINOR_PER_MAJOR + 1))
 
@@ -551,7 +556,7 @@ def draw_joint_panel(fig, cell, panel, samples, base, letter):
     draw_box(ax_right, y, 'vertical', panel['color'])
     ax_top.set_ylim(0.4, 1.6)
     ax_right.set_xlim(0.4, 1.6)
-    # panel letter just above the y-axis title, level with the top box
+    # panel letter above the y tick labels, level with the top box
     ax.text(PANEL_LETTER_XY[0], PANEL_LETTER_XY[1], letter, transform=ax.transAxes,
             ha='left', va='top',
                 fontsize=FONTS['panel_letter'], fontweight='bold')
@@ -631,12 +636,17 @@ def plot_uncertainty_MPSP_vs_TCI(results_file=None, baseline_file=None,
 
     apply_font_rcparams()
     n_rows, n_cols = GRID_SHAPE
-    width, height = CELL_SIZE[0]*n_cols, CELL_SIZE[1]*n_rows
-    fig = plt.figure(figsize=(width, height))
     m = MARGINS_IN
-    grid = fig.add_gridspec(n_rows, n_cols, wspace=GRID_SPACE['w'], hspace=GRID_SPACE['h'],
+    width = m['left'] + n_cols*CELL_IN[0] + (n_cols - 1)*GAP_IN['w'] + m['right']
+    height = m['bottom'] + n_rows*CELL_IN[1] + (n_rows - 1)*GAP_IN['h'] + m['top']
+    fig = plt.figure(figsize=(width, height))
+    grid = fig.add_gridspec(n_rows, n_cols,
+                            wspace=GAP_IN['w']/CELL_IN[0], hspace=GAP_IN['h']/CELL_IN[1],
                             left=m['left']/width, right=1 - m['right']/width,
                             bottom=m['bottom']/height, top=1 - m['top']/height)
+    ylabels = {panel['ylabel'] for panel in PANELS}
+    if len(ylabels) != 1:
+        raise ValueError(f'one shared y-axis title needs one y label, got {ylabels}')
     axes = []
     for i, panel in enumerate(PANELS):
         letter = chr(ord('A') + i)
@@ -648,6 +658,11 @@ def plot_uncertainty_MPSP_vs_TCI(results_file=None, baseline_file=None,
                 transform=ax.transAxes, ha='right', va='top',
                 fontsize=CALLOUT_FONTSIZE, color=INK, bbox=RHO_BOX, zorder=6)
         axes.append(ax)
+    # the shared y-axis title, down the far left, centred on the joint axes
+    boxes = [ax.get_position() for ax in axes]
+    y_mid = 0.5*(min(b.y0 for b in boxes) + max(b.y1 for b in boxes))
+    fig.text(Y_TITLE_X_IN/width, y_mid, bold_title(ylabels.pop()), rotation=90,
+             ha='left', va='center', fontsize=FONTS['axis_title'])
 
     fig.canvas.draw()
     for ax in axes:
