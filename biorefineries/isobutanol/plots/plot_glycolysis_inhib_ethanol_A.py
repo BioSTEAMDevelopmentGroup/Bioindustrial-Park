@@ -90,13 +90,19 @@ FIGURE = ksf.SweepFigure(
     baseline_callout=('baseline', (-8, 26), 0.3),
 )
 
-# The same figure coloured by IRR at default prices (0-14 %; every
-# money-losing cell, IRR < 0 or -inf, in the light-grey under-colour), with
-# the same optimum and baseline markers; no market-range hatching
+# The same figure coloured by IRR at default prices (-15 to 15 %, white
+# break-even contour; cells below -15 % and outright money-losers, IRR -inf,
+# in the light-grey under-colour), with the highest-IRR point marked in place
+# of the MESP optimum; no market-range hatching
+OPTIMA_IRR = [row if row[0] != 'MPSP' else
+              ('IRR', 'max', 'IRR', '*', '#33ccff', 14, (12, 24), -0.3)
+              for row in OPTIMA]
+
 FIGURE_IRR = dataclasses.replace(
     FIGURE,
     output_stem='glycolysis_inhib_ethanol_A_IRR',
     color_axis='IRR',
+    optima=OPTIMA_IRR,
     levels=None, cbar_ticks=None, cbar_minor_step=None,
     comparison_range=None,
 )

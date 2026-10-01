@@ -55,28 +55,35 @@ MESP_LEVELS = fs.MESP_LEVELS
 MESP_CBAR_TICKS = fs.MESP_CBAR_TICKS
 MESP_CBAR_MINOR_STEP = fs.MESP_CBAR_MINOR_STEP
 
-# Default IRR colour scale [%]: 0-14 % (the sweeps top out below the 15 %
-# hurdle); the colormap is the MESP one reversed (high IRR = yellow, as low
-# MESP), and every money-losing cell -- IRR < 0, or -inf where solve_TEA finds
-# no IRR at all -- takes the light-grey under-colour.
-IRR_LEVELS = np.arange(0., 14.00001, 0.25)
-IRR_CBAR_TICKS = np.arange(0., 14.00001, 2.)
-IRR_CBAR_MINOR_STEP = 0.5
+# Default IRR colour scale [%]: -15 to 15 % (the sweeps top out below the 15 %
+# hurdle; the finite negative IRRs are a thin rim down to ~-75 %, and a scale
+# reaching that far would squeeze the profitable range into a sixth of the
+# colours); the colormap is the MESP one reversed (high IRR = yellow, as low
+# MESP). Cells below -15 % and the -inf of an outright money-loser (solve_TEA
+# finds no IRR at all) take the light-grey under-colour; a white contour marks
+# break-even (IRR = 0).
+IRR_LEVELS = np.arange(-15., 15.00001, 0.5)
+IRR_CBAR_TICKS = np.arange(-15., 15.00001, 5.)
+IRR_CBAR_MINOR_STEP = 1.
 IRR_UNDER_COLOR = (0.82, 0.82, 0.82)
+IRR_REFERENCE_LINES = (0.,)
 
 # Colour axes: the sweep metric read, its unit conversion, default scale,
-# which end extends, the colorbar title and its tick format
+# which end extends, the colorbar title, its tick format and the values
+# marked by a white contour line (and a matching line on the colourbar)
 COLOR_AXES = {
     'MESP': dict(sweep_metric='MPSP', scale=USD_PER_KG_TO_USD_PER_GGE,
                  levels=MESP_LEVELS, cbar_ticks=MESP_CBAR_TICKS,
                  cbar_minor_step=MESP_CBAR_MINOR_STEP, extend='max',
                  reverse=False, under_color=None,
-                 title=fs.bold_title('MESP', fs.USD_PER_GGE), tick_fmt='{:.2f}'),
+                 title=fs.bold_title('MESP', fs.USD_PER_GGE), tick_fmt='{:.2f}',
+                 reference_lines=()),
     'IRR': dict(sweep_metric='IRR', scale=100.,
                 levels=IRR_LEVELS, cbar_ticks=IRR_CBAR_TICKS,
                 cbar_minor_step=IRR_CBAR_MINOR_STEP, extend='min',
                 reverse=True, under_color=IRR_UNDER_COLOR,
-                title=fs.bold_title('IRR', '%'), tick_fmt='{:.0f}'),
+                title=fs.bold_title('IRR', '%'), tick_fmt='{:.0f}',
+                reference_lines=IRR_REFERENCE_LINES),
 }
 
 # Ethanol market price range, the one plots/plot_uncertainty_MPSP_vs_TCI.py
@@ -240,6 +247,13 @@ def draw_panel(figure, fig, ax, cax):
             label, offset, rad = figure.baseline_callout
             callout(label, figure.baseline, 'data', offset, rad, BASELINE_MARKER_SIZE)
 
+    # reference values (e.g. IRR break-even), in the comparison line's style
+    if axis['reference_lines']:
+        ax.contour(figure.spec_1, figure.spec_2, values,
+                   levels=list(axis['reference_lines']),
+                   colors=[COMPARISON_LINE_RGBA], linewidths=COMPARISON_LINE_WIDTH,
+                   zorder=3)
+
     # optimum markers + labels
     optima = {}
     for metric, sense, label, marker, color, size, offset, rad in figure.optima:
@@ -265,7 +279,8 @@ def draw_panel(figure, fig, ax, cax):
     cbar = fig.colorbar(sm, cax=cax, spacing='proportional', extend=extend,
                         extendfrac=0.04)
     cbar.set_ticks(cbar_ticks)
-    cbar.set_ticklabels([axis['tick_fmt'].format(t) for t in cbar_ticks])
+    cbar.set_ticklabels([axis['tick_fmt'].format(t).replace('-', '−')
+                         for t in cbar_ticks])
     cbar.ax.yaxis.set_minor_locator(FixedLocator(
         [v for v in np.arange(levels[0], levels[-1] + 1e-9, minor_step)
          if not np.any(np.isclose(v, cbar_ticks))]))
@@ -275,6 +290,9 @@ def draw_panel(figure, fig, ax, cax):
             cbar.ax.fill_betweenx(figure.comparison_range, 0., 1., facecolor='none',
                                   edgecolor=COMPARISON_HATCH_RGBA,
                                   hatch=COMPARISON_HATCH, linewidth=0., zorder=3)
+    for v in axis['reference_lines']:
+        cbar.ax.axhline(v, color=COMPARISON_LINE_RGBA, linewidth=COMPARISON_LINE_WIDTH,
+                        zorder=3)
     cbar.ax.tick_params(which='major', labelsize=FONTS['tick'],
                         length=TICK_LEN['major'])
     cbar.ax.tick_params(which='minor', length=TICK_LEN['minor'])
