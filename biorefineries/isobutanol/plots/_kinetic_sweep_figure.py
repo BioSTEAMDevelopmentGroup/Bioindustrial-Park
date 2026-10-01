@@ -71,7 +71,9 @@ COMPARISON_LINE_RGBA = (1., 1., 1., 0.9)
 COMPARISON_LINE_WIDTH = 0.9
 COMPARISON_HATCH_LINE_WIDTH = 0.6
 
-G_PER_L_PER_H = r'$\mathrm{g·L}^{-1}\mathrm{·h}^{-1}$'
+BASELINE_MARKER_SIZE = 7 # pt
+
+G_PER_L_PER_H =r'$\mathrm{g·L}^{-1}\mathrm{·h}^{-1}$'
 
 
 @dataclass
@@ -84,7 +86,9 @@ class SweepFigure:
     `label_ha` overrides it; `marker_nudge` fans co-located optima apart
     [pt]. `mesp_levels` / `mesp_cbar_ticks` / `mesp_cbar_minor_step` override
     the default colour scale; `comparison_range` = (low, high) $/GGE hatches
-    the region whose MESP lies in that range (e.g. ETHANOL_MARKET_RANGE)."""
+    the region whose MESP lies in that range (e.g. ETHANOL_MARKET_RANGE);
+    `baseline` = (x, y) marks the baseline point with an unlabelled white
+    diamond."""
     output_stem: str
     csv_prefix: str
     spec_1: np.ndarray
@@ -106,6 +110,7 @@ class SweepFigure:
     mesp_cbar_ticks: np.ndarray = None
     mesp_cbar_minor_step: float = None
     comparison_range: tuple = None
+    baseline: tuple = None
 
 #%% Sweep data
 
@@ -175,6 +180,12 @@ def draw_panel(figure, fig, ax, cax):
                    levels=list(figure.comparison_range),
                    colors=[COMPARISON_LINE_RGBA], linewidths=COMPARISON_LINE_WIDTH,
                    zorder=3)
+
+    # baseline point: unlabelled white diamond, black outline
+    if figure.baseline is not None:
+        ax.plot(*figure.baseline, linestyle='none', marker='D', markersize=BASELINE_MARKER_SIZE,
+                markerfacecolor='white', markeredgecolor='black',
+                markeredgewidth=0.8, zorder=9, clip_on=False)
 
     # optimum markers + labels
     optima = {}

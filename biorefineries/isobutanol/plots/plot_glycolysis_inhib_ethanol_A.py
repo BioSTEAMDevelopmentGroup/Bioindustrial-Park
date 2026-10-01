@@ -82,6 +82,8 @@ FIGURE = ksf.SweepFigure(
     mesp_cbar_minor_step=0.1,
     # hatched: MESP within the ethanol market price range (2.31-5.15 $/GGE)
     comparison_range=ksf.ETHANOL_MARKET_RANGE,
+    # scenario-A baseline (both multipliers 1x)
+    baseline=(1., 1.),
 )
 
 if __name__ == '__main__':
