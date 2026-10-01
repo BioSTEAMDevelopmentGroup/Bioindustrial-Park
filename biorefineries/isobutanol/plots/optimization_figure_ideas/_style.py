@@ -80,6 +80,11 @@ Render checks (call after building the figure)
                                    closer than 0.03 in (e.g. 'loss0')
     min_font_check(fig, min_pt=9) -> [str]
     glyph_check(fig) -> [str]      characters Arial cannot render
+    marker_text_hits(fig, pad_pt=1, exempt=()) -> [str]  scatter / marker
+                                   points whose display centre falls in an
+                                   annotation's window extent (per axes,
+                                   insets included) and is not hidden under
+                                   an opaque backing box (BACKING_MIN_ALPHA)
     check_figure(fig, size=None, raise_on_fail=True, exempt=()) -> dict
     FigureCheckError (AssertionError subclass)
 Palette checks
@@ -106,6 +111,7 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 from matplotlib import pyplot as plt                       # noqa: E402
+from matplotlib.collections import PathCollection          # noqa: E402
 from matplotlib.lines import Line2D                         # noqa: E402
 from matplotlib.patches import Rectangle                    # noqa: E402
 from matplotlib.text import Text                            # noqa: E402
@@ -188,6 +194,10 @@ FS = {'tick': 12, 'axis': 12, 'letter': 14, 'title': 12, 'row': 11,
 MIN_FONT_PT = 9
 TICK_LABEL_GAP_IN = 0.03          # min gap between same-axis tick labels
 HALO_LW = 2.0                     # white stroke behind text over dots (pt)
+MARKER_TEXT_PAD_PT = 1.0          # marker_text_hits: annotation bbox pad
+BACKING_MIN_ALPHA = 0.85          # a text's bbox patch at least this
+                                  # opaque, drawn above a marker layer,
+                                  # hides that layer's points
 UNIT_TITER = 'g·L$^{-1}$'
 UNIT_PROD = 'g·L$^{-1}$·h$^{-1}$'
 UNIT_PROTEOME = 'g·(g DCW)$^{-1}$'
@@ -733,16 +743,124 @@ def tick_label_collisions(fig, tol_px=0.5, min_gap_in=TICK_LABEL_GAP_IN):
     return msgs
 
 
+def _axes_tree(fig):
+    """Every axes of the figure, child (inset) axes included."""
+    out, stack = [], list(fig.axes)
+    while stack:
+        a = stack.pop(0)
+        if a not in out:
+            out.append(a)
+            stack.extend(getattr(a, 'child_axes', []))
+    return out
+
+
+def _marker_centres(artist):
+    """Display centres (N x 2) of the points a scatter (PathCollection) or a
+    marker-drawing Line2D shows, clipped to its clip box; None if it draws
+    no markers."""
+    if not artist.get_visible() or artist.get_alpha() == 0:
+        return None
+    if isinstance(artist, PathCollection):
+        offs = np.asarray(artist.get_offsets(), float).reshape(-1, 2)
+        if not len(offs) or not np.any(np.asarray(artist.get_sizes()) > 0):
+            return None
+        pts = artist.get_offset_transform().transform(offs)
+    elif isinstance(artist, Line2D):
+        if artist.get_marker() in (None, '', ' ', 'None', 'none'):
+            return None
+        xy = np.asarray(artist.get_xydata(), float).reshape(-1, 2)
+        if not len(xy):
+            return None
+        pts = artist.get_transform().transform(xy)
+    else:
+        return None
+    pts = pts[np.all(np.isfinite(pts), axis=1)]
+    clip = artist.get_clip_box() if artist.get_clip_on() else None
+    if clip is not None and len(pts):
+        pts = pts[(pts[:, 0] >= clip.x0) & (pts[:, 0] <= clip.x1)
+                  & (pts[:, 1] >= clip.y0) & (pts[:, 1] <= clip.y1)]
+    return pts
+
+
+def _backing_zorder(t):
+    """zorder of the opaque backing box under Text `t` (its bbox patch with
+    face alpha >= BACKING_MIN_ALPHA), or None."""
+    patch = t.get_bbox_patch()
+    if patch is None or not patch.get_visible():
+        return None
+    a = patch.get_facecolor()[3]          # artist alpha already applied
+    return t.get_zorder() if a >= BACKING_MIN_ALPHA else None
+
+
+def marker_text_hits(fig, pad_pt=MARKER_TEXT_PAD_PT, exempt=()):
+    """Scatter / marker points under annotation text, per axes (insets
+    included): a point counts when its display-coordinate centre falls
+    inside an annotation text's window extent (the text alone, not an
+    annotation's leader arrow) padded by `pad_pt` -- unless the text
+    carries an opaque backing box (bbox patch, face alpha >=
+    BACKING_MIN_ALPHA) drawn above the point's layer (text zorder > the
+    artist's), which hides it. Annotation texts = each axes' ax.texts
+    (ax.text / ax.annotate), checked against that axes' points, plus the
+    figure-level texts (fig.text), checked against every axes' points (a
+    figure text draws above the axes, so its backing box hides them all);
+    tick and axis labels are not annotations. `exempt`: Text artists to
+    ignore. Draws the canvas first. Returns a list of messages; [] =
+    pass."""
+    fig.canvas.draw()
+    r = fig.canvas.get_renderer()
+    ex = {id(t) for t in exempt}
+    pad = float(pad_pt) * fig.dpi / 72.0
+    layers = {}
+    for i, ax in enumerate(_axes_tree(fig)):
+        if not ax.get_visible():
+            continue
+        for art in list(ax.collections) + list(ax.lines):
+            pts = _marker_centres(art)
+            if pts is not None and len(pts):
+                layers.setdefault(i, []).append((art, pts))
+    jobs = [(t, i, False) for i, ax in enumerate(_axes_tree(fig))
+            if i in layers for t in ax.texts]
+    jobs += [(t, i, True) for t in fig.texts for i in layers]
+    msgs = []
+    for t, i, at_fig in jobs:
+        if (id(t) in ex or not t.get_visible() or t.get_alpha() == 0
+                or not t.get_text().strip()):
+            continue
+        bb = Text.get_window_extent(t, r)         # the text, not its arrow
+        if bb.width <= 0 or bb.height <= 0:
+            continue
+        zb = _backing_zorder(t)
+        if zb is not None and at_fig:
+            continue                              # above every axes
+        for art, pts in layers[i]:
+            if zb is not None and zb > art.get_zorder():
+                continue                          # hidden under the box
+            n = int(((pts[:, 0] > bb.x0 - pad) & (pts[:, 0] < bb.x1 + pad)
+                     & (pts[:, 1] > bb.y0 - pad)
+                     & (pts[:, 1] < bb.y1 + pad)).sum())
+            if n:
+                lab = art.get_label()
+                lab = '' if lab.startswith('_') else f' {lab!r}'
+                msgs.append(f'{n} marker centre(s) under '
+                            f'{t.get_text()!r} [{"fig.text over " if at_fig else ""}'
+                            f'ax{i}; {type(art).__name__}{lab} z '
+                            f'{art.get_zorder():g}]')
+    return msgs
+
+
 def check_figure(fig, size=None, raise_on_fail=True, exempt=()):
     """Draw and run the render checks: text_overlaps, tick_label_collisions,
-    min_font_check, glyph_check (and the canvas size if `size` = (w, h)
-    inches is given). Prints every problem; raises FigureCheckError if any
-    (unless raise_on_fail=False). Returns {'overlaps', 'ticks', 'fonts',
-    'glyphs', 'size'} (lists of messages)."""
+    min_font_check, glyph_check, marker_text_hits (no scatter / marker point
+    under an annotation unless an opaque backing box hides it) and the
+    canvas size if `size` = (w, h) inches is given. `exempt` Text artists
+    are skipped by the overlap and marker checks. Prints every problem;
+    raises FigureCheckError if any (unless raise_on_fail=False). Returns
+    {'overlaps', 'ticks', 'fonts', 'glyphs', 'markers', 'size'} (lists of
+    messages)."""
     res = {'overlaps': text_overlaps(fig, exempt=exempt),
            'ticks': tick_label_collisions(fig),
            'fonts': min_font_check(fig), 'glyphs': glyph_check(fig),
-           'size': []}
+           'markers': marker_text_hits(fig, exempt=exempt), 'size': []}
     if size is not None:
         got = tuple(round(float(v), 4) for v in fig.get_size_inches())
         if got != tuple(round(float(v), 4) for v in size):

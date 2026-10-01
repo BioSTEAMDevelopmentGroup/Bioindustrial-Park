@@ -17,7 +17,7 @@ alongside a running simulation.
 | file | role |
 |---|---|
 | `_common.py` | Data layer. It holds the paths and the campaign registry, the cached loaders, and the one set of definitions. It also holds the proteome sectors, the decision bands, `compute_facts()`, `EXPECTED` and `check_facts()`. The public API is documented at the top of the file. |
-| `_style.py` | Style layer. It holds the palette, rcParams, `style_ticks` and inch-based placement. It provides the IRR / log-trial / logit axes, the loss band, plateau and tint helpers, and `inline_key`. It also holds the render checks (`text_overlaps`, `tick_label_collisions`, `min_font_check`, `glyph_check`, `check_figure`), the palette check (`cvd_check`) and `save()`. The public API is documented at the top of the file. |
+| `_style.py` | Style layer. It holds the palette, rcParams, `style_ticks` and inch-based placement. It provides the IRR / log-trial / logit axes, the loss band, plateau and tint helpers, and `inline_key`. It also holds the render checks (`text_overlaps`, `tick_label_collisions`, `min_font_check`, `glyph_check`, `marker_text_hits`, `check_figure`), the palette check (`cvd_check`) and `save()`. The public API is documented at the top of the file. |
 | `check_facts.py` | The folder's offline test. It prints every computed-vs-expected fact, the hard-coded-literal scan of the figure scripts, the palette check and the sim-safety check. It exits 1 on any mismatch. |
 | `fig_main_scouts.py` | Main figure (panels a–f), stem `kinBO_main_scouts`. |
 | `fig_s1_replicates.py` | Fig. S1, the replicate / honesty check, stem `kinBO_S1_replicates`. |
@@ -50,7 +50,8 @@ Every figure script must:
    the code. `check_facts.py` scans for them.
 3. call `_style.check_figure(fig, size=...)` after building. This draws the figure and
    checks text overlaps, same-axis tick collisions, the 9-pt font floor, Arial glyph
-   coverage and the canvas size. It raises `FigureCheckError` on any problem.
+   coverage, markers under text and the canvas size. It raises `FigureCheckError` on
+   any problem.
 4. call `_style.save(fig, stem)`.
 
 Minimal skeleton of a figure script:
@@ -183,3 +184,10 @@ All files are in `analyses/results/`. Study stems have the form
   major 4 pt, minor 2 pt.
 * On a horizontal IRR axis narrower than about 2.8 in, the "loss" and "0" tick labels
   collide. Use `irr_axis(ax, 'x', loss_fs=9)`.
+* No data marker may cross a letter. `marker_text_hits` (run by `check_figure`) flags
+  every scatter or marker point whose centre falls inside an annotation's text extent
+  (1-pt pad), per axes, insets included, plus figure-level text over any axes. A point
+  under an opaque backing box (face alpha ≥ 0.85, drawn above the point's layer) is
+  hidden and passes. Put labels on empty spots first; use a backing box only where no
+  spot is free, and say in the caption's methods notes what it hides. The main figure's
+  panel-b labels are placed this way by `_spot` / `_best_spot`.

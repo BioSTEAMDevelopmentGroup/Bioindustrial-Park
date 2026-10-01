@@ -47,6 +47,19 @@ limit, with every label next to its own marker; the caption states that
 the seeds held co-producers and is trimmed (detail moved to the methods
 notes).
 
+Round 5: no data marker under any letter. b's labels are placed by an
+exhaustive search (`_spot` / `_best_spot`, replacing `_place_label` and the
+round-4 sandwich, whose outlined designs ran through the letters) on spots
+no marker disk touches (asserted): '27.3 %' beside the star, the
+best-seed label above its ring with a leader, the 296-designs finding top
+left, the plateau label above the plateau's empty left end with a leader;
+the outlined-designs block, for which no spot below the starting strain is
+free, is the one label on an opaque white backing box, placed to hide the
+fewest outlined designs (never the best one; counts in the caption's
+methods notes). a's strip label moves off its two seeds, and the inset
+moves into the empty region between IRR 0 and the starting-strain label
+(`INSET_DATA`, clearances asserted by `inset_clearance`).
+
 SIM-SAFE: pandas / numpy / matplotlib only, through the sibling modules
 _common (data, definitions, facts) and _style (palette, axes, checks);
 enzyme_burden.py is read BY FILE PATH for the caption's housekeeping sector.
@@ -55,7 +68,10 @@ against `_common.EXPECTED` by `check_facts()` before drawing); the script also
 asserts the figure-level claims it prints (e.g. "ethanol only", "all
 co-production"), counts the loss dots against the facts, and checks that no
 annotation touches a key marker, connector, trajectory line, arrow or the
-inset (`mark_clashes`), on top of `_style.check_figure`.
+inset (`mark_clashes`) and that the inset sits clear of the 0 line and a's
+labels (`inset_clearance`), on top of `_style.check_figure` (which includes
+`marker_text_hits`: no scatter / marker centre under any annotation unless
+an opaque backing box hides it).
 
 Run:  "C:/Users/saran/anaconda3/envs/IBO_2026/python.exe" fig_main_scouts.py
       [--out-dir DIR] [--no-latest] [--no-caption]
@@ -105,11 +121,6 @@ CONNECTOR = dict(color='0.25', lw=1.1, solid_capstyle='butt')
 L = {
     'a_strip': (0.72, 4.55, 0.40, 2.85),
     'a': (1.17, 4.55, 4.20, 2.85),
-    # inset in axes fraction of a; 0.36 wide so its '1,000' tick label
-    # clears a's right spine (round 2); round 4: 0.28 tall with its trial
-    # labels on TOP (they sat in the loss band, 0.25 in above a's own
-    # '1,000'), clear of the starting-strain label
-    'a_inset': (0.585, 0.075, 0.36, 0.28),
     'b': (6.02, 4.55, 3.86, 2.85),
     # c ends 0.08 in short of the table's first column (round 3: the relay's
     # grey 'of 998' started 0.01 in from c's right spine)
@@ -118,6 +129,14 @@ L = {
     'e': (5.26, 0.72, 1.64, 2.58),
     'f': (7.52, 0.72, 2.36, 2.58),
 }
+# a's inset in a's DATA coordinates ((trials), (IRR %)), round 5: inside
+# the empty region above IRR = 0 and below the starting-strain label (its
+# frame dipped into the loss band and its top labels crowded the label
+# before); the right edge keeps its '1,000' label clear of a's right-spine
+# ticks (round 2). The clearances are asserted (inset_clearance)
+INSET_DATA = ((125.0, 1400.0), (0.9, 7.6))
+INSET_GAP_PT = 2.0                # min gap: inset (labels incl.) <-> the 0
+                                  # line, a's labels, a's right-spine ticks
 TABLE_X = (3.68, 4.15)            # centres of the two table columns
 GROUP_X = 0.12                    # group headers, left-aligned
 ROW_LABEL_X = 1.30                # row labels, right-aligned
@@ -158,31 +177,36 @@ BEST_SEED_LINE = dict(color=P['ibo_dark'], lw=0.9, ls=(0, (1.2, 1.6)),
                       zorder=1.15)
 
 RIGHT_PAD_PT = 5.0                # a: right-aligned labels, clear of ticks
-BLOCK_MAX_COVER = 5               # b: outlined designs touching its glyph
-                                  # bands (incl. a 2-px pad)
-BLOCK_X_MAX = 93.0                # b: the block's right edge (share, %)
-BLOCK_MAX_INSIDE = 3              # b: outlined design CENTRES inside the
-                                  # block's bounding box (round 4: no
-                                  # position clears all; drawn above the
-                                  # block's white under-copy, so visible)
+# b labels (round 5): every label on a spot no marker touches (LABEL_PAD_PT
+# clearance), inside the axes clear of the inward ticks (B_MARGINS_PT:
+# left, bottom, right, top); the outlined-designs block alone on a tight
+# white backing box above every dot layer (BLOCK_Z) and below the key marks
+LABEL_PAD_PT = 1.0
+LINE_CLEAR_PT = 1.0               # extra clearance from a reference line
+LABEL_LS = (1.15, 1.1, 1.0)       # multi-line labels: the most generous
+                                  # line spacing a free spot holds
+BLOCK_LS = (1.1,)                 # the block's line spacing
+INSET_LS = 1.05                   # the inset's two-line note
+B_MARGINS_PT = (3.0, 3.0, 5.0, 4.5)
+BLOCK_BOX_PAD = 0.25              # backing-box pad, fraction of the font size
+# opaque (>= S.BACKING_MIN_ALPHA): at alpha 0.9 the hidden designs showed
+# through as 10 % ghosts under the letters, which read as smudges
+BLOCK_BOX = dict(boxstyle=f'square,pad={BLOCK_BOX_PAD}', fc='white',
+                 ec='none', alpha=1.0)
+BLOCK_Z = 2.9                     # dots z 2 / outlined 2.6 < box < marks 5-7
+BLOCK_MAX_HIDDEN_OUTLINED = 4     # outlined designs the box may hide
+BLOCK_HIDDEN = {}                 # what the box hides (-> caption notes)
+RING_B_S = 42                     # b's isobutanol-TRY best-visit rings (pt^2)
+LEADER_LW = 0.7
+LEADER_MIN_GAP_PT = 3.0           # a label further above its line gets a
+                                  # leader
 # in-figure family names (lower case of C.FAMILY_LABEL: 'ethanol TRY')
 FAM_TEXT = {f: C.FAMILY_LABEL[f][0].lower() + C.FAMILY_LABEL[f][1:]
             for f in ('etoh', 'ibo')}
 
 ANNOT = []        # annotation Text artists checked against the marks
 MARKS = []        # key marks / lines / arrows annotations must not touch
-HALO_COPIES = []  # white under-copies of sandwiched labels (exempt from
-                  # the text-overlap check: each sits under its own label)
-# b's labels over the dot clouds are drawn in three layers (round 4):
-# a white copy (white fill + HALO_LW stroke) ABOVE the plain dots (z 2) and
-# BELOW the outlined uninformed designs (z 2.6), then the coloured text on
-# top with a hairline halo: the dots under the glyphs are hidden, every
-# outlined design stays visible, and no marker ring runs through a letter
-SANDWICH_Z = (2.5, 2.8)
-SANDWICH_UNDER_HALO = 4.5         # pt; closes the word spaces (Arial space
-                                  # at 9-10 pt = 2.5-2.8 pt): no plain dot
-                                  # shows between two words
-SANDWICH_TOP_HALO = 0.8
+A_TEXTS = {}      # a's labels the inset check refers to
 
 
 # %% Small helpers ---------------------------------------------------------------
@@ -195,20 +219,6 @@ def _ann(ax, s, xy, xytext=(0, 0), **kw):
                     annotation_clip=False, **kw)
     ANNOT.append(t)
     return t
-
-
-def _sandwich(ax, s, xy, xytext=(0, 0), **kw):
-    """A label in the three layers of SANDWICH_Z (see there); returns the
-    coloured top Text (registered in ANNOT like _ann's)."""
-    kw.setdefault('fontsize', S.FS['annot'])
-    kw.pop('zorder', None)
-    under = ax.annotate(s, xy=xy, xytext=xytext, textcoords='offset points',
-                        annotation_clip=False,
-                        **{**kw, 'color': 'white'}, zorder=SANDWICH_Z[0])
-    S.halo(under, lw=SANDWICH_UNDER_HALO)
-    HALO_COPIES.append(under)
-    return S.halo(_ann(ax, s, xy, xytext, zorder=SANDWICH_Z[1], **kw),
-                  lw=SANDWICH_TOP_HALO)
 
 
 def _mark(ax, x, y, marker, s, face, edge, lw=0.0, z=5, check=True):
@@ -455,9 +465,25 @@ def panel_a(fig, F):
     S.halo(_ann(strip, FAM_TEXT['etoh'].split()[0], (0.25, F['U_pct']),
                 (0, 4), ha='center', va='bottom', rotation=90,
                 fontsize=S.FS['key'], color=P['etoh_dark']))
-    S.halo(_ann(strip, FAM_TEXT['ibo'].split()[0], (0.75, 0.0), (0, 3),
-                ha='center', va='bottom', rotation=90,
-                fontsize=S.FS['key'], color=P['ibo_dark']))
+    # round 5: 'isobutanol' on the free stretch of its column nearest the
+    # column's foot (the round-4 label sat over two seeds under a halo)
+    sc_strip = [c for c in strip.collections
+                if isinstance(c, PathCollection)]
+    st_strict = [c for c in sc_strip if c in MARKS]
+    pt = fig.dpi / 72.0
+    fx, fy = strip.transData.transform((0.75, 0.0))
+    xs = strip.transData.transform(
+        [(x, 0.0) for x in np.arange(0.55, 0.9501, 0.005)])[:, 0]
+    ys = np.arange(fy + 2.0 * pt, strip.transData.transform((0, U))[1], 1.0)
+    A = np.array([(x, y) for x in xs for y in ys])
+    sp = _spot(strip, FAM_TEXT['ibo'].split()[0],
+               dict(ha='center', va='bottom', rotation=90,
+                    fontsize=S.FS['key'], color=P['ibo_dark']), A,
+               pts=_disks(fig, [c for c in sc_strip if c not in st_strict]),
+               strict_pts=_disks(fig, st_strict),
+               hlines=[0.0, U, best_seed], margins_pt=(3.0, 1.0, 5.0, 1.0),
+               cost=np.abs(A[:, 0] - fx) + 0.5 * (A[:, 1] - fy))
+    S.halo(_put(strip, sp, []))
     strip.set_ylabel(S.bold_axis_title('IRR [%]'), labelpad=2)
     # header: the seeds and the scout trials they were picked from (so the
     # trial axis is not read as the whole compute)
@@ -536,7 +562,8 @@ def panel_a(fig, F):
     # the right-aligned labels end RIGHT_PAD_PT short of x = 2,000 (round 3:
     # at 0 pt 'trial 104,' and 'trials' touched the right-spine ticks)
     rp = -RIGHT_PAD_PT
-    _ann(ax, f'starting strain {C.fmt_irr(start)}', (2000, start), (rp, -3),
+    A_TEXTS['start'] = _ann(
+        ax, f'starting strain {C.fmt_irr(start)}', (2000, start), (rp, -3),
          ha='right', va='top', fontsize=fs, color=NOTE)
     _ann(ax, f'best seed {C.fmt_irr(best_seed)}', (2000, best_seed), (rp, 3),
          ha='right', va='bottom', fontsize=fs, color=P['ibo_dark'])
@@ -566,7 +593,10 @@ def panel_a(fig, F):
     MARKS.append(con)
 
     # inset: refinement of the TRY-informed best so far
-    ins = ax.inset_axes(L['a_inset'])
+    (ix0, ix1), (iy0, iy1) = INSET_DATA
+    f0, f1 = ax.transAxes.inverted().transform(
+        ax.transData.transform([(ix0, iy0), (ix1, iy1)]))
+    ins = ax.inset_axes([f0[0], f0[1], f1[0] - f0[0], f1[1] - f0[1]])
     ins.set_facecolor('white')
     for sp in ins.spines.values():
         sp.set_color('0.6')
@@ -590,12 +620,14 @@ def panel_a(fig, F):
     ins.tick_params(axis='x', which='both', labeltop=True, labelbottom=False)
     # bottom right, under the flat line (top left touched the trial-871 dot
     # once the inset was narrowed). In IRR, the inset's own axis (round 3:
-    # the PI values, a second metric, live in caption (a))
+    # the PI values, a second metric, live in caption (a)). Round 5: two
+    # lines, right of the trial 25-100 steps (one line now spans the
+    # shorter inset's width and ran into the trial-25 dot)
     v25 = rel['sims'][25]['bsf_pct']
-    ins.text(0.96, 0.08, f"refined: {C.fmt_num(v25, 1)} → "
+    ins.text(0.95, 0.07, f"refined:\n{C.fmt_num(v25, 1)} → "
                          f"{C.fmt_irr(rb['irr_pct'])}",
              transform=ins.transAxes, ha='right', va='bottom',
-             fontsize=S.FS['note'], color=P['relay'])
+             fontsize=S.FS['note'], color=P['relay'], linespacing=INSET_LS)
     S.style_ticks(ax)
     ax.tick_params(axis='y', which='both', labelleft=False)
     return ax, strip, ins
@@ -654,7 +686,7 @@ def panel_b(fig, F):
     for k in C.IBO_SCOUTS:
         bv = camp[k]['best_visit']
         _ring(ax, bv['share_pct'], bv['irr_pct'], C.campaign(k).marker,
-              P['ibo_dark'], s=42, lw=1.3, z=6)
+              P['ibo_dark'], s=RING_B_S, lw=1.3, z=6)
     rb = F['relay']['best']
     ub = camp['unin']['best_visit']
     _mark(ax, rb['share_pct'], rb['irr_pct'], '*', 140, P['relay'], 'white',
@@ -662,202 +694,317 @@ def panel_b(fig, F):
     _mark(ax, ub['share_pct'], ub['irr_pct'], 'D', 50, P['unin'], 'white',
           0.6, z=7)
 
-    # labels: no boxes; the labels over dot clouds are sandwiches
-    # (_sandwich, SANDWICH_Z: the dots under the glyphs hidden, the outlined
-    # uninformed designs kept visible, the letters on top). The fixed
-    # labels first, then the two free ones placed by search (round 3: the
-    # old fixed spots hid three outlined uninformed designs and sat on teal
-    # dots)
-    # round 4: the ring is the isobutanol TRY campaigns' best visit AND the
-    # best seed (a's dotted violet line): one name, 'best seed', as in a
-    iy_bv = camp['iy']['best_visit']
-    fixed = [
-        _sandwich(ax, f"{FAM_TEXT['ibo']} best\n= best seed, "
-                      f"{C.fmt_irr(best_seed)}",
-                  (iy_bv['share_pct'], iy_bv['irr_pct']), (-1, 7),
-                  ha='right', va='bottom', color=P['ibo_dark'],
-                  linespacing=1.1)]
-    g = F['global']
-    fixed.append(S.halo(_ann(
-        ax, f"{g['n_relay_gt_best_seed']} designs above "
-            f"{C.fmt_irr(best_seed)}: all TRY-informed co-production",
-        (50, S.IRR_LIM[1]), (0, -4), ha='center', va='top', fontsize=9.5,
-        color=P['relay'])))
-    fixed.append(S.halo(_ann(ax, C.fmt_irr(rb['irr_pct']),
-                             (rb['share_pct'], rb['irr_pct']), (8, 0),
-                             ha='left', va='center', fontsize=S.FS['note'],
-                             color=P['relay'])))
-    # obstacles. STRICT (never under a label): the key marks, the four
-    # reference lines, the fixed labels. COVER: the outlined uninformed
-    # isobutanol designs, counted against each line's glyph band, then
-    # their centres inside the bounding box; no position of the block
-    # clears all of them (they are scattered over x 17-75 %, y 0-13 %), so
-    # the block takes the position covering the fewest and is drawn as a
-    # sandwich (SANDWICH_Z): the covered designs print ABOVE its white
-    # under-copy and BELOW its letters (round 4: rings ran through letters
-    # under the round-3 hairline halo). SOFT: every other dot (minimised;
-    # hidden under the glyphs)
+    # labels (round 5): no data marker under any letter. Every label but
+    # the outlined-designs block sits where no marker disk touches its text
+    # box (_spot; asserted): '27.3 %' beside the star, the TRY-informed
+    # finding top left, the best-seed label top right with a leader down to
+    # its ring, the plateau label over the plateau's empty left end with a
+    # leader down to the line. No position between the 0 and
+    # starting-strain lines is free for the block at 9 pt (dots everywhere
+    # over 0-100 %), so it is the one label on a tight white backing box
+    # (BLOCK_BOX, above every dot layer, below the key marks), placed where
+    # the box hides the fewest outlined designs, then the fewest dots; the
+    # counts go to the caption's methods notes (BLOCK_HIDDEN)
     strict = [m for m in MARKS if isinstance(m, PathCollection)
               and m.axes is ax]
-    soft = [c for c in ax.collections if isinstance(c, PathCollection)
-            and c not in strict and c is not sc2]
-    hlines = [0.0, start, U, best_seed]
+    data = [c for c in ax.collections if isinstance(c, PathCollection)
+            and c not in strict]
+    pts, outl, strict_pts = (_disks(fig, data), _disks(fig, [sc2]),
+                             _disks(fig, strict))
+    common = dict(pts=pts, strict_pts=strict_pts,
+                  hlines=[0.0, start, U, best_seed], margins_pt=B_MARGINS_PT)
+    fs = S.FS['note']
+    pt = fig.dpi / 72.0
+    to_px = ax.transData.transform
+    abb = ax.bbox
+    placed = []                       # boxes (px) later labels keep clear of
+
+    # '27.3 %' beside the star: right of it, else above it
+    sx, sy = to_px((rb['share_pct'], rb['irr_pct']))
+    o = np.array([(dx, dy) for dx in np.arange(6.0, 20.01, 0.5)
+                  for dy in np.arange(-8.0, 10.01, 0.5)])
+    sp_r = _spot(ax, C.fmt_irr(rb['irr_pct']),
+                 dict(fontsize=fs, color=P['relay'], ha='left', va='center'),
+                 np.c_[sx + o[:, 0] * pt, sy + o[:, 1] * pt],
+                 cost=np.hypot(o[:, 0] - 6.0, o[:, 1]) * pt, **common)
+    o = np.array([(dx, dy) for dx in np.arange(-6.0, 6.01, 0.5)
+                  for dy in np.arange(7.0, 16.01, 0.5)])
+    sp_a = _spot(ax, C.fmt_irr(rb['irr_pct']),
+                 dict(fontsize=fs, color=P['relay'], ha='center',
+                      va='bottom'),
+                 np.c_[sx + o[:, 0] * pt, sy + o[:, 1] * pt],
+                 cost=(np.hypot(o[:, 0], o[:, 1] - 7.0) + 6.0) * pt, **common)
+    sp = min(sp_r, sp_a, key=lambda q: q['score'])
+    _put(ax, sp, placed)
+
+    # the ring (isobutanol TRY best visit = best seed): the lowest free
+    # spot above it that spans its x, with a vertical leader down to it
+    # (placed before the TRY-informed finding, which can go anywhere)
+    iy_bv = camp['iy']['best_visit']
+    rx, ry = to_px((iy_bv['share_pct'], iy_bv['irr_pct']))
+    xs = np.arange(rx - 1.0, abb.x1 + 0.5, 1.0)
+    ys = np.arange(abb.y1, ry, -1.0)
+    A = np.array([(x, y) for x in xs for y in ys])
+    sp = _best_spot(ax, [f"{FAM_TEXT['ibo']} best\n= best seed, "
+                         f"{C.fmt_irr(best_seed)}"],
+                    dict(fontsize=fs, color=P['ibo_dark'], ha='right',
+                         va='top'), A,
+                    lambda box: (box[:, 1] - ry) + 0.3 * (box[:, 2] - rx),
+                    within_x=rx, avoid=placed, **common)
+    _put(ax, sp, placed, leader_to=(rx, ry),
+         shrink_pt=np.sqrt(RING_B_S) / 2 + 1.5, color=P['ibo_dark'],
+         pts_all=pts)
+
+    # the TRY-informed finding: the free spot nearest the top-left corner,
+    # under the top ticks; two lines if a free spot holds them, else four
+    # short ones (the cloud's top reaches the two-line box's bottom edge)
+    g = F['global']
+    n296, bs = g['n_relay_gt_best_seed'], C.fmt_irr(best_seed)
+    xs = np.arange(abb.x0, abb.x0 + 0.6 * abb.width, 1.0)
+    ys = np.arange(abb.y1, to_px((0, best_seed))[1], -1.0)
+    A = np.array([(x, y) for x in xs for y in ys])
+    sp = _best_spot(ax, [f"{n296} designs above {bs}:\n"
+                         f"all TRY-informed co-production",
+                         f"{n296} designs\nabove {bs}:\nall TRY-informed"
+                         f"\nco-production"],
+                    dict(fontsize=fs, color=P['relay'], ha='left', va='top'),
+                    A, (abb.y1 - A[:, 1]) + 0.3 * (A[:, 0] - abb.x0),
+                    avoid=placed, **common)
+    _put(ax, sp, placed)
+
+    # the plateau label: above the dashed line, as close as an empty spot
+    # allows (one or two lines); a vertical leader down to the line when it
+    # sits more than LEADER_MIN_GAP_PT above it
+    _, uy = to_px((0, U))
+    xs = np.arange(abb.x0, abb.x0 + 0.75 * abb.width, 1.5)
+    ys = np.arange(uy + 2.0 * pt, to_px((0, best_seed))[1], 1.0)
+    A = np.array([(x, y) for x in xs for y in ys])
+    # (cost = the gap to the line: the nearest free spot wins, then the
+    # preferred wrap / spacing)
+    sp = _best_spot(ax, [f'uninformed plateau {C.fmt_irr(U)}',
+                         f'uninformed\nplateau {C.fmt_irr(U)}'],
+                    dict(fontsize=fs, color=P['unin_text'], ha='left',
+                         va='bottom'), A,
+                    lambda box: (box[:, 1] - uy) + 0.2 * (box[:, 0] - abb.x0),
+                    steps=(1e-3, 1e-2), avoid=placed, **common)
+    lead = sp['box'].y0 - uy > LEADER_MIN_GAP_PT * pt
+    _put(ax, sp, placed, color=P['unin_text'],
+         leader_to=(None, uy) if lead else None,
+         pts_all=np.vstack([pts, strict_pts]))
+
+    # the outlined uninformed designs' block, on its backing box: between
+    # the 0 and starting-strain lines, wrapped three ways
     ui = F['unin']['ibo_ge5']
     lt = F['unin']['ibo_lt5']
     thr = f'{C.IBO_THRESHOLD:g} {S.UNIT_TITER}'
-    # the plateau label: along the dashed line, just above or below it
-    plat_kw = dict(ha='left', color=P['unin_text'])
-    cands = [((x, U), (0, dy), {'va': va}) for x in np.arange(1.0, 56.0, 1.0)
-             for dy, va in ((2.5, 'bottom'), (-2.5, 'top'))]
-    xy_p, off, kw, sc_p = _place_label(
-        ax, f'uninformed plateau {C.fmt_irr(U)}', plat_kw, cands, strict,
-        [sc2], soft, [h for h in hlines if h != U], fixed)
-    t_plat = _sandwich(ax, f'uninformed plateau {C.fmt_irr(U)}', xy_p, off,
-                       **plat_kw, **kw)
-    # the uninformed isobutanol designs' block: between the 0 line and the
-    # starting-strain line, right of the cyan column
-    # round 4: three lines instead of four (less area over the data)
-    blk = (f"{ui['n']} uninformed designs with ≥ {thr}\n"
-           f"isobutanol (outlined): best "
-           f"{C.fmt_irr(ui['max_irr_pct'])},\n"
-           f"{_pct0(ui['pct_losing'])} lose money (vs "
-           f"{_pct0(lt['pct_losing'])} of the rest)")
-    blk_kw = dict(ha='center', va='center', fontsize=S.FS['note'],
-                  color=P['unin_text'], linespacing=1.15)
-    cands = [((x, y), (0, 0), {}) for x in np.arange(20.0, 90.0, 0.5)
-             for y in np.arange(1.5, 12.01, 0.25)]
-    # x_range: clear of the ethanol (x < 5 %) and isobutanol-only
-    # (x > BLOCK_X_MAX %) dot columns, whose dots the block's white
-    # under-copy would hide
-    xy, off, kw, sc_b = _place_label(ax, blk, blk_kw, cands, strict, [sc2],
-                                     soft, hlines, fixed + [t_plat],
-                                     x_range=(5.0, BLOCK_X_MAX))
-    _sandwich(ax, blk, xy, off, **blk_kw)
-    # the checks: no key mark, reference line or other label under either
-    # label; the plateau label covers no outlined design; the block covers
-    # at most BLOCK_MAX_COVER glyph bands / BLOCK_MAX_INSIDE centres
-    assert sc_p[:4] == (0, 0, 0, 0) and sc_b[0] == 0, (sc_p, sc_b)
-    assert sc_b[2] <= BLOCK_MAX_COVER, sc_b
-    assert sc_b[3] <= BLOCK_MAX_INSIDE, sc_b
-    print(f'b labels: plateau at {xy_txt(xy_p)} {kw_txt(sc_p)}, block at '
-          f'{xy_txt(xy)} {kw_txt(sc_b)}')
+    n_ui, best_ui = ui['n'], C.fmt_irr(ui['max_irr_pct'])
+    lose_ui, lose_lt = _pct0(ui['pct_losing']), _pct0(lt['pct_losing'])
+    wraps = (f"{n_ui} uninformed designs with ≥ {thr}\nisobutanol "
+             f"(outlined): best {best_ui},\n{lose_ui} lose money (vs "
+             f"{lose_lt} of the rest)",
+             f"{n_ui} uninformed designs with\n≥ {thr} isobutanol "
+             f"(outlined):\nbest {best_ui}, {lose_ui} lose money\n(vs "
+             f"{lose_lt} of the rest)",
+             f"{n_ui} uninformed designs\nwith ≥ {thr} isobutanol\n"
+             f"(outlined): best {best_ui},\n{lose_ui} lose money\n(vs "
+             f"{lose_lt} of the rest)")
+    y_lo, y_hi = to_px((0, 0.0))[1], to_px((0, start))[1]
+    xs = np.arange(abb.x0, abb.x1, 1.5)
+    ys = np.arange(y_lo, y_hi, 1.0)
+    A = np.array([(x, y) for x in xs for y in ys])
+    blk_kw = dict(fontsize=fs, color=P['unin_text'], ha='center',
+                  va='center', bbox=BLOCK_BOX, zorder=BLOCK_Z)
+    sp = _best_spot(ax, wraps, blk_kw, A,
+                    np.abs(A[:, 0] - 0.5 * (abb.x0 + abb.x1)) * 0.01,
+                    lss=BLOCK_LS, key_pts=outl,
+                    grow_px=BLOCK_BOX_PAD * fs * pt, avoid=placed, **common)
+    assert sp['score'][0] == 0, f"block: {sp['score']}"
+    _put(ax, sp, placed, boxed=True)
+    hb = sp['box'].padded(0.0)
+    BLOCK_HIDDEN.update(
+        outlined=int(_n_touch(outl, hb.extents[None], 0.0)[0]),
+        dots=int(_n_touch(pts, hb.extents[None], 0.0)[0]),
+        alpha=BLOCK_BOX['alpha'])
+    BLOCK_HIDDEN['other'] = BLOCK_HIDDEN['dots'] - BLOCK_HIDDEN['outlined']
+    assert BLOCK_HIDDEN['outlined'] <= BLOCK_MAX_HIDDEN_OUTLINED, BLOCK_HIDDEN
+    # the design the block quotes ('best ...') stays visible
+    top = outl[[int(np.argmax(outl[:, 1]))]]
+    assert _n_touch(top, hb.extents[None], LABEL_PAD_PT * pt)[0] == 0,         'the block hides the best outlined design'
+    print(f"b block: box hides {BLOCK_HIDDEN['outlined']} of {n_ui} "
+          f"outlined designs + {BLOCK_HIDDEN['other']} other dots "
+          f"(score {sp['score'][:4]})")
     S.style_ticks(ax)
     return ax
 
 
-def xy_txt(xy):
-    return f'({xy[0]:.1f}, {xy[1]:.2f})'
+# %% Label placement (round 5) --------------------------------------------------
+def _disks(fig, cols):
+    """(N x 3) [x, y, radius] display px of the finite points of the
+    scatter collections `cols`."""
+    out = [np.zeros((0, 3))]
+    for c in cols:
+        p = np.asarray(c.get_offset_transform().transform(c.get_offsets()),
+                       float).reshape(-1, 2)
+        p = p[np.all(np.isfinite(p), axis=1)]
+        r = float(np.sqrt(np.max(c.get_sizes())) / 2 * fig.dpi / 72)
+        out.append(np.column_stack([p, np.full(len(p), r)]))
+    return np.vstack(out)
 
 
-def kw_txt(score):
-    return (f'(covers {score[2]} outlined designs (weight {score[1]}), '
-            f'{score[3]} centres inside, {score[4]} dots)')
-
-
-def _word_spans(fig, line, fontsize):
-    """(line width, [(x0, x1, weight) of each word from the line start]) in
-    display px (prefix widths, so kerning and the spaces are as rendered);
-    weight 2 for a word with a digit (a number under a marker is worse
-    than a word), else 1."""
-    words, spans, pos = line.split(' '), [], 0
-    for w in words:
-        a = _text_w_in(fig, line[:pos], fontsize) if pos else 0.0
-        b = _text_w_in(fig, line[:pos + len(w)], fontsize)
-        wt = 2 if any(ch.isdigit() for ch in w) else 1
-        spans.append((a * fig.dpi, b * fig.dpi, wt))
-        pos += len(w) + 1
-    return _text_w_in(fig, line, fontsize) * fig.dpi, spans
-
-
-def _line_boxes(bb, lines, ha):
-    """Approximate glyph boxes (display px) of the WORDS of a multi-line
-    label with bounding box `bb` (`lines` = [_word_spans(...)]): equal line
-    slots, the glyph band 5-92 % of each slot from its top, each line
-    aligned by `ha`; [(Bbox, weight)]. Round 4: per word, so a marker in a word space (which
-    the label's white under-copy leaves visible, see SANDWICH_Z) is not
-    counted as under the text."""
-    n, h = len(lines), bb.height
-    out = []
-    for i, (w, spans) in enumerate(lines):
-        top = bb.y1 - i * h / n
-        y0, y1 = top - 0.92 * h / n, top - 0.05 * h / n
-        if ha == 'center':
-            x0 = 0.5 * (bb.x0 + bb.x1) - w / 2
-        elif ha == 'right':
-            x0 = bb.x1 - w
-        else:
-            x0 = bb.x0
-        out += [(mtransforms.Bbox([[x0 + a, y0], [x0 + b, y1]]), wt)
-                for a, b, wt in spans]
+def _n_touch(pts, boxes, pad, chunk=256):
+    """(M,) number of disks of `pts` (N x 3 [x, y, r] px) touching each box
+    of `boxes` (M x 4 [x0, y0, x1, y1] px) grown by `pad` px."""
+    boxes = np.atleast_2d(np.asarray(boxes, float))
+    out = np.zeros(len(boxes), int)
+    if not len(pts) or not len(boxes):
+        return out
+    e = pts[:, 2] + pad
+    lo, hi = boxes.min(0), boxes.max(0)
+    keep = ((pts[:, 0] > lo[0] - e) & (pts[:, 0] < hi[2] + e)
+            & (pts[:, 1] > lo[1] - e) & (pts[:, 1] < hi[3] + e))
+    x, y, e = pts[keep, 0], pts[keep, 1], e[keep]
+    for i in range(0, len(boxes), chunk):
+        b = boxes[i:i + chunk]
+        hit = ((x > b[:, :1] - e) & (x < b[:, 2:3] + e)
+               & (y > b[:, 1:2] - e) & (y < b[:, 3:4] + e))
+        out[i:i + chunk] = hit.sum(1)
     return out
 
 
-def _place_label(ax, s, kw, candidates, strict, cover, soft, hlines, texts,
-                 pad_px=2.0, x_range=None):
-    """The best candidate (xy, offset_pt, extra_kw) for a label: inside the
-    axes, then lexicographically fewest (STRICT scatter points under its
-    bbox + horizontal lines in `hlines` (data y) crossing it + `texts` it
-    overlaps; COVER scatter points under its line glyph bands; COVER centres
-    inside its bbox; SOFT dot centres inside it). Strict / cover points
-    count when their marker disk touches the box.
-    `x_range` (data x0, x1): the bbox must also lie within it.
-    Returns (xy, offset, extra_kw, (n_strict, cover weight (numbers x 2),
-    n_cover, n_inside, n_soft)).
-    """
+def _extent(ax, s, kw):
+    """Window extent of label `s` (annotate kwargs `kw`, without any bbox
+    patch) relative to its anchor: [dx0, dy0, dx1, dy1] px."""
+    r = ax.figure.canvas.get_renderer()
+    probe = ax.annotate(s, xy=(0.5, 0.5), xycoords='axes fraction',
+                        annotation_clip=False, **kw)
+    bb = probe.get_window_extent(r)
+    probe.remove()
+    a = ax.transAxes.transform((0.5, 0.5))
+    return np.array([bb.x0 - a[0], bb.y0 - a[1], bb.x1 - a[0], bb.y1 - a[1]])
+
+
+def _spot(ax, s, kw, anchors, *, pts, strict_pts, hlines=(), avoid=(),
+          key_pts=None, grow_px=0.0, cost=None, within_x=None,
+          margins_pt=(1.0, 1.0, 1.0, 1.0), pad_pt=LABEL_PAD_PT):
+    """The best anchor (display px, M x 2 `anchors`) for label `s`.
+
+    The label's box (its text extent grown by `grow_px`, e.g. a backing
+    patch) must lie inside the axes by `margins_pt` (left, bottom, right,
+    top: clear of the inward ticks) and, with `within_x`, reach that x
+    (from 3 pt right of its left edge to 1 pt past its right edge).
+    Candidates are ranked lexicographically by (STRICT: key-mark disks
+    touching + reference lines `hlines` (data y) crossing + `avoid` boxes
+    overlapped; `key_pts` disks touching; `pts` disks touching; `cost`),
+    every touch within `pad_pt`. `cost`: an (M,) array, or a function of
+    the (M x 4) boxes. Returns {'xy' (data), 'box' (Bbox px), 'score',
+    's', 'kw'}."""
     fig = ax.figure
-    r = fig.canvas.get_renderer()
+    pt = fig.dpi / 72.0
+    pad = pad_pt * pt
+    ext = _extent(ax, s, {k: v for k, v in kw.items() if k != 'bbox'})
+    A = np.asarray(anchors, float).reshape(-1, 2)
+    boxes = np.column_stack([A[:, 0] + ext[0] - grow_px,
+                             A[:, 1] + ext[1] - grow_px,
+                             A[:, 0] + ext[2] + grow_px,
+                             A[:, 1] + ext[3] + grow_px])
+    abb = ax.bbox
+    ml, mb, mr, mt = (m * pt for m in margins_pt)
+    ok = ((boxes[:, 0] > abb.x0 + ml) & (boxes[:, 2] < abb.x1 - mr)
+          & (boxes[:, 1] > abb.y0 + mb) & (boxes[:, 3] < abb.y1 - mt))
+    if within_x is not None:
+        ok &= (boxes[:, 0] + 3.0 * pt < within_x) & \
+              (boxes[:, 2] + 1.0 * pt > within_x)
+    c = (np.zeros(len(A)) if cost is None
+         else cost(boxes) if callable(cost) else np.asarray(cost, float))
+    A, boxes, c = A[ok], boxes[ok], c[ok]
+    assert len(A), f'no candidate inside the axes for {s!r}'
+    n_strict = _n_touch(strict_pts, boxes, pad)
+    lpad = pad + LINE_CLEAR_PT * pt       # lines: + their half width
+    for h in hlines:
+        y = ax.transData.transform((1.0, h))[1]
+        n_strict += ((boxes[:, 1] - lpad < y)
+                     & (boxes[:, 3] + lpad > y)).astype(int)
+    for b in avoid:
+        n_strict += ((boxes[:, 0] < b.x1 + pad) & (boxes[:, 2] > b.x0 - pad)
+                     & (boxes[:, 1] < b.y1 + pad)
+                     & (boxes[:, 3] > b.y0 - pad)).astype(int)
+    n_key = (_n_touch(key_pts, boxes, pad) if key_pts is not None
+             else np.zeros(len(A), int))
+    n_all = _n_touch(pts, boxes, pad)
+    i = np.lexsort((c, n_all, n_key, n_strict))[0]
+    return {'xy': ax.transData.inverted().transform(A[i]),
+            'box': mtransforms.Bbox(boxes[i].reshape(2, 2)),
+            'score': (int(n_strict[i]), int(n_key[i]), int(n_all[i]),
+                      float(c[i])),
+            's': s, 'kw': kw}
 
-    def pts(cols):
-        out = []
-        for c in cols:
-            xy = c.get_offset_transform().transform(c.get_offsets())
-            rad = float(np.sqrt(np.max(c.get_sizes())) / 2 * fig.dpi / 72)
-            out.append((xy, rad))
-        return out
 
-    def n_touch(groups, bb, disk=True):
-        n = 0
-        for p, rad in groups:
-            e = (rad + pad_px) if disk else 0.0
-            n += int(((p[:, 0] > bb.x0 - e) & (p[:, 0] < bb.x1 + e)
-                      & (p[:, 1] > bb.y0 - e) & (p[:, 1] < bb.y1 + e)).sum())
-        return n
-
-    strict_p, cover_p, soft_p = pts(strict), pts(cover), pts(soft)
-    # widths (px) of the label's lines: COVER points count against the
-    # glyph band of each line, not the block's bounding box (a ragged
-    # multi-line block leaves gaps a marker can sit in, unhidden)
-    fs = kw.get('fontsize', S.FS['annot'])
-    lws = [_word_spans(fig, ln, fs) for ln in s.split('\n')]
-    ly = [ax.transData.transform((0, h))[1] for h in hlines]
-    tbb = [t.get_window_extent(r) for t in texts]
-    abb = ax.get_window_extent(r)
-    if x_range is not None:
-        xr0, xr1 = (ax.transData.transform((v, 0))[0] for v in x_range)
+def _best_spot(ax, texts, kw, anchors, cost, lss=LABEL_LS, steps=(1e4, 1e5),
+               **spot_kw):
+    """The best `_spot` over a label's wraps `texts` (preferred first) x line
+    spacings `lss` (most generous first): each rank down costs steps[1]
+    (wrap) / steps[0] (spacing) on top of `cost` (array or function of the
+    boxes), so a free spot always wins, then -- with the default steps --
+    the preferred wrap, then the most generous spacing, then `cost`."""
     best = None
-    for xy, off, extra in candidates:
-        probe = ax.annotate(s, xy=xy, xytext=off, textcoords='offset points',
-                            annotation_clip=False, **kw, **extra)
-        bb = probe.get_window_extent(r)
-        probe.remove()
-        if (bb.x0 < abb.x0 + pad_px or bb.x1 > abb.x1 - pad_px
-                or bb.y0 < abb.y0 + pad_px or bb.y1 > abb.y1 - pad_px):
-            continue
-        if x_range is not None and (bb.x0 < xr0 or bb.x1 > xr1):
-            continue
-        n_strict = n_touch(strict_p, bb)
-        n_strict += sum(1 for y in ly if bb.y0 - pad_px < y < bb.y1 + pad_px)
-        n_strict += sum(1 for t in tbb if bb.overlaps(t))
-        hits = [(n_touch(cover_p, lb), wt)
-                for lb, wt in _line_boxes(bb, lws, (kw | extra).get(
-                    'ha', 'left'))]
-        score = (n_strict, sum(n * wt for n, wt in hits),
-                 sum(n for n, _ in hits), n_touch(cover_p, bb, False),
-                 n_touch(soft_p, bb, False))
-        if best is None or score < best[3]:
-            best = (xy, off, extra, score)
-    assert best is not None, f'no candidate position for {s!r}'
+    for k, s in enumerate(texts):
+        for i, ls in enumerate(lss):
+            extra = steps[1] * k + steps[0] * i
+            c = ((lambda box, f=cost, e=extra: f(box) + e) if callable(cost)
+                 else np.asarray(cost, float) + extra)
+            sp = _spot(ax, s, {**kw, 'linespacing': ls}, anchors, cost=c,
+                       **spot_kw)
+            if best is None or sp['score'] < best['score']:
+                best = sp
     return best
+
+
+def _put(ax, sp, placed, boxed=False, leader_to=None,
+         shrink_pt=0.5, color=None, pts_all=None):
+    """Draw the label `_spot` chose; unboxed labels must be free (no key
+    mark, line, label or dot touching: asserted). `leader_to` = (x, y)
+    display px of a vertical leader's end below the label (x None = pick
+    the x along the label's bottom whose segment touches no dot of
+    `pts_all`, nearest its left quarter; a given x is checked against
+    `pts_all` too). Appends the label's box (and the
+    leader's) to `placed`; returns the annotation."""
+    s, kw = sp['s'], dict(sp['kw'])
+    print(f"label {s.splitlines()[0]!r} (+{s.count(chr(10))} lines, spacing "
+          f"{kw.get('linespacing', 1.2):g}): score {sp['score'][:3]}"
+          f"{' boxed' if boxed else ''}{' + leader' if leader_to else ''}")
+    if not boxed:
+        assert sp['score'][:3] == (0, 0, 0), \
+            f'{s!r} is not on a free spot: {sp["score"]}'
+    box = sp['box']
+    fig = ax.figure
+    pt = fig.dpi / 72.0
+    if leader_to is None:
+        t = _ann(ax, s, tuple(sp['xy']), **kw)
+        placed.append(box)
+        return t
+    lx, ly = leader_to
+    y_end = ly + shrink_pt * pt * (1 if box.y0 > ly else -1)
+    cand = (np.arange(box.x0 + 4 * pt, box.x1 - 4 * pt, 1.0) if lx is None
+            else np.array([lx]))
+    segs = np.column_stack([cand - pt, np.full(len(cand), min(y_end, box.y0)),
+                            cand + pt, np.full(len(cand), max(y_end, box.y0))])
+    n = _n_touch(pts_all, segs, LABEL_PAD_PT * pt)
+    pref = box.x0 + 0.25 * box.width
+    j = np.lexsort((np.abs(cand - pref), n))[0]
+    assert n[j] == 0, f'the leader of {s!r} runs through {n[j]} dot(s)'
+    lx = cand[j]
+    tx, ty = ax.transData.inverted().transform((lx, ly))
+    rel = ((lx - box.x0) / box.width, 0.0)
+    t = ax.annotate(s, xy=(tx, ty), xytext=tuple(sp['xy']),
+                    textcoords='data', annotation_clip=False,
+                    arrowprops=dict(arrowstyle='-', color=color or TEXT,
+                                    lw=LEADER_LW, relpos=rel, shrinkA=1.0,
+                                    shrinkB=shrink_pt), **kw)
+    ANNOT.append(t)
+    MARKS.append(t.arrow_patch)
+    placed += [box, mtransforms.Bbox([[lx - pt, min(ly, box.y0)],
+                                      [lx + pt, max(ly, box.y0)]])]
+    return t
 
 
 def key_b(fig):
@@ -1254,7 +1401,7 @@ def mark_clashes(fig, texts, marks, regions=(), pad_px=1.0):
     for t in texts:
         if not t.get_visible() or not t.get_text().strip():
             continue
-        bb = t.get_window_extent(r)
+        bb = Text.get_window_extent(t, r)         # the text, not its arrow
         for m, xy, rad in pts:
             if getattr(t, 'arrow_patch', None) is m:
                 continue
@@ -1282,7 +1429,8 @@ def mark_clashes(fig, texts, marks, regions=(), pad_px=1.0):
 def build(F):
     ANNOT.clear()
     MARKS.clear()
-    HALO_COPIES.clear()
+    BLOCK_HIDDEN.clear()
+    A_TEXTS.clear()
     fig = S.new_figure(*S.MAIN_SIZE)
     ax_a, strip, ins = panel_a(fig, F)
     ax_b = panel_b(fig, F)
@@ -1335,12 +1483,48 @@ def build(F):
                      e=ax_e, f=ax_f)
 
 
+def inset_clearance(fig, axes, gap_pt=INSET_GAP_PT):
+    """a's inset, its tick labels included, must sit wholly in a's empty
+    region: >= `gap_pt` above the IRR = 0 line, >= `gap_pt` below every a
+    label it lies under, and inside a clear of the right-spine ticks.
+    Returns a list of messages; [] = pass."""
+    fig.canvas.draw()
+    r = fig.canvas.get_renderer()
+    ax, ins = axes['a'], axes['inset']
+    tb = ins.get_tightbbox(r)
+    gap = gap_pt * fig.dpi / 72.0
+    msgs = []
+    y0 = ax.transData.transform((1.0, 0.0))[1]
+    if tb.y0 < y0 + gap:
+        msgs.append(f'inset reaches {(tb.y0 - y0) * 72 / fig.dpi:.1f} pt '
+                    f'from the IRR = 0 line (< {gap_pt} pt)')
+    for t in ANNOT:
+        if t.axes is not ax:
+            continue
+        lb = t.get_window_extent(r)
+        if lb.x1 > tb.x0 and lb.x0 < tb.x1 and lb.y0 >= tb.y0 \
+                and lb.y0 < tb.y1 + gap:
+            msgs.append(f'inset top {(lb.y0 - tb.y1) * 72 / fig.dpi:.1f} pt '
+                        f'below {t.get_text()!r} (< {gap_pt} pt)')
+    tick_pt = 4.0                         # a's inward right-spine ticks
+    if (tb.x1 > ax.bbox.x1 - (tick_pt * fig.dpi / 72.0 + gap)
+            or tb.x0 < ax.bbox.x0 or tb.y1 > ax.bbox.y1):
+        msgs.append(f'inset {tb} not inside a clear of its spine ticks')
+    a = A_TEXTS['start'].get_window_extent(r)
+    print(f'inset: {(tb.y0 - y0) * 72 / fig.dpi:.1f} pt above IRR = 0, '
+          f'{(a.y0 - tb.y1) * 72 / fig.dpi:.1f} pt under the starting-'
+          f'strain label, {(ax.bbox.x1 - tb.x1) * 72 / fig.dpi:.1f} pt from '
+          f"a's right spine; frame {ins.bbox.width / fig.dpi:.2f} x "
+          f'{ins.bbox.height / fig.dpi:.2f} in')
+    return msgs
+
+
 def run_checks(fig, axes, raise_on_fail=True):
-    res = S.check_figure(fig, size=S.MAIN_SIZE, raise_on_fail=False,
-                         exempt=HALO_COPIES)
+    res = S.check_figure(fig, size=S.MAIN_SIZE, raise_on_fail=False)
     fig.canvas.draw()
     inset_bb = axes['inset'].get_tightbbox(fig.canvas.get_renderer())
     clashes = mark_clashes(fig, ANNOT, MARKS, regions=[('inset', inset_bb)])
+    clashes += inset_clearance(fig, axes)
     for m in clashes:
         S._safe_print(f'[marks] {m}')
     print(f'mark checks: {len(clashes)} problem(s)')
@@ -1361,7 +1545,7 @@ def _eb():
 METHODS_MARK = '*Methods notes (not part of the legend).*'
 
 
-def caption(F):
+def caption(F, hidden=None):
     """The legend (title + panels + synthesis, every number from the facts)
     followed by a short block of methods notes that belong in Methods, not
     in the legend (round 2: the legend was 788 words)."""
@@ -1532,6 +1716,14 @@ def caption(F):
         f"{C.fmt_trial(25)} to {C.fmt_irr(rb['irr_pct'])} at "
         f"{C.fmt_trial(rb['sim'])}, PI {pi25:.2f} → {pi_best:.2f}. (b) No "
         f"design making < {thr} {unit} isobutanol exceeds {U} (b's title).",
+        *(["* (b) The outlined designs' label sits on "
+           + ("an opaque white box" if hidden['alpha'] >= 0.999 else
+              f"a white box ({hidden['alpha'] * 100:.0f} % opaque)")
+           + f" (no position between IRR 0 and the starting strain is free "
+           f"of designs) that hides "
+           f"{WORDS.get(hidden['outlined'], hidden['outlined'])} of the "
+           f"{ib5['n']} outlined designs, none the best, and "
+           f"{hidden['other']} other designs."] if hidden else []),
         f"* (e) Pdc and ALS→Aro10 commit carbon to ethanol and isobutanol; "
         f"light shades: Adh1, Adh6. Constant proteome sectors are omitted; "
         f"the "
@@ -1586,7 +1778,7 @@ def main(argv=None):
         print(f'DRAFT: {n_bad} render-check problem(s); not a release render')
         sys.exit(1)
     if not args.no_caption:
-        txt = caption(F)
+        txt = caption(F, hidden=dict(BLOCK_HIDDEN))
         with open(CAPTION_PATH, 'w', encoding='utf-8') as fh:
             fh.write(txt)
         n_leg = len(txt.split(METHODS_MARK)[0].split())

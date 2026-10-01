@@ -19,6 +19,7 @@ Neither objective alone reliably returned a profitable co-producer here (unseede
 * (b) omits the 1,352 designs making < 1 g·L⁻¹ alcohol (none has an IRR); ethanol TRY designs lie mostly under the uninformed column. The uninformed campaign proposed 95 of its 97 isobutanol-making designs after trial 104 (5 % of its later trials). (c) The ethanol TRY campaigns returned 8.1–12.7 %.
 * (f) The replicate uninformed campaign made isobutanol in 38 % of its trials and found its best design at trial 1,603; the unseeded runs reached 25 % only at trial 104, or never. The seeded runs' best seeds were 22.9 % and 25.1 %.
 * (a) Inset: 26.2 % at trial 25 to 27.3 % at trial 913, PI 0.73 → 0.81. (b) No design making < 5 g·L⁻¹ isobutanol exceeds 15.8 % (b's title).
+* (b) The outlined designs' label sits on an opaque white box (no position between IRR 0 and the starting strain is free of designs) that hides three of the 97 outlined designs, none the best, and 12 other designs.
 * (e) Pdc and ALS→Aro10 commit carbon to ethanol and isobutanol; light shades: Adh1, Adh6. Constant proteome sectors are omitted; the four designs beyond the budget grow at ×0.84, ×0.63, ×0.30, ×0.997 of their penalty-free rate. The scouts' 11,968 simulations are by-products of the TRY campaigns.
 * The best design lies at five search bounds, so higher IRR may exist outside the searched ranges.
 * IRRs are at default prices under the model version used for the campaigns (starting strain 12.6 %; 12.8 % under the current model version).
