@@ -62,6 +62,7 @@ IRR axes
     logit_pct_axis(ax, which='x', ticks_pct=(1, 2, 5, ..., 90),
                    lim_pct=(0.8, 93))  logit share axis (plot FRACTIONS)
     loss_band(ax, which='y'), plateau_line(ax, U_pct, which='y', **kw),
+    halo(text, lw=2) white stroke behind a label over dots (no bbox)
     start_line(ax, start_pct, which='y', **kw), tint_above(ax, U_pct,
     which='y'), panel_rng() (np.random.default_rng(0), one per panel)
 Campaign encodings
@@ -74,7 +75,9 @@ Keys
                                    (glyphs drawn as markers, not Unicode)
 Render checks (call after building the figure)
     text_overlaps(fig, exempt=(), tol_px=0.5) -> [str]  (empty = pass)
-    tick_label_collisions(fig) -> [str]  same-axis tick labels that overlap
+    tick_label_collisions(fig, min_gap_in=0.03) -> [str]  same-axis tick
+                                   labels that overlap, or x-axis labels
+                                   closer than 0.03 in (e.g. 'loss0')
     min_font_check(fig, min_pt=9) -> [str]
     glyph_check(fig) -> [str]      characters Arial cannot render
     check_figure(fig, size=None, raise_on_fail=True, exempt=()) -> dict
@@ -177,6 +180,8 @@ DPI = 300
 FS = {'tick': 12, 'axis': 12, 'letter': 14, 'title': 12, 'row': 11,
       'table': 11, 'annot': 10, 'note': 9, 'key': 9}
 MIN_FONT_PT = 9
+TICK_LABEL_GAP_IN = 0.03          # min gap between same-axis tick labels
+HALO_LW = 2.0                     # white stroke behind text over dots (pt)
 UNIT_TITER = 'g·L$^{-1}$'
 UNIT_PROD = 'g·L$^{-1}$·h$^{-1}$'
 UNIT_PROTEOME = 'g·(g DCW)$^{-1}$'
@@ -461,6 +466,16 @@ def tint_above(ax, U_pct, which='y'):
                 lw=0, zorder=0.05)
 
 
+def halo(t, lw=HALO_LW, color='white'):
+    """A thin white stroke behind a Text (instead of an opaque bbox): keeps a
+    label legible over dots while hiding only the dots under its glyphs.
+    Returns the Text."""
+    from matplotlib import patheffects
+    t.set_path_effects([patheffects.withStroke(linewidth=lw,
+                                               foreground=color)])
+    return t
+
+
 def panel_rng():
     """The per-panel jitter generator (spec: default_rng(0), one per panel,
     fixed draw order)."""
@@ -677,12 +692,19 @@ def glyph_check(fig):
     return msgs
 
 
-def tick_label_collisions(fig, tol_px=0.5):
-    """Tick labels of the SAME axis that overlap each other (e.g. 'loss' vs
-    '0' on a narrow horizontal IRR axis). text_overlaps exempts same-axis
-    tick labels from each other (spec 2); this stricter check catches the
-    real collisions among them. Returns a list of messages; [] = pass."""
+def tick_label_collisions(fig, tol_px=0.5, min_gap_in=TICK_LABEL_GAP_IN):
+    """Tick labels of the SAME axis that overlap or nearly touch each other.
+    text_overlaps exempts same-axis tick labels from each other (spec 2);
+    this stricter check catches the real collisions among them:
+      * x-axis labels (side by side) collide when they overlap vertically
+        and their horizontal gap is below `min_gap_in` inches (default 0.03
+        in) -- e.g. 'loss' and '0' abutting as 'loss0' on a narrow
+        horizontal IRR axis (round 2);
+      * y-axis labels (stacked) collide only when they overlap (> tol_px in
+        both directions), as before.
+    Returns a list of messages; [] = pass."""
     fig.canvas.draw()
+    gap = float(min_gap_in) * fig.dpi
     by_axis = {}
     for t, bb, owner, w in _drawn_texts(fig):
         if owner is not None:
@@ -694,7 +716,11 @@ def tick_label_collisions(fig, tol_px=0.5):
             for tj, bj, wj in items[i + 1:]:
                 dx = min(bi.x1, bj.x1) - max(bi.x0, bj.x0)
                 dy = min(bi.y1, bj.y1) - max(bi.y0, bj.y0)
-                if dx > tol_px and dy > tol_px:
+                if 'xtick' in wi:
+                    hit = dy > tol_px and dx > -gap
+                else:
+                    hit = dx > tol_px and dy > tol_px
+                if hit:
                     msgs.append(f'tick labels collide: {ti.get_text()!r} x '
                                 f'{tj.get_text()!r} [{wi}] ({dx:.1f} x '
                                 f'{dy:.1f} px)')

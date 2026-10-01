@@ -786,6 +786,17 @@ def _compute_facts():
         'final_PI': float(unin_c['PI'].max()),
         'n_bsf_changes': int(len(changes)),   # finite best-so-far steps
     }
+    # when the uninformed campaign proposed its isobutanol-making designs:
+    # in the shared space-filling start-up, or by its GP after the plateau
+    sims_u = unin_c['sim'].to_numpy(int)
+    n_su = _leading_identical_rows(('unin',) + SCOUT_KEYS,
+                                   list(DECISION_VARS))
+    post = sims_u > unin['plateau_sim']
+    unin['ibo_ge5'].update({
+        'n_startup': int((ib5 & (sims_u <= n_su)).sum()),
+        'n_after_plateau': int((ib5 & post).sum()),
+        'pct_of_post_plateau': 100.0 * float(ib5[post].mean()),
+    })
     facts['unin'] = unin
 
     # --- the seeds (relay manifest)
@@ -886,6 +897,16 @@ def _compute_facts():
             load_trajectory('unin_rep').head(51)[dec].to_numpy(float),
             load_trajectory('unin').head(51)[dec].to_numpy(float))),
         'scouts': rep_scouts,
+        # the two replicate profitability campaigns (panel f, Fig. S1)
+        'profit_stats': {
+            k: {'exploration_pct': st['exploration_pct'],
+                'n_gt_U': st['n_gt_U'],
+                'best_irr_pct': st['best_visit']['irr_pct'],
+                'best_etoh': st['best_visit']['etoh'],
+                'best_ibo': st['best_visit']['ibo'],
+                'best_class': st['best_visit']['class']}
+            for k, st in ((k, campaign_stats(k, U))
+                          for k in ('unin_rep', 'relay_rep'))},
     }
 
     # --- returned-design proteome and products (section 1.6)
@@ -1057,7 +1078,9 @@ EXPECTED = {
     },
     'unin': {
         'ibo_ge5': {'n': E(97), 'max_irr_pct': E('13.86'),
-                    'pct_no_irr': E('43.3'), 'pct_losing': E('63.9')},
+                    'pct_no_irr': E('43.3'), 'pct_losing': E('63.9'),
+                    'n_startup': E(2), 'n_after_plateau': E(95),
+                    'pct_of_post_plateau': E('5.0')},
         'ibo_lt5': {'n': E(1900), 'pct_no_irr': E('21.0'),
                     'pct_losing': E('33.4')},
         'last_neginf_sim': E(24), 'first_finite_sim': E(25),
@@ -1149,6 +1172,14 @@ EXPECTED = {
             103: {'irr_pct': E('25.09'), 'ibo': E('30.7'), 'etoh': E('46.7')},
         },
         'unin_rep_startup_identical': E(False),
+        'profit_stats': {
+            'unin_rep': {'exploration_pct': E('38.3'), 'n_gt_U': E(609),
+                         'best_irr_pct': E('27.26'), 'best_etoh': E('29.2'),
+                         'best_ibo': E('41.7'), 'best_class': E('coprod')},
+            'relay_rep': {'exploration_pct': E('77.6'), 'n_gt_U': E(639),
+                          'best_irr_pct': E('27.14'),
+                          'best_class': E('coprod')},
+        },
         'scouts': {
             'rep_iy': {'best_visit_irr_pct': E('25.13'),
                        'returned_irr_pct': E('15.45'), 'n_gt_U': E(92),
