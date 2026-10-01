@@ -87,7 +87,12 @@ LETTER_A_X, LETTER_B_X = 0.06, 5.02
 BAND_ROWS = (3.50, 3.355, 3.21, 3.065, 2.92, 2.775)
 LINE_LW = 2.2                                     # step-line width (a)
 DASH = (0, (4, 2))                                # replicate line style
-LEADER = dict(lw=0.7, solid_capstyle='butt')      # label leader (a)
+# 'replicate: co-producing' (a): no leader; the label hangs directly under
+# the dashed line's first >= 25 % segment, its left end just right of that
+# segment's open circle. Offsets in points from the circle centre
+CIRC25_S, CIRC25_LW = 30, 1.3                     # first-25 % circles
+CP_GAP_X_PT = 1.5                                 # circle edge -> text left
+CP_GAP_Y_PT = 1.2                                 # line edge -> text top
 # Best-design markers sit at their TRUE positions. The two TRY-informed bests
 # (trials 913 / 824, IRR 27.3 / 27.1 %) are ~4 pt apart on the log axis, so
 # this work's filled star is drawn larger and the replicate's smaller
@@ -433,8 +438,9 @@ def draw_panel_a(fig, facts, F):
         if f25 is None:
             continue
         s, b = series[key]
-        ax.scatter([f25], [100.0 * C.bsf_at(s, b, f25)], s=30, marker='o',
-                   facecolor='white', edgecolor=P[ckey], lw=1.3, zorder=6)
+        ax.scatter([f25], [100.0 * C.bsf_at(s, b, f25)], s=CIRC25_S,
+                   marker='o', facecolor='white', edgecolor=P[ckey],
+                   lw=CIRC25_LW, zorder=6)
     # best design: filled marker for this work, white-faced for the
     # replicate, every one at its true (trial, IRR). The two TRY-informed
     # stars nearly coincide: this work's is larger, the replicate's smaller
@@ -474,9 +480,9 @@ def draw_panel_a(fig, facts, F):
     x_end = facts['campaigns']['unin']['max_sim']
     # product labels of the two unseeded lines, each naming its line
     # ("this work" / "replicate") and attached to it: the solid line's label
-    # sits on the line; the dashed line's hangs below it with a leader up
-    # to the line at x_lead, where no other line runs (the TRY-informed
-    # lines end at trial 1,000)
+    # sits on the line; the dashed line's hangs directly under it, starting
+    # just right of the line's first-25 % circle, where the dashed line is
+    # the nearest line above the text (the TRY-informed lines run higher)
     ax.text(x_end, U_pct + 0.45, 'this work: ethanol only',
             color=P['unin_text'], fontsize=S.FS['note'], style='italic',
             ha='right', va='bottom', zorder=8)
@@ -484,26 +490,19 @@ def draw_panel_a(fig, facts, F):
             color=P['unin_text'], fontsize=S.FS['annot'], fontweight='bold',
             ha='right', va='bottom', zorder=8)
     s_r, b_r = series['unin_rep']
-    cp_txt = 'replicate: co-producing'
-    cp_w = _text_w_in(fig, cp_txt, fontsize=S.FS['note'], style='italic')
-    # data x of the label's left end (display -> data on the log axis)
-    px_end = ax.transData.transform((x_end, 0.0))[0]
-    x_left = ax.transData.inverted().transform(
-        (px_end - cp_w * fig.dpi, 0.0))[0]
-    lo = 100.0 * float(b_r[np.searchsorted(s_r, x_left) - 1:].min())
-    y_cp = lo - 0.6                                  # text top
-    ax.text(x_end, y_cp, cp_txt, color=P['unin_text'],
-            fontsize=S.FS['note'], style='italic', ha='right', va='top',
-            zorder=8)
-    relay_end = max(C.complete(k)['sim'].max() for k in ('relay',
-                                                          'relay_rep'))
-    x_lead = float(relay_end * (x_end / relay_end) ** 0.4)
-    y_line = 100.0 * C.bsf_at(s_r, b_r, x_lead)
-    if not relay_end < x_lead < x_end:
-        raise C.FactsMismatch('co-producing leader not clear of the '
-                              'TRY-informed lines')
-    ax.plot([x_lead, x_lead], [y_cp + 0.45, y_line], color=P['unin_text'],
-            zorder=2.9, label='_leader', **LEADER)
+    x_cp = prog['unin_rep']['first_ge25']            # its open circle
+    if x_cp is None:
+        raise C.FactsMismatch('replicate uninformed never reached 25 %')
+    y_cp = 100.0 * C.bsf_at(s_r, b_r, x_cp)
+    # the best-so-far line only rises, so the segment at the label's left
+    # end is the lowest stretch of line above the whole label
+    circ_r_pt = np.sqrt(CIRC25_S) / 2.0 + CIRC25_LW / 2.0   # its radius
+    ax.annotate('replicate: co-producing', xy=(x_cp, y_cp),
+                xycoords='data', textcoords='offset points',
+                xytext=(circ_r_pt + CP_GAP_X_PT,
+                        -(LINE_LW / 2.0 + CP_GAP_Y_PT)),
+                color=P['unin_text'], fontsize=S.FS['note'],
+                style='italic', ha='left', va='top', zorder=8)
     ax.text(x_end, facts['start_irr_pct'] - 0.7,
             f"starting strain {C.fmt_pct(facts['start_irr_pct'])}",
             color=S.NOTE, fontsize=S.FS['note'], ha='right', va='top',
@@ -851,8 +850,7 @@ def build_caption(facts, F):
         f'best-so-far '
         f'design of the two unseeded campaigns (co-producing = at least '
         f'{C.IBO_THRESHOLD:g} g·L⁻¹ each of isobutanol and ethanol; ethanol '
-        f'only = less than {C.IBO_THRESHOLD:g} g·L⁻¹ isobutanol); the '
-        f'replicate\'s label hangs from its dashed line on a leader. The '
+        f'only = less than {C.IBO_THRESHOLD:g} g·L⁻¹ isobutanol). The '
         f'table above the axes gives, for each pair, this work / replicate. '
         f'Its first two rows apply to the seeded campaigns only: the IRR of '
         f'the best preloaded seed and the first simulated trial that beat '
