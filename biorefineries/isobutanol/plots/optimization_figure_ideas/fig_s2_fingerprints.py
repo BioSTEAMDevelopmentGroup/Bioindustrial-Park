@@ -246,12 +246,16 @@ def fmt_fold(f):
 
 
 def fmt_abs(v):
+    """Absolute g/L/h at two significant figures ('0.0012', '0.012', '0.57',
+    '1.8'), so a value just above the 0.001 search floor never prints as the
+    floor itself (only the outlined at-bound cells read '0.001'; review r2)
+    and small values keep the same precision as the rest of the block."""
     if v == 0:
         return '0'
-    if v < 0.01:
-        return f'{v:.3f}'
     if v < 1.0:
-        return f'{v:.2f}'
+        s = f'{v:.2g}'
+        if s != '1':              # 0.995 <= v < 1 falls through to '1.0'
+            return s
     return f'{v:.1f}'
 
 
@@ -643,8 +647,14 @@ def draw(facts, items):
                                     fontsize=FS_CELL, color=sub, ha='left',
                                     va='center', zorder=3)]
                 else:
-                    txts = [ax.text(x + CW / 2, yc,
-                                    cell_text(b.key, col.var, v, base),
+                    txt = cell_text(b.key, col.var, v, base)
+                    if (b.key == 'path' and r['kind'] != 'base'
+                            and col.var not in r['hits']):
+                        # an un-outlined cell must not read as the floor
+                        assert txt != fmt_abs(C.BANDS[col.var][0]), (
+                            f'{r["label"]} {col.var} = {v!r} prints as the '
+                            f'search floor {txt!r} but is not at the bound')
+                    txts = [ax.text(x + CW / 2, yc, txt,
                                     fontsize=FS_CELL, color=tc, ha='center',
                                     va='center', zorder=3)]
                 for t in txts:
