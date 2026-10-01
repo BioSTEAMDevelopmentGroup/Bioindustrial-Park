@@ -149,7 +149,9 @@ PALETTE = {
     'ibo_dark': '#5E4385',      # isobutanol-scout markers, headers
     'ibo_light': '#BFAEDA',     # isobutanol-scout dots / strips
     'adh1': '#F3D9A6',          # light shade of Pdc (e)
-    'adh6': '#D3C6E8',          # light shade of ALS->Aro10 (e)
+    'adh6': '#C2B2DE',          # light shade of ALS->Aro10 (e); darkened
+                                # round 3 (was #D3C6E8: adh1/adh6 OKLab
+                                # 12.3 < the dataviz normal floor 15)
     'gly': '#8C8C8C',           # glycolysis (e)
     'tca': '#CFCFCF',           # TCA + acetate (e)
     'base': '#90918e',          # starting strain line / open diamond

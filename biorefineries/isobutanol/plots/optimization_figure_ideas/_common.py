@@ -890,8 +890,18 @@ def _compute_facts():
             'exploration_pct': st['exploration_pct'],
             'n_complete': st['n_complete']}
     dec = list(DECISION_VARS)
+    # the two SEEDED campaigns, like for like: each one's best preloaded
+    # seed and the first simulated trial above it (main caption, Fig. S1)
+    seeded = {}
+    for k in ('relay', 'relay_rep'):
+        m = man if k == 'relay' else load_manifest(k)
+        bs_k = float(m['IRR'].max())
+        seeded[k] = {'best_seed_pct': _pct(bs_k),
+                     'first_gt_best_seed': first_sim(
+                         complete(k), bs_k + ABOVE_EPS, strict=True)}
     facts['replicates'] = {
         'progress': rep_prog,
+        'seeded': seeded,
         'unin_rep_walk': walk,
         'unin_rep_startup_identical': bool(np.allclose(
             load_trajectory('unin_rep').head(51)[dec].to_numpy(float),
@@ -1164,6 +1174,12 @@ EXPECTED = {
                           'first_ge25': E(19), 'best_pct': E('27.14'),
                           'best_sim': E(824), 'at25_pct': E('25.59'),
                           'at100_pct': E('26.66')},
+        },
+        'seeded': {
+            'relay': {'best_seed_pct': E('22.898'),
+                      'first_gt_best_seed': E(13)},
+            'relay_rep': {'best_seed_pct': E('25.13'),
+                          'first_gt_best_seed': E(19)},
         },
         'unin_rep_walk': {
             63: {'irr_pct': E('17.25'), 'ibo': E('11.8'), 'etoh': E('110.2')},
