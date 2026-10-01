@@ -306,7 +306,7 @@ def plot_bars_stack(table, path, metrics=STACK_METRICS):
         t = table[table.metric == m]
         _draw_index_bars(ax, t, order)
         q2, reliable = t.Q2.iloc[0], bool(t.reliable.iloc[0])
-        ax.set_ylabel(STACK_TITLES.get(m, m), fontsize=12)
+        ax.set_ylabel(STACK_TITLES.get(m, m), fontsize=12, fontweight='bold')
         # surrogate fit inside the panel, top left (the tallest bars sit below 0.7)
         ax.text(0.015, 0.95, f'Q$^2$ = {q2:.2f}' + ('' if reliable else ' (unreliable)'),
                 transform=ax.transAxes, ha='left', va='top', fontsize=10)
@@ -315,7 +315,7 @@ def plot_bars_stack(table, path, metrics=STACK_METRICS):
             ax.tick_params(labelbottom=False)
     # inside the top (PI) panel: its bars descend left to right, so the upper right is empty
     axes[0].legend(loc='upper right', frameon=False)
-    fig.supylabel('Share of variance', fontsize=12)
+    fig.supylabel('Share of variance for …', fontsize=12, fontweight='bold')
     fig.tight_layout(h_pad=0.6)
     fig.savefig(path + '.png', dpi=600, bbox_inches='tight')
     fig.savefig(path + '.pdf', bbox_inches='tight')
