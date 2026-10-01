@@ -83,7 +83,7 @@ COLOR_AXES = {
                 levels=IRR_LEVELS, cbar_ticks=IRR_CBAR_TICKS,
                 cbar_minor_step=IRR_CBAR_MINOR_STEP, extend='min',
                 reverse=True, under_color=IRR_UNDER_COLOR,
-                title=fs.bold_title('IRR', '%'), tick_fmt='{:.0f}',
+                title=fs.bold_title('Profitability as IRR', '%'), tick_fmt='{:.0f}',
                 reference_lines=IRR_REFERENCE_LINES),
 }
 
