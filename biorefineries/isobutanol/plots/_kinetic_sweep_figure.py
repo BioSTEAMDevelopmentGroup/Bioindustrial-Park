@@ -87,8 +87,9 @@ class SweepFigure:
     [pt]. `mesp_levels` / `mesp_cbar_ticks` / `mesp_cbar_minor_step` override
     the default colour scale; `comparison_range` = (low, high) $/GGE hatches
     the region whose MESP lies in that range (e.g. ETHANOL_MARKET_RANGE);
-    `baseline` = (x, y) marks the baseline point with an unlabelled white
-    diamond."""
+    `baseline` = (x, y) marks the baseline point with a white diamond, and
+    `baseline_callout` = (label, label offset [pt], arrow curvature) labels it
+    in the optima's callout style (None = no label)."""
     output_stem: str
     csv_prefix: str
     spec_1: np.ndarray
@@ -111,6 +112,7 @@ class SweepFigure:
     mesp_cbar_minor_step: float = None
     comparison_range: tuple = None
     baseline: tuple = None
+    baseline_callout: tuple = None
 
 #%% Sweep data
 
@@ -181,11 +183,25 @@ def draw_panel(figure, fig, ax, cax):
                    colors=[COMPARISON_LINE_RGBA], linewidths=COMPARISON_LINE_WIDTH,
                    zorder=3)
 
-    # baseline point: unlabelled white diamond, black outline
+    def callout(label, xy, where, offset, rad, size):
+        ax.annotate(label, xy=xy, xycoords=where, xytext=offset,
+                    textcoords='offset points', fontsize=FONTS['annotation'],
+                    color=figure.label_color.get(label, 'black'),
+                    ha=figure.label_ha.get(label, 'left' if offset[0] >= 0 else 'right'),
+                    va='bottom' if offset[1] >= 0 else 'top', zorder=11,
+                    annotation_clip=False,
+                    arrowprops=dict(arrowstyle='-|>', mutation_scale=9, color='black', lw=0.9,
+                                    shrinkA=1, shrinkB=size/2 + 1,
+                                    connectionstyle=f'arc3,rad={rad}'))
+
+    # baseline point: white diamond, black outline, + its callout
     if figure.baseline is not None:
         ax.plot(*figure.baseline, linestyle='none', marker='D', markersize=BASELINE_MARKER_SIZE,
                 markerfacecolor='white', markeredgecolor='black',
                 markeredgewidth=0.8, zorder=9, clip_on=False)
+        if figure.baseline_callout is not None:
+            label, offset, rad = figure.baseline_callout
+            callout(label, figure.baseline, 'data', offset, rad, BASELINE_MARKER_SIZE)
 
     # optimum markers + labels
     optima = {}
@@ -199,15 +215,7 @@ def draw_panel(figure, fig, ax, cax):
         ax.plot(ox, oy, linestyle='none', marker=marker, markersize=size,
                 markerfacecolor=color, markeredgecolor='black',
                 markeredgewidth=0.8, zorder=10, clip_on=False, transform=where)
-        ax.annotate(label, xy=(ox, oy), xycoords=where, xytext=offset,
-                    textcoords='offset points', fontsize=FONTS['annotation'],
-                    color=figure.label_color.get(label, 'black'),
-                    ha=figure.label_ha.get(label, 'left' if offset[0] >= 0 else 'right'),
-                    va='bottom' if offset[1] >= 0 else 'top', zorder=11,
-                    annotation_clip=False,
-                    arrowprops=dict(arrowstyle='-|>', mutation_scale=9, color='black', lw=0.9,
-                                    shrinkA=1, shrinkB=size/2 + 1,
-                                    connectionstyle=f'arc3,rad={rad}'))
+        callout(label, (ox, oy), where, offset, rad, size)
 
     ax.xaxis.set_major_locator(MultipleLocator(figure.x_major))
     ax.xaxis.set_minor_locator(AutoMinorLocator(figure.x_minor_div))

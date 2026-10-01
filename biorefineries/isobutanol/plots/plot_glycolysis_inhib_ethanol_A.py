@@ -84,6 +84,7 @@ FIGURE = ksf.SweepFigure(
     comparison_range=ksf.ETHANOL_MARKET_RANGE,
     # scenario-A baseline (both multipliers 1x)
     baseline=(1., 1.),
+    baseline_callout=('baseline', (-8, 26), 0.3),
 )
 
 if __name__ == '__main__':
