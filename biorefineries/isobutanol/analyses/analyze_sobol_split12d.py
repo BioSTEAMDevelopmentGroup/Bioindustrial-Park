@@ -302,11 +302,14 @@ def plot_bars_stack(table, path, metrics=STACK_METRICS):
     fig, axes = plt.subplots(len(metrics), 1, sharex=True, squeeze=False,
                              figsize=(7.5, 1.9*len(metrics) + 1.6))
     axes = axes[:, 0]
-    for ax, m in zip(axes, metrics):
+    for k, (ax, m) in enumerate(zip(axes, metrics)):
         t = table[table.metric == m]
         _draw_index_bars(ax, t, order)
         q2, reliable = t.Q2.iloc[0], bool(t.reliable.iloc[0])
         ax.set_ylabel(STACK_TITLES.get(m, m), fontsize=12, fontweight='bold')
+        # panel letter at the top left, outside the axes, left of the y-axis title
+        ax.text(-0.12, 1.0, 'ABCDEFGHIJ'[k], transform=ax.transAxes, ha='right', va='top',
+                fontsize=14, fontweight='bold')
         # surrogate fit inside the panel, top left (the tallest bars sit below 0.7)
         ax.text(0.015, 0.95, f'Q$^2$ = {q2:.2f}' + ('' if reliable else ' (unreliable)'),
                 transform=ax.transAxes, ha='left', va='top', fontsize=10)
