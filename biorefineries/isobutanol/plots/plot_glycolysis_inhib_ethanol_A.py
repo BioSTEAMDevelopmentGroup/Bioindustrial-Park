@@ -92,7 +92,7 @@ FIGURE = ksf.SweepFigure(
 
 # The same figure coloured by IRR at default prices (-15 to 15 %, white
 # break-even contour; cells below -15 % and outright money-losers, IRR -inf,
-# in the light-grey under-colour), with the highest-IRR point marked in place
+# in the dark-grey under-colour), with the highest-IRR point marked in place
 # of the MESP optimum; no market-range hatching
 OPTIMA_IRR = [row if row[0] != 'MPSP' else
               ('IRR', 'max', 'IRR', '*', '#33ccff', 14, (12, 24), -0.3)

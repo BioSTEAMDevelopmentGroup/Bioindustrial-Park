@@ -60,12 +60,13 @@ MESP_CBAR_MINOR_STEP = fs.MESP_CBAR_MINOR_STEP
 # reaching that far would squeeze the profitable range into a sixth of the
 # colours); the colormap is the MESP one reversed (high IRR = yellow, as low
 # MESP). Cells below -15 % and the -inf of an outright money-loser (solve_TEA
-# finds no IRR at all) take the light-grey under-colour; a white contour marks
+# finds no IRR at all) take the dark-grey under-colour; a white contour marks
 # break-even (IRR = 0).
 IRR_LEVELS = np.arange(-15., 15.00001, 0.5)
 IRR_CBAR_TICKS = np.arange(-15., 15.00001, 5.)
 IRR_CBAR_MINOR_STEP = 1.
-IRR_UNDER_COLOR = (0.82, 0.82, 0.82)
+# = the MESP figures' over-colour: the colormap's dark-grey end
+IRR_UNDER_COLOR = fs.JBEI_UCB_colormap()(1.)
 IRR_REFERENCE_LINES = (0.,)
 
 # Colour axes: the sweep metric read, its unit conversion, default scale,
