@@ -2,7 +2,7 @@
 
 **(a)** Best IRR so far; strip: the seeds (teal rings: co-producers above the plateau). Inset: refinement, linear trial axis.
 
-**(b)** IRR vs isobutanol share of the alcohol titer, every design making ≥ 1 g·L⁻¹ alcohol (the 100 % column spread over 98–100 %). Large cyan dots: uninformed designs making isobutanol. Open violet ○ □ △: isobutanol TRY best visits; ◆ ★: profitability bests.
+**(b)** IRR vs isobutanol share of the alcohol titer, every design making ≥ 1 g·L⁻¹ alcohol (the 100 % column spread over 98–100 %). Open violet ○ □ △: isobutanol TRY best visits; ◆ ★: profitability bests.
 
 **(c)** Each campaign's trials (strip), highest-IRR visit (open) and returned design (filled: the argmax of its own objective).
 

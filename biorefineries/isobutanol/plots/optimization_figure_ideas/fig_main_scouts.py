@@ -914,27 +914,26 @@ def panel_b(fig, F):
     thr = f'{C.IBO_THRESHOLD:g} {S.UNIT_TITER}'
     n_ui, best_ui = ui['n'], C.fmt_irr(ui['max_irr_pct'])
     lose_ui, lose_lt = _pct0(ui['pct_losing']), _pct0(lt['pct_losing'])
-    # fresh round 2: '(large)' -- every uninformed dot now has a dark rim;
-    # these are the large ones; narrower wraps let the box reach the empty
-    # stretch between 40 and 70 %
-    wraps = (f"{n_ui} uninformed designs with ≥ {thr}\nisobutanol "
-             f"(large): best {best_ui},\n{lose_ui} lose money (vs "
+    # 2026-10-01: all uninformed dots share one size (no '(large)' cue);
+    # narrower wraps let the box reach the empty stretch between 40 and 70 %
+    wraps = (f"{n_ui} uninformed designs with ≥ {thr}\nisobutanol: "
+             f"best {best_ui},\n{lose_ui} lose money (vs "
              f"{lose_lt} of the rest)",
-             f"{n_ui} uninformed designs with\n≥ {thr} isobutanol "
-             f"(large):\nbest {best_ui}, {lose_ui} lose money\n(vs "
+             f"{n_ui} uninformed designs with\n≥ {thr} isobutanol:\n"
+             f"best {best_ui}, {lose_ui} lose money\n(vs "
              f"{lose_lt} of the rest)",
-             f"{n_ui} uninformed designs\nwith ≥ {thr} isobutanol\n"
-             f"(large): best {best_ui},\n{lose_ui} lose money\n(vs "
+             f"{n_ui} uninformed designs\nwith ≥ {thr} isobutanol:\n"
+             f"best {best_ui},\n{lose_ui} lose money\n(vs "
              f"{lose_lt} of the rest)",
-             f"{n_ui} uninformed\ndesigns with\n≥ {thr} isobutanol\n"
-             f"(large): best {best_ui},\n{lose_ui} lose money\n(vs "
+             f"{n_ui} uninformed\ndesigns with\n≥ {thr} isobutanol:\n"
+             f"best {best_ui},\n{lose_ui} lose money\n(vs "
              f"{lose_lt} of the rest)",
-             f"{n_ui} uninformed designs\nmaking isobutanol (large):\n"
+             f"{n_ui} uninformed designs\nmaking isobutanol:\n"
              f"best {best_ui}, {lose_ui} lose\nmoney (vs {lose_lt} of the "
              f"rest)",
-             f"{n_ui} uninformed designs making\nisobutanol (large): best "
+             f"{n_ui} uninformed designs making\nisobutanol: best "
              f"{best_ui},\n{lose_ui} lose money (vs {lose_lt} of the rest)",
-             f"{n_ui} uninformed\ndesigns making\nisobutanol (large):\n"
+             f"{n_ui} uninformed\ndesigns making\nisobutanol:\n"
              f"best {best_ui}, {lose_ui}\nlose money (vs\n{lose_lt} of the "
              f"rest)")
     y_lo, y_hi = to_px((0, 0.0))[1], to_px((0, start))[1]
@@ -966,7 +965,7 @@ def panel_b(fig, F):
     top = outl[[int(np.argmax(outl[:, 1]))]]
     assert _n_touch(top, hb.extents[None], LABEL_PAD_PT * pt)[0] == 0,         'the block hides the best outlined design'
     print(f"b block: opaque box (alpha {BLOCK_BOX['alpha']}) over "
-          f"{BLOCK_HIDDEN['outlined']} of {n_ui} large dots + "
+          f"{BLOCK_HIDDEN['outlined']} of {n_ui} isobutanol-making dots + "
           f"{BLOCK_HIDDEN['other']} other dots (score {sp['score'][:4]})")
 
     S.style_ticks(ax)
@@ -1824,8 +1823,7 @@ def caption(F):
         '',
         f"**(b)** IRR vs isobutanol share of the alcohol titer, every design "
         f"making ≥ {C.SHARE_MIN_ALCOHOL:g} {unit} alcohol (the 100 % column "
-        f"spread over {100 - COL_JITTER:g}–100 %). Large cyan dots: "
-        f"uninformed designs making isobutanol. Open violet ○ □ △: "
+        f"spread over {100 - COL_JITTER:g}–100 %). Open violet ○ □ △: "
         f"{fam['ibo']} best visits; ◆ ★: profitability bests.",
         '',
         f"**(c)** Each campaign's trials (strip), highest-IRR visit (open) "

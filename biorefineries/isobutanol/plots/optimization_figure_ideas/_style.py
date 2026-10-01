@@ -1117,11 +1117,15 @@ def dot_composite(spec):
 # (L* 80 / 86), uninformed dots mid (L* 62: a thin dark-cyan rim), the
 # TRY-informed dots dark (L* 48). Lavender tweaks alone could not do it
 # (every tested violet stayed < 12 under deutan or protan).
+# 2026-10-01 (user): every uninformed dot the same size and unrimmed; the
+# isobutanol-making ones are no longer singled out by size. Without the rim
+# the plain #18C4DC fill fails the deutan / protan check against the scout
+# violet dots, so the dot FILL is a deeper cyan (lightest passing of a
+# #18C4DC -> #0E93A9 ramp); lines / markers keep PALETTE['unin'].
+UNIN_DOT = '#109DB4'
 B_DOTS = {
-    'unin': dict(face=PALETTE['unin'], edge=PALETTE['unin_text'], s=5.0,
-                 lw=0.5, alpha=0.9),
-    'unin_ibo': dict(face=PALETTE['unin'], edge=PALETTE['unin_text'],
-                     s=13.0, lw=0.6, alpha=1.0),
+    'unin': dict(face=UNIN_DOT, s=5.0, alpha=0.9),
+    'unin_ibo': dict(face=UNIN_DOT, s=5.0, alpha=0.9),
     'relay': dict(face=PALETTE['relay'], s=5.0, alpha=0.9),
     'etoh': dict(face=darken(PALETTE['etoh_light'], 8.0), s=4.0, alpha=0.6),
     'ibo': dict(face=darken(PALETTE['ibo_light'], 8.0), s=4.0, alpha=0.6),
