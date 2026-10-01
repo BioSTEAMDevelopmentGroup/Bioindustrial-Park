@@ -17,17 +17,27 @@ T1 (the returned strains differ in their enzyme levers and feeding) at the
 parameter level, plus the T3 detail that the isobutanol scouts' best visits
 are different designs from the ones they returned.
 
-Encoding (spec section 5.2, figwork/figure_spec.md)
+Encoding (spec section 5.2, figwork/figure_spec.md; colour maps revised in
+review round 1 so no ramp reuses the set's semantic hues: violet =
+isobutanol, amber = ethanol, cyan / teal = the profitability campaigns)
     Native capacities  k_3 (Pdc), k_6 (Adh1), glycolysis, k_17 (Adh6):
-                       log2 fold vs the starting strain, PuOr_r, clipped +-4
+                       log2 fold vs the starting strain, RdBu_r (blue =
+                       lower, red = higher), clipped +-4
     Isobutanol pathway k_13 (ALS), ehrlich_downstream (Ilv5/Ilv3/Aro10):
-                       absolute g/L/h, Purples 0-4
-    Inhibition         the three product-inhibition multipliers: BrBG on
-                       log2(multiplier), 1 = the starting strain
+                       absolute g/L/h, Purples 0-4 (violet = isobutanol, as
+                       in the main figure)
+    Inhibition         the three product-inhibition multipliers on log2:
+                       green = below 1 (weaker inhibition, a more tolerant
+                       strain), white = 1 (the starting strain), grey =
+                       above 1 (more sensitive); a two-slope norm so each
+                       arm reaches its band edge (0.75 / 1.5)
     Feeding            threshold, target delta, spikes (actual / cap):
                        greys within the search range
-    Outlined cells sit at a search bound (_common.at_bound, 1e-6 relative).
+    Bound-hit cells (_common.at_bound, 1e-6 relative) get a black outer and
+    a white inner outline, so the mark reads on light AND dark fills.
     Right-hand table: IRR, own objective, Phi_M and the growth factor.
+    ramp_check() asserts the ramps' distance from the semantic hues and the
+    cell-text contrast before anything is saved.
 
 Every number in the figure and in the caption file it writes
 (kinBO_S2_fingerprints_caption.md, next to this script) is computed from the
@@ -50,7 +60,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _common as C                                           # noqa: E402
 import _style as S                                            # noqa: E402
 from matplotlib import colormaps                              # noqa: E402
-from matplotlib.colors import ListedColormap, Normalize, to_rgb  # noqa: E402
+from matplotlib.colors import (ListedColormap, Normalize,     # noqa: E402
+                               TwoSlopeNorm, to_hex, to_rgb)
 from matplotlib.lines import Line2D                           # noqa: E402
 from matplotlib.patches import Rectangle                      # noqa: E402
 
@@ -70,12 +81,15 @@ CELL_PAD = 0.016          # white separator between cells
 RH = 0.27                 # design-row pitch
 HEADER_GAP = 0.25         # group-header row pitch
 Y_BOT = 0.70              # heatmap bottom edge
-CBAR_Y, CBAR_H = 0.33, 0.075   # colour bars under the heatmap
+CBAR_Y, CBAR_H = 0.37, 0.075   # colour bars under the heatmap
 TABLE_GAP = 0.10          # heatmap -> right table (IRR, own objective,
 RIGHT_MARGIN = 0.05       #   Phi_M, growth; placed by place_table)
 KEY_PITCH = 0.19          # line pitch of the keys / notes above the table
 LABEL_ROT = 45.0          # column-label rotation [deg]
-OUTLINE_LW = 1.4          # bound-hit outline [pt]
+OUTLINE_LW = 1.4          # bound-hit outline, black outer stroke [pt]
+INNER_LW = 0.8            #   and its white inner stroke [pt] (visible on
+                          #   dark fills, where the black merges)
+MINI_W, MINI_H = 0.21, 0.13   # mini heatmap cells of the bound key [in]
 
 FS_ROW = 10               # row labels / right-table values
 FS_CELL = S.FS['note']    # 9-pt cell text (the floor)
@@ -100,10 +114,17 @@ S2_EXPECTED = {
     # isobutanol-yield pair: consecutive trials, returned vs best visit
     'iy_sims': {'returned': E(842), 'best_visit': E(843)},
     'iy_yield_gain_pct': E('7.6'), 'iy_irr_drop_pts': E('21.2'),
-    # isobutanol titer / productivity: returned designs knock Adh1 down,
-    # best visits keep it above the starting strain
-    'it_ip_ret_k6_fold_max': E('0.002'),
-    'it_ip_ret_etoh_max': E('0.2'),
+    # isobutanol titer / productivity: returned designs knock Adh1 down
+    # (the productivity one to the search floor), best visits keep it
+    # above the starting strain
+    'it_ip_ret_k6_fold': {'it': E('0.0022'), 'ip': E('0.0010')},
+    'it_ip_ret_k6_hit': {'it': E(None), 'ip': E('lo')},
+    'it_ip_ret_etoh': {'it': E('0.21'), 'ip': E('0.07')},
+    # inhibition multipliers of the 8 returned designs: half at the 0.75
+    # floor (no proteome cost); the uninformed design's isobutanol ceiling
+    # is inert (it makes no isobutanol)
+    'inhib_ret': {'n': E(24), 'floor': E(12), 'ceiling': E(2)},
+    'unin_ibo_hit': E('hi'), 'unin_ibo_titer': E('0.00'),
     'it_ip_bv_k6_fold': {'it': E('1.4'), 'ip': E('1.4')},
     'it_ip_bv_etoh': {'it': E('4.0'), 'ip': E('50.1')},
     'it_ip_bv_ibo': {'it': E('34.8'), 'ip': E('29.9')},
@@ -152,7 +173,7 @@ BLOCKS = (
     Block('path', 'Isobutanol pathway', 'absolute, ' + S.UNIT_PROD, (
         Column('k_13', 'ALS (k$_{13}$)'),
         Column('ehrlich_downstream', 'Ilv5–Aro10'))),
-    Block('inhib', 'Inhibition', 'multiplier', (
+    Block('inhib', 'Inhibition', 'strength multiplier', (
         Column('inhib_ethanol', 'by ethanol'),
         Column('inhib_isobutanol', 'by isobutanol'),
         Column('inhib_acetate', 'by acetate'))),
@@ -162,16 +183,43 @@ BLOCKS = (
         Column('max_n_spikes', 'spikes / cap'))),
 )
 FOLD_CLIP = 4.0                                   # log2 fold, +-4 (1/16x-16x)
-INHIB_LIM = max(abs(np.log2(C.BANDS['inhib_ethanol'][0])),
-                abs(np.log2(C.BANDS['inhib_ethanol'][1])))
+INHIB_LO, INHIB_HI = (float(np.log2(b)) for b in C.BANDS['inhib_ethanol'])
 PATH_LIM = C.BANDS['k_13'][1]                     # 0-4 g/L/h
 GREYS = ListedColormap(colormaps['Greys'](np.linspace(0.03, 0.80, 256)))
-CMAPS = {'native': colormaps['PuOr_r'], 'path': colormaps['Purples'],
-         'inhib': colormaps['BrBG'], 'feed': GREYS}
+# inhibition: green arm (multiplier < 1: weaker inhibition, more tolerant)
+# -> white at 1 (the starting strain) -> grey arm (> 1: more sensitive).
+# The arms stop at light-mid tones (Greens 0.52 / Greys 0.48): the block
+# carries the least design information (costless levers), so it gets the
+# least ink; dark text and the black bound outline stay legible on it.
+INHIB_GREEN_END, INHIB_GREY_END = 0.52, 0.48
+INHIB_CMAP = ListedColormap(np.vstack([
+    colormaps['Greens'](np.linspace(INHIB_GREEN_END, 0.0, 128)),
+    colormaps['Greys'](np.linspace(0.0, INHIB_GREY_END, 128))]),
+    name='inhib_green_grey')
+CMAPS = {'native': colormaps['RdBu_r'], 'path': colormaps['Purples'],
+         'inhib': INHIB_CMAP, 'feed': GREYS}
 NORMS = {'native': Normalize(-FOLD_CLIP, FOLD_CLIP),
          'path': Normalize(0.0, PATH_LIM),
-         'inhib': Normalize(-INHIB_LIM, INHIB_LIM),
+         'inhib': TwoSlopeNorm(vcenter=0.0, vmin=INHIB_LO, vmax=INHIB_HI),
          'feed': Normalize(0.0, 1.0)}
+# Semantic hues of the figure set that a ramp must not imitate (spec
+# section 2). Purples is the isobutanol-pathway ramp ON PURPOSE, so it is
+# only held away from the ethanol and campaign hues.
+SEMANTIC = {'ethanol': ('etoh', 'etoh_dark', 'etoh_light'),
+            'isobutanol': ('ibo', 'ibo_dark', 'ibo_light'),
+            'campaign': ('unin', 'unin_text', 'relay')}
+RAMP_AVOID = {'native': ('ethanol', 'isobutanol', 'campaign'),
+              'path': ('ethanol', 'campaign'),
+              'inhib': ('ethanol', 'isobutanol', 'campaign'),
+              'feed': ('ethanol', 'isobutanol', 'campaign')}
+# CIE76 floor (normal vision) vs every avoided hue. Calibrated on the maps
+# the round-1 review rejected for hue reuse: PuOr_r came within 4.4 of the
+# isobutanol violet and 6.1 of the ethanol light amber, BrBG within 4.1 of
+# the ethanol light amber and 13.0 of the TRY-informed teal; RdBu_r /
+# Purples / the green-grey ramp / greys all stay >= 19.
+RAMP_MIN_DE = 15.0
+RAMP_NEAR_WHITE_L = 90.0  # samples lighter than this L* read as neutral
+TEXT_MIN_CONTRAST = 3.0  # WCAG contrast of cell text on its fill
 
 
 def scale_value(block, var, value, base):
@@ -228,6 +276,78 @@ def luma(rgb):
     """Rec. 601 luma of gamma-encoded sRGB (white text below 0.45)."""
     r, g, b = rgb[:3]
     return 0.299 * r + 0.587 * g + 0.114 * b
+
+
+def wcag_contrast(c1, c2):
+    """WCAG 2 contrast ratio of two matplotlib colours."""
+    def rel_lum(c):
+        lin = S._hex2lin(to_hex(c))
+        return float(0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2])
+    a, b = sorted((rel_lum(c1), rel_lum(c2)), reverse=True)
+    return (a + 0.05) / (b + 0.05)
+
+
+def _ramp_samples(key, n=33):
+    """Hex samples of a block's ramp over the range its cells can take."""
+    lo, hi = {'native': (-FOLD_CLIP, FOLD_CLIP), 'path': (0.0, PATH_LIM),
+              'inhib': (INHIB_LO, INHIB_HI), 'feed': (0.0, 1.0)}[key]
+    return [to_hex(CMAPS[key](NORMS[key](z)))
+            for z in np.linspace(lo, hi, n)]
+
+
+def ramp_check(verbose=True):
+    """Colour check of the four block ramps (review round 1).
+
+    1. Semantics (asserted): every non-neutral ramp sample (L* < 90) is at
+       least RAMP_MIN_DE (CIE76, normal vision) from every semantic hue the
+       block must avoid (RAMP_AVOID), so no cell can read as ethanol /
+       isobutanol / a campaign colour. The CVD minimum is reported as
+       ADVISORY: under deutan / protan vision any two-hue diverging ramp
+       folds onto the blue-yellow axis that the violet / amber product pair
+       also occupies, and every cell prints its value.
+    2. Diverging arms (asserted): the two ends of the native and inhibition
+       ramps differ by >= S.CVD_MIN_DE under normal, deutan, protan and
+       tritan vision (Machado 2009), so 'lower' and 'higher' stay apart.
+    Returns the report lines; raises S.FigureCheckError on failure."""
+    lines, bad = [], []
+    for key, fams in RAMP_AVOID.items():
+        hues = [h for f in fams for h in SEMANTIC[f]]
+        worst_n, worst_c = (np.inf, None), (np.inf, None)
+        for hx in _ramp_samples(key):
+            if S.lstar(hx) >= RAMP_NEAR_WHITE_L:
+                continue
+            for h in hues:
+                dn = S.delta_e76(hx, S.PALETTE[h])
+                dc = min(S.delta_e76(hx, S.PALETTE[h], k)
+                         for k in ('deutan', 'protan', 'tritan'))
+                if dn < worst_n[0]:
+                    worst_n = (dn, f'{hx} vs {h}')
+                if dc < worst_c[0]:
+                    worst_c = (dc, f'{hx} vs {h}')
+        ok = worst_n[0] >= RAMP_MIN_DE
+        if not ok:
+            bad.append(key)
+        lines.append(f"  {'ok  ' if ok else 'FAIL'} {key:6s} ramp: min dE "
+                     f'{worst_n[0]:5.1f} normal ({worst_n[1]}); CVD '
+                     f'advisory min {worst_c[0]:5.1f} ({worst_c[1]})')
+    for key in ('native', 'inhib'):
+        s = _ramp_samples(key)
+        d = {k or 'normal': S.delta_e76(s[0], s[-1], k)
+             for k in (None, 'deutan', 'protan', 'tritan')}
+        ok = min(d.values()) >= S.CVD_MIN_DE
+        if not ok:
+            bad.append(key + ' arms')
+        lines.append(f"  {'ok  ' if ok else 'FAIL'} {key:6s} arms "
+                     f'{s[0]} / {s[-1]}: ' + '  '.join(
+                         f'{k} {v:.1f}' for k, v in d.items()))
+    if verbose:
+        print('S2 ramp check (CIE76; semantic floor '
+              f'{RAMP_MIN_DE:g} normal vision):')
+        for ln in lines:
+            print(ln)
+    if bad:
+        raise S.FigureCheckError(f'S2 ramp check failed: {bad}')
+    return lines
 
 
 # %% Rows ----------------------------------------------------------------------------------
@@ -300,6 +420,12 @@ def s2_facts(facts, items):
     rel, uni = rows[('relay', 'ret')], rows[('unin', 'ret')]
     iy_r, iy_b = rows[('iy', 'ret')]['rec'], rows[('iy', 'bv')]['rec']
     fold = lambda r, v: r['decision'][v] / base[v]        # noqa: E731
+    inhib_vars = [c.var for b in BLOCKS if b.key == 'inhib'
+                  for c in b.columns]
+    ret_hits = [r['hits'].get(v) for (k, kind), r in rows.items()
+                if kind == 'ret' for v in inhib_vars]
+    inhib_ret = {'n': len(ret_hits), 'floor': ret_hits.count('lo'),
+                 'ceiling': ret_hits.count('hi')}
     out = {
         'relay_k3_fold': fold(rel, 'k_3'),
         'relay_k6_fold': fold(rel, 'k_6'),
@@ -315,10 +441,17 @@ def s2_facts(facts, items):
         'iy_yield_gain_pct': 100.0 * (iy_r['ibo_yield'] / iy_b['ibo_yield']
                                       - 1.0),
         'iy_irr_drop_pts': iy_b['irr_pct'] - iy_r['irr_pct'],
-        'it_ip_ret_k6_fold_max': max(fold(rows[(k, 'ret')], 'k_6')
-                                     for k in ('it', 'ip')),
-        'it_ip_ret_etoh_max': max(rows[(k, 'ret')]['rec']['etoh']
-                                  for k in ('it', 'ip')),
+        'it_ip_ret_k6_fold': {k: fold(rows[(k, 'ret')], 'k_6')
+                              for k in ('it', 'ip')},
+        'it_ip_ret_k6_hit': {k: rows[(k, 'ret')]['hits'].get('k_6')
+                             for k in ('it', 'ip')},
+        'it_ip_ret_etoh': {k: rows[(k, 'ret')]['rec']['etoh']
+                           for k in ('it', 'ip')},
+        'inhib_ret': inhib_ret,
+        'it_ip_ret_irr': {k: rows[(k, 'ret')]['irr_pct']
+                          for k in ('it', 'ip')},
+        'unin_ibo_hit': uni['hits'].get('inhib_isobutanol'),
+        'unin_ibo_titer': uni['rec']['ibo'],
         'it_ip_bv_k6_fold': {k: fold(rows[(k, 'bv')], 'k_6')
                              for k in ('it', 'ip')},
         'n_rows': sum(1 for t, _ in items if t == 'row'),
@@ -439,6 +572,23 @@ def column_x():
     return xs, spans
 
 
+def draw_bound_outline(ax, x, y, w, h, pad=0.0, zorder=4):
+    """Bound-hit mark of the cell (x, y, w, h) in inches: a black outer
+    stroke centred `pad` inside the cell's grid line (pad 0: it fills the
+    white CELL_PAD separator) plus a white inner stroke just inside it, so
+    the mark reads on light fills (black) and on dark fills (white).
+    Returns the inset [in] of the free area left inside it."""
+    lb, li = OUTLINE_LW / 72.0, INNER_LW / 72.0
+    ax.add_patch(Rectangle((x + pad, y + pad), w - 2 * pad, h - 2 * pad,
+                           facecolor='none', edgecolor='black',
+                           lw=OUTLINE_LW, joinstyle='miter', zorder=zorder))
+    o = pad + lb / 2 + li / 2
+    ax.add_patch(Rectangle((x + o, y + o), w - 2 * o, h - 2 * o,
+                           facecolor='none', edgecolor='white', lw=INNER_LW,
+                           joinstyle='miter', zorder=zorder + 0.1))
+    return pad + lb / 2 + li
+
+
 def draw(facts, items):
     fig = S.new_figure(W, H)
     ax = S.inch_axes(fig, 0.0, 0.0, W, H)
@@ -452,6 +602,7 @@ def draw(facts, items):
     fam_color = {'profit': S.TEXT, 'etoh': S.PALETTE['etoh_dark'],
                  'ibo': S.PALETTE['ibo_dark']}
     cells = []                  # [(cell texts, free area in inches)]
+    contrasts = []              # [(WCAG contrast of cell text, text)]
     table = {'irr': [], 'obj': [], 'phi': [], 'growth': []}
 
     # --- rows: labels, markers, trial numbers, cells, right-hand table
@@ -496,14 +647,12 @@ def draw(facts, items):
                                     cell_text(b.key, col.var, v, base),
                                     fontsize=FS_CELL, color=tc, ha='center',
                                     va='center', zorder=3)]
-                d = CELL_PAD / 2     # outline stroke centred on the cell edge
-                inner = d
+                for t in txts:
+                    contrasts.append((wcag_contrast(t.get_color(), rgb),
+                                      t.get_text()))
+                inner = CELL_PAD / 2
                 if r['kind'] != 'base' and col.var in r['hits']:
-                    ax.add_patch(Rectangle(
-                        (x + d, y + d), CW - 2 * d, h - 2 * d,
-                        facecolor='none', edgecolor='black', lw=OUTLINE_LW,
-                        zorder=4))
-                    inner = d + OUTLINE_LW / 72.0 / 2
+                    inner = draw_bound_outline(ax, x, y, CW, h)
                 cells.append((txts, (x + inner, y + inner, x + CW - inner,
                                      y + h - inner)))
         # right-hand table (x positions set by place_table once measured)
@@ -564,18 +713,29 @@ def draw(facts, items):
         dict(marker='o', ms=6.0, mfc='white', mec=S.TEXT, mew=1.3,
              text='best visit (highest IRR)', style='italic')],
         fontsize=FS_HEAD)
-    S.inline_key(fig, X_GROUP - 0.005, ky - 2 * KEY_PITCH, [
-        dict(swatch='white', edgecolor='black', lw=OUTLINE_LW, size_in=0.11,
-             text='at a search bound')], fontsize=FS_HEAD, gap_in=0.04)
+    # bound key: two mini heatmap cells (a light and a dark fill of the
+    # feeding ramp) carrying the same double outline as the heatmap
+    yk = ky - 2 * KEY_PITCH
+    xk = X_GROUP
+    for frac in (0.08, 1.0):
+        ax.add_patch(Rectangle((xk, yk - MINI_H / 2), MINI_W, MINI_H,
+                               facecolor=GREYS(frac), edgecolor='none',
+                               zorder=3))
+        draw_bound_outline(ax, xk, yk - MINI_H / 2, MINI_W, MINI_H, pad=0.0)
+        xk += MINI_W + 0.03
+    ax.text(xk + 0.02, yk, 'cell at a search bound', fontsize=FS_HEAD,
+            color=S.TEXT, ha='left', va='center')
 
     # --- table notes (top right, right-aligned)
     xr = W - RIGHT_MARGIN
     ax.text(xr, ky, f'bold IRR: above the plateau '
             f'({C.fmt_pct(facts["U_pct"])})', fontsize=FS_HEAD,
             color=S.NOTE, ha='right', va='center')
-    ax.text(xr, ky - KEY_PITCH, f'growth derated at Φ$_\\mathrm{{M}}$ > '
-            f'{facts["budget"]:.4f}', fontsize=FS_HEAD, color=S.NOTE,
-            ha='right', va='center')
+    ax.text(xr, ky - KEY_PITCH, 'bold growth: derated by more than 1 %',
+            fontsize=FS_HEAD, color=S.NOTE, ha='right', va='center')
+    ax.text(xr, ky - 2 * KEY_PITCH, f'growth is derated once '
+            f'Φ$_\\mathrm{{M}}$ > {facts["budget"]:.4f}', fontsize=FS_HEAD,
+            color=S.NOTE, ha='right', va='center')
 
     # --- colour bars under the heatmap, one per block
     for b in BLOCKS:
@@ -584,7 +744,7 @@ def draw(facts, items):
                 color=S.NOTE, ha='center', va='center')
         cax = S.inch_axes(fig, x0, CBAR_Y, x1 - x0, CBAR_H)
         draw_colorbar(cax, b.key)
-    return fig, rotated, cells
+    return fig, rotated, cells, contrasts
 
 
 def place_table(fig, table, x0, x1, min_gap=0.10):
@@ -621,11 +781,11 @@ def draw_colorbar(cax, key):
         lo, hi = 0.0, PATH_LIM
         ticks = [0, 2, 4]
         labels = ['0', '2', '4']
-    elif key == 'inhib':
+    elif key == 'inhib':      # direction stated at the ends (review r1)
         blo, bhi = C.BANDS['inhib_ethanol']
-        lo, hi = np.log2(blo), np.log2(bhi)
+        lo, hi = INHIB_LO, INHIB_HI
         ticks = [lo, 0.0, hi]
-        labels = [f'{blo:g}', '1', f'{bhi:g}']
+        labels = [f'{blo:g}\ntolerant', '1', f'{bhi:g}\nsensitive']
     else:
         lo, hi = 0.0, 1.0
         ticks = [0.0, 1.0]
@@ -660,6 +820,22 @@ def write_caption(facts, f2, path=CAPTION_PATH):
     bv_k6 = bv_k6[0] if len(bv_k6) == 1 else '–'.join(bv_k6)
     lo_i, hi_i = C.BANDS['inhib_ethanol']
     et, ib = f2['it_ip_bv_etoh'], f2['it_ip_bv_ibo']
+    ir = f2['inhib_ret']
+    # titer / productivity returned designs: each scout's own value (review
+    # r1: a shared '<=' bound was false for the titer scout)
+    k6_ret = ' and '.join(f'{f2["it_ip_ret_k6_fold"][k]:.4f}×'
+                          for k in ('it', 'ip'))
+    at_floor = [C.campaign(k).label for k in ('it', 'ip')
+                if f2['it_ip_ret_k6_hit'][k] == 'lo']
+    k6_floor = (f" (the {' and '.join(at_floor)} scout's at the search "
+                "floor)" if at_floor else '')
+    etoh_ret = ' and '.join(f'{f2["it_ip_ret_etoh"][k]:.2f}'
+                            for k in ('it', 'ip'))
+    irrs = [f2['it_ip_ret_irr'][k] for k in ('it', 'ip')]
+    irr_ret = ('have no IRR' if not np.any(np.isfinite(irrs)) else
+               'lose money (IRR ' + ' and '.join(
+                   C.fmt_pct(v).replace('-', '−') if np.isfinite(v)
+                   else 'none' for v in irrs) + ')')
     ph = 'Φ<sub>M</sub>'
     gl = 'g·L<sup>−1</sup>'
     glh = 'g·L<sup>−1</sup>·h<sup>−1</sup>'
@@ -675,20 +851,34 @@ def write_caption(facts, f2, path=CAPTION_PATH):
         '* **Columns.** Native capacities are fold change vs the starting '
         f'strain (Pdc k<sub>3</sub> {base["k_3"]:.2f}, Adh1 k<sub>6</sub> '
         f'{base["k_6"]:.2f} and Adh6 k<sub>17</sub> {base["k_17"]:.4f} {glh}; '
-        f'glycolysis multiplier {base["glycolysis"]:.0f}); the colour is '
-        'clipped at 1/16× and 16×. The isobutanol-pathway capacities (ALS '
-        'k<sub>13</sub> and the Ilv5/Ilv3/Aro10 group, "Ilv5–Aro10") are '
-        f'absolute, in {glh}. Inhibition multipliers scale the ethanol, '
-        'isobutanol and acetate product-inhibition coefficients (search range '
-        f'{lo_i:g}–{hi_i:g}; 1 = starting strain). Feeding variables are '
-        f'shaded within their search ranges (threshold and target Δ in {gl}; '
-        'spikes = actual / cap, shaded by the actual count). Outlined cells '
-        'sit at a search bound.',
+        f'glycolysis multiplier {base["glycolysis"]:.0f}): blue = lower, '
+        'red = higher, the colour clipped at 1/16× and 16×. The '
+        'isobutanol-pathway capacities (ALS k<sub>13</sub> and the '
+        'Ilv5/Ilv3/Aro10 group, "Ilv5–Aro10") are absolute, in '
+        f'{glh} (purple). Feeding variables are shaded grey within their '
+        f'search ranges (threshold and target Δ in {gl}; spikes = actual / '
+        'cap, shaded by the actual count). Cells with a black outer and '
+        'white inner outline sit at a search bound.',
+        f'* **Inhibition multipliers** (search range {lo_i:g}–{hi_i:g}; 1 = '
+        'starting strain) scale every coefficient through which ethanol, '
+        'isobutanol or acetate slows growth and production (terms '
+        'exp(−k·c)) or speeds cell death. Lower means weaker product '
+        'inhibition, a more tolerant strain (green); higher means a more '
+        'sensitive one (grey). The multipliers carry no proteome cost, so '
+        f'the searches use them freely: {ir["floor"]} of the {ir["n"]} '
+        f'multipliers of the returned designs sit at the {lo_i:g} floor '
+        f'({ir["ceiling"]} at the {hi_i:g} ceiling). A multiplier on a '
+        'product the design does not make is inert: the uninformed design '
+        f'makes no isobutanol ({f2["unin_ibo_titer"]:.2f} {gl}), so its '
+        f'isobutanol multiplier at the {hi_i:g} ceiling has no effect. '
+        'This block therefore says less about strain design than the '
+        'capacity columns do.',
         '* **Right.** IRR ("loss" = negative or no IRR; bold = above the '
         f'uninformed campaign\'s plateau, {C.fmt_pct(facts["U_pct"])}); the '
         "campaign's own objective; the metabolic proteome "
-        f'{ph} [g·(g DCW)<sup>−1</sup>]; and the growth factor (growth is '
-        f'derated above {ph} = {budget:.4f}, the penalty-free budget). The '
+        f'{ph} [g·(g DCW)<sup>−1</sup>]; and the growth factor (bold = '
+        'derated by more than 1 %; growth is derated above '
+        f'{ph} = {budget:.4f}, the penalty-free budget). The '
         f'starting strain\'s IRR ({C.fmt_pct(facts["start_irr_pct"])}) is '
         'under the model version the campaigns ran with.',
         '* **Returned strains differ in products and proteome.** The '
@@ -713,9 +903,9 @@ def write_caption(facts, f2, path=CAPTION_PATH):
         f'{iy_b["TCI"]:.0f} MM$, batch {iy_r["tau"]:.0f} vs '
         f'{iy_b["tau"]:.0f} h, growth ×{iy_r["growth"]:.2f} vs '
         f'×{iy_b["growth"]:.2f}. The isobutanol titer and productivity scouts '
-        'returned designs with Adh1 knocked down (≤ '
-        f'{f2["it_ip_ret_k6_fold_max"]:.3f}× the starting strain) that make ≤ '
-        f'{f2["it_ip_ret_etoh_max"]:.1f} {gl} ethanol and have no IRR; their '
+        f'returned designs with Adh1 knocked down to {k6_ret} of the '
+        f'starting strain{k6_floor}; they make {etoh_ret} {gl} ethanol and '
+        f'{irr_ret}. Their '
         f'best visits keep Adh1 at {bv_k6}× and make {et["it"]:.1f} and '
         f'{et["ip"]:.1f} {gl} ethanol alongside {ib["it"]:.1f} and '
         f'{ib["ip"]:.1f} {gl} isobutanol.',
@@ -737,10 +927,16 @@ def write_caption(facts, f2, path=CAPTION_PATH):
 def main():
     facts = C.check_facts()
     S.cvd_check()
+    ramp_check()
     items = design_rows(facts)
     f2 = s2_facts(facts, items)
-    fig, rotated, cells = draw(facts, items)
+    fig, rotated, cells, contrasts = draw(facts, items)
     probs = rotated_label_overlaps(fig, rotated) + cell_text_fit(fig, cells)
+    cmin, ctext = min(contrasts)
+    print(f'cell-text contrast: min {cmin:.2f} ({ctext!r}) over '
+          f'{len(contrasts)} texts (floor {TEXT_MIN_CONTRAST:g})')
+    probs += [f'cell text contrast {c:.2f} < {TEXT_MIN_CONTRAST:g}: {t!r}'
+              for c, t in contrasts if c < TEXT_MIN_CONTRAST]
     for m in probs:
         S._safe_print(f'[s2] {m}')
     S.check_figure(fig, size=S.S2_SIZE, exempt=rotated)
