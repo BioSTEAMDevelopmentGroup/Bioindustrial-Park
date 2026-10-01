@@ -305,10 +305,11 @@ def plot_bars_stack(table, path, metrics=STACK_METRICS):
     for ax, m in zip(axes, metrics):
         t = table[table.metric == m]
         _draw_index_bars(ax, t, order)
-        s, q2, reliable = t.surrogate.iloc[0], t.Q2.iloc[0], bool(t.reliable.iloc[0])
-        ax.set_title(f'{STACK_TITLES.get(m, m)} ({s.upper()} surrogate, Q$^2$ = {q2:.2f}'
-                     + ('' if reliable else ', unreliable') + ')',
-                     fontweight='bold', fontsize=12)
+        q2, reliable = t.Q2.iloc[0], bool(t.reliable.iloc[0])
+        ax.set_ylabel(STACK_TITLES.get(m, m), fontsize=12)
+        # surrogate fit inside the panel, top left (the tallest bars sit below 0.7)
+        ax.text(0.015, 0.95, f'Q$^2$ = {q2:.2f}' + ('' if reliable else ' (unreliable)'),
+                transform=ax.transAxes, ha='left', va='top', fontsize=10)
         _ticks(ax)
         if ax is not axes[-1]:
             ax.tick_params(labelbottom=False)
