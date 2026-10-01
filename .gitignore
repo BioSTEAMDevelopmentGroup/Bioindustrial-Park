@@ -87,3 +87,8 @@ docs
 ehthumbs.db
 Thumbs.db
 surfaces
+
+# Allow Excel files anywhere under results folders
+!**/results/
+!**/results/**/
+!**/results/**/*.xlsx
