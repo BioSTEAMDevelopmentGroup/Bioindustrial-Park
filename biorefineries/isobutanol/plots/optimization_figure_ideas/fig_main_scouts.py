@@ -60,6 +60,19 @@ methods notes). a's strip label moves off its two seeds, and the inset
 moves into the empty region between IRR 0 and the starting-strain label
 (`INSET_DATA`, clearances asserted by `inset_clearance`).
 
+Fresh round 1: the d/e key in three rows ending inside e (its third column
+ran under f's letter), the bottom-row axes 0.11 in shorter for it; the
+TRY-informed text in its own darker teal (`relay_text`); a's seed columns
+named as scout families in a header key (no in-strip labels), the
+first trial >= 25 % marked, the start-up strip kept below the lines and the
+starting-strain label above its line; b's outlined-designs block on a
+translucent backing (dims, does not hide; the one marker-check exemption)
+and the number of overplotted isobutanol-only designs beside the 100 %
+column; c's '0' labelled and its filled markers above the open ones; f's
+seeds arrow ending on the TRY-informed star; the caption's two-sentence
+headline, trial / FAIL definitions, the seed-selection arithmetic and a
+compute caveat (`facts['sobol']`).
+
 SIM-SAFE: pandas / numpy / matplotlib only, through the sibling modules
 _common (data, definitions, facts) and _style (palette, axes, checks);
 enzyme_burden.py is read BY FILE PATH for the caption's housekeeping sector.
@@ -124,10 +137,12 @@ L = {
     'b': (6.02, 4.55, 3.86, 2.85),
     # c ends 0.08 in short of the table's first column (round 3: the relay's
     # grey 'of 998' started 0.01 in from c's right spine)
-    'c': (1.52, 0.72, 1.90, 2.58),
-    'd': (4.44, 0.72, 0.72, 2.58),
-    'e': (5.26, 0.72, 1.64, 2.58),
-    'f': (7.52, 0.72, 2.36, 2.58),
+    # fresh round 1: 0.11 in shorter (2.58 -> 2.47) so the header band
+    # holds the three-row d/e key
+    'c': (1.52, 0.72, 1.90, 2.47),
+    'd': (4.44, 0.72, 0.72, 2.47),
+    'e': (5.26, 0.72, 1.64, 2.47),
+    'f': (7.52, 0.72, 2.36, 2.47),
 }
 # a's inset in a's DATA coordinates ((trials), (IRR %)), round 5: inside
 # the empty region above IRR = 0 and below the starting-strain label (its
@@ -152,10 +167,15 @@ TOP_LETTER_Y, BOT_LETTER_Y = 7.66, 3.86
 LETTER_X = {'a': 0.06, 'b': 5.42, 'c': 0.06, 'd': 4.20, 'e': 5.26, 'f': 6.94}
 TITLE_DX = {'f': 0.22}            # default 0.28 in (S.panel_title)
 MIN_TITLE_GAP_IN = 0.30           # title end -> next letter (asserted)
-BAND_Y = (3.62, 3.44)             # the two key lines of the header band
+BAND_Y = (3.645, 3.475)           # the two key lines of the header band
+# fresh round 1: the d/e key in three rows (two columns + an inline third
+# row), so it ends inside e's column (its third column ran under f's letter)
+BAND_Y_DE = BAND_Y + (3.305,)
 HEAD_Y = 7.45                     # top-row sub-header line (a strip, b key)
-KEY_DE_X = 4.44                   # d/e key start (= d's left edge)
-KEY_GAP_IN = 0.22                 # min gap between the d/e and f keys
+KEY_DE_X = 4.52                   # d/e key start (0.08 in right of d's
+                                  # left edge: clear of c's table header)
+KEY_GAP_IN = 0.30                 # min gap between the d/e and f keys
+KEY_DE_MAX_X = 6.90               # the d/e key ends inside e (e's right)
 
 # bottom-row rows (shared y of c, the table, d, e; y grows downward)
 ROW_Y = {'base': 0.0, 'unin': 1.8, 'relay': 2.8, 'ey': 4.6, 'et': 5.6,
@@ -163,6 +183,8 @@ ROW_Y = {'base': 0.0, 'unin': 1.8, 'relay': 2.8, 'ey': 4.6, 'et': 5.6,
 HEADER_Y = {'profit': 1.0, 'etoh': 3.8, 'ibo': 7.6}
 ROW_YLIM = (10.9, -0.5)
 BAR_H = 0.62
+
+STARTUP_TOP = S.LOSS_CENTER - 0.75   # a: top of the start-up strip (IRR)
 
 # role-marker sizes (scatter s, pt^2)
 S_RING, S_FILLED = 44, 38
@@ -189,13 +211,19 @@ BLOCK_LS = (1.1,)                 # the block's line spacing
 INSET_LS = 1.05                   # the inset's two-line note
 B_MARGINS_PT = (3.0, 3.0, 5.0, 4.5)
 BLOCK_BOX_PAD = 0.25              # backing-box pad, fraction of the font size
-# opaque (>= S.BACKING_MIN_ALPHA): at alpha 0.9 the hidden designs showed
-# through as 10 % ghosts under the letters, which read as smudges
+# fresh round 1: TRANSLUCENT (alpha 0.7 < S.BACKING_MIN_ALPHA), so the
+# designs behind the block stay visible (dimmed to 30 %) instead of hidden
+# (round 5's opaque box hid 15 designs, disclosed only in the methods
+# notes). The block is the one label exempt from the marker check
+# (BLOCK_TEXT -> check_figure(marker_exempt=...)); it is still placed to
+# cover the fewest outlined designs, never the best one
 BLOCK_BOX = dict(boxstyle=f'square,pad={BLOCK_BOX_PAD}', fc='white',
-                 ec='none', alpha=1.0)
+                 ec='none', alpha=0.7)
+BLOCK_TEXT = []                   # the block's Text (marker-check exempt)
 BLOCK_Z = 2.9                     # dots z 2 / outlined 2.6 < box < marks 5-7
 BLOCK_MAX_HIDDEN_OUTLINED = 4     # outlined designs the box may hide
-BLOCK_HIDDEN = {}                 # what the box hides (-> caption notes)
+BLOCK_HIDDEN = {}                 # what the box dims (printed)
+COL_SHARE_MIN = 99.9              # b: the 100 % column (isobutanol share)
 RING_B_S = 42                     # b's isobutanol-TRY best-visit rings (pt^2)
 LEADER_LW = 0.7
 LEADER_MIN_GAP_PT = 3.0           # a label further above its line gets a
@@ -205,6 +233,7 @@ FAM_TEXT = {f: C.FAMILY_LABEL[f][0].lower() + C.FAMILY_LABEL[f][1:]
             for f in ('etoh', 'ibo')}
 
 ANNOT = []        # annotation Text artists checked against the marks
+COLUMN_COUNT = {}  # b: designs in the 100 % column above the plateau
 MARKS = []        # key marks / lines / arrows annotations must not touch
 A_TEXTS = {}      # a's labels the inset check refers to
 
@@ -457,54 +486,43 @@ def panel_a(fig, F):
     strip.set_xticks([0.25, 0.75])
     strip.tick_params(axis='x', which='both', length=0, top=False,
                       labelbottom=False)
-    # round 4: the family names written out, rotated INSIDE their columns
-    # where the column is empty (no 'EtOH' / 'IBO' abbreviations): ethanol
-    # above its cluster (no ethanol seed exceeds the plateau), isobutanol
-    # below its cluster (two seeds there, under a halo)
     assert F['seeds']['max_etoh_irr_pct'] < F['U_pct']
-    S.halo(_ann(strip, FAM_TEXT['etoh'].split()[0], (0.25, F['U_pct']),
-                (0, 4), ha='center', va='bottom', rotation=90,
-                fontsize=S.FS['key'], color=P['etoh_dark']))
-    # round 5: 'isobutanol' on the free stretch of its column nearest the
-    # column's foot (the round-4 label sat over two seeds under a halo)
-    sc_strip = [c for c in strip.collections
-                if isinstance(c, PathCollection)]
-    st_strict = [c for c in sc_strip if c in MARKS]
-    pt = fig.dpi / 72.0
-    fx, fy = strip.transData.transform((0.75, 0.0))
-    xs = strip.transData.transform(
-        [(x, 0.0) for x in np.arange(0.55, 0.9501, 0.005)])[:, 0]
-    ys = np.arange(fy + 2.0 * pt, strip.transData.transform((0, U))[1], 1.0)
-    A = np.array([(x, y) for x in xs for y in ys])
-    sp = _spot(strip, FAM_TEXT['ibo'].split()[0],
-               dict(ha='center', va='bottom', rotation=90,
-                    fontsize=S.FS['key'], color=P['ibo_dark']), A,
-               pts=_disks(fig, [c for c in sc_strip if c not in st_strict]),
-               strict_pts=_disks(fig, st_strict),
-               hlines=[0.0, U, best_seed], margins_pt=(3.0, 1.0, 5.0, 1.0),
-               cost=np.abs(A[:, 0] - fx) + 0.5 * (A[:, 1] - fy))
-    S.halo(_put(strip, sp, []))
     strip.set_ylabel(S.bold_axis_title('IRR [%]'), labelpad=2)
-    # header: the seeds and the scout trials they were picked from (so the
-    # trial axis is not read as the whole compute)
+    # header: the seeds, the scout trials they were picked from (so the
+    # trial axis is not read as the whole compute) and, fresh round 1, the
+    # two columns named as SCOUT FAMILIES in a colour key ('ethanol' /
+    # 'isobutanol' inside the strip read as product classes, and the
+    # isobutanol label sat on seeds: no free stretch of that column holds
+    # 'isobutanol TRY')
     hx = L['a_strip'][0] - 0.08
     h1 = f"{C.fmt_int(F['seeds']['n'])} seeds"
     S.fig_text(fig, hx, HEAD_Y, h1, fontsize=S.FS['key'], fontweight='bold',
                ha='left', va='bottom')
-    S.fig_text(fig, hx + _text_w_in(fig, h1 + ' ', S.FS['key'],
-                                    fontweight='bold'), HEAD_Y,
-               f"(picked from the scouts' "
-               f"{C.fmt_int(F['global']['n_try'])} trials)",
-               fontsize=S.FS['key'], color=GREY_LABEL, ha='left',
-               va='bottom')
+    h2 = f" from {C.fmt_int(F['global']['n_try'])} scout trials:"
+    x2 = hx + _text_w_in(fig, h1, S.FS['key'], fontweight='bold')
+    t2 = S.fig_text(fig, x2, HEAD_Y, h2, fontsize=S.FS['key'],
+                    color=GREY_LABEL, ha='left', va='bottom')
+    fig.canvas.draw()
+    bb = t2.get_window_extent(fig.canvas.get_renderer())
+    yc = (bb.y0 + bb.y1) / 2 / fig.dpi
+    dot = dict(marker='o', ms=5.0, mew=0.0)
+    xk, _ = S.inline_key(
+        fig, x2 + _text_w_in(fig, h2, S.FS['key']) + 0.08, yc,
+        [{**dot, 'mfc': DOT_ETOH, 'mec': DOT_ETOH, 'text': FAM_TEXT['etoh']},
+         {**dot, 'mfc': DOT_IBO, 'mec': DOT_IBO, 'text': FAM_TEXT['ibo']}],
+        fontsize=S.FS['key'], item_gap_in=0.13)
+    assert xk <= LETTER_X['b'] - 0.25, f'a header runs to {xk:.2f} in'
 
     # --- main axes
     S.log_trial_axis(ax)
     S.loss_band(ax)
     # the UNINFORMED campaign's space-filling start-up: a cyan strip along
-    # its flat loss segment only (the TRY-informed campaign had none)
+    # its flat loss segment only (the TRY-informed campaign had none).
+    # Fresh round 1: the strip stops below the two lines' loss level
+    # (STARTUP_TOP), so it holds the label and not the TRY-informed line's
+    # trial-1 loss
     n_start = F['checks']['shared_startup_rows']
-    ax.fill_between([1, n_start + 1], S.LOSS_BAND[0], S.LOSS_BAND[1],
+    ax.fill_between([1, n_start + 1], S.LOSS_BAND[0], STARTUP_TOP,
                     color=P['unin'], alpha=0.10, lw=0, zorder=0.12)
     MARKS.append(S.plateau_line(ax, U))
     MARKS.append(S.start_line(ax, start))
@@ -530,8 +548,9 @@ def panel_a(fig, F):
     # first trial above every seed, the best
     rb = rel['best']
     sim2, sim_s = rel['first_gt_U'], rel['first_gt_best_seed']
+    sim25 = rel['first_ge25']
     _mark(ax, F['U_sim'], U, 'D', 55, P['unin'], 'white', 0.8, z=6)
-    for sim in (sim2, sim_s, rb['sim']):
+    for sim in (sim2, sim_s, sim25, rb['sim']):
         v = rel['sims'][sim]['bsf_pct'] if sim in rel['sims'] else \
             rel['bsf_pct'][sim]
         _mark(ax, sim, v, 'o', 22, P['relay'], 'white', 0.6, z=6)
@@ -541,18 +560,25 @@ def panel_a(fig, F):
     vs = rel['sims'][sim_s]['bsf_pct']
     fs = S.FS['note']
     _ann(ax, f"{C.fmt_irr(v2)} · {C.fmt_trial(sim2)}", (sim2, v2), (5, -3),
-         ha='left', va='top', fontsize=fs, color=P['relay'])
+         ha='left', va='top', fontsize=fs, color=P['relay_text'])
     _ann(ax, f"{C.fmt_irr(vs)} · {C.fmt_trial(sim_s)}", (sim_s, vs),
-         (-5, 3), ha='right', va='bottom', fontsize=fs, color=P['relay'])
+         (-5, 3), ha='right', va='bottom', fontsize=fs, color=P['relay_text'])
+    # fresh round 1: the first trial >= 25 % (f and its caption compare it
+    # with the replicate's), above-left of its dot, over the trial-13 label
+    v25 = rel['sims'][sim25]['bsf_pct']
+    assert v25 >= 25.0 > rel['sims'][sim_s]['bsf_pct']
+    _ann(ax, f"{C.fmt_irr(v25)} · {C.fmt_trial(sim25)}", (sim25, v25),
+         (-4, 6.5), ha='right', va='bottom', fontsize=fs,
+         color=P['relay_text'])
     _ann(ax, C.fmt_irr(rb['irr_pct']), (rb['sim'], rb['irr_pct']), (0, 7),
-         ha='center', va='bottom', fontsize=fs, color=P['relay'])
+         ha='center', va='bottom', fontsize=fs, color=P['relay_text'])
     # round 4: what the TRY-informed line produces, as the uninformed line
     # says 'ethanol only' (every incumbent from the first trial above every
     # seed on co-produces; asserted in assert_claims), under the line from
     # trial 25
     s25 = 25
     _ann(ax, 'ethanol + isobutanol', (s25, rel['sims'][s25]['bsf_pct']),
-         (4, -4), ha='left', va='top', fontsize=fs, color=P['relay'])
+         (4, -4), ha='left', va='top', fontsize=fs, color=P['relay_text'])
 
     # start-up label (in the loss band, under the flat cyan segment),
     # starting strain, best seed, direct labels
@@ -562,9 +588,11 @@ def panel_a(fig, F):
     # the right-aligned labels end RIGHT_PAD_PT short of x = 2,000 (round 3:
     # at 0 pt 'trial 104,' and 'trials' touched the right-spine ticks)
     rp = -RIGHT_PAD_PT
+    # fresh round 1: above its line, like the best-seed and plateau labels
+    # (below it, the inset's top tick labels sat tight under it)
     A_TEXTS['start'] = _ann(
-        ax, f'starting strain {C.fmt_irr(start)}', (2000, start), (rp, -3),
-         ha='right', va='top', fontsize=fs, color=NOTE)
+        ax, f'starting strain {C.fmt_irr(start)}', (2000, start), (rp, 3),
+         ha='right', va='bottom', fontsize=fs, color=NOTE)
     _ann(ax, f'best seed {C.fmt_irr(best_seed)}', (2000, best_seed), (rp, 3),
          ha='right', va='bottom', fontsize=fs, color=P['ibo_dark'])
     _ann(ax, f"uninformed: {C.fmt_irr(U)} at {C.fmt_trial(unin['plateau_sim'])},"
@@ -575,7 +603,7 @@ def panel_a(fig, F):
     # the seed strip as a whole (from above every seed, not from one seed)
     y_lab, x_lab = 29.4, 1.5
     t1 = _ann(ax, 'TRY-informed', (x_lab, y_lab), ha='left', va='center',
-              fontweight='bold', color=P['relay'])
+              fontweight='bold', color=P['relay_text'])
     fig.canvas.draw()
     bb = t1.get_window_extent(fig.canvas.get_renderer())
     x_end = ax.transData.inverted().transform((bb.x1, bb.y0))[0]
@@ -627,7 +655,8 @@ def panel_a(fig, F):
     ins.text(0.95, 0.07, f"refined:\n{C.fmt_num(v25, 1)} → "
                          f"{C.fmt_irr(rb['irr_pct'])}",
              transform=ins.transAxes, ha='right', va='bottom',
-             fontsize=S.FS['note'], color=P['relay'], linespacing=INSET_LS)
+             fontsize=S.FS['note'], color=P['relay_text'],
+             linespacing=INSET_LS)
     S.style_ticks(ax)
     ax.tick_params(axis='y', which='both', labelleft=False)
     return ax, strip, ins
@@ -724,13 +753,14 @@ def panel_b(fig, F):
     o = np.array([(dx, dy) for dx in np.arange(6.0, 20.01, 0.5)
                   for dy in np.arange(-8.0, 10.01, 0.5)])
     sp_r = _spot(ax, C.fmt_irr(rb['irr_pct']),
-                 dict(fontsize=fs, color=P['relay'], ha='left', va='center'),
+                 dict(fontsize=fs, color=P['relay_text'], ha='left',
+                      va='center'),
                  np.c_[sx + o[:, 0] * pt, sy + o[:, 1] * pt],
                  cost=np.hypot(o[:, 0] - 6.0, o[:, 1]) * pt, **common)
     o = np.array([(dx, dy) for dx in np.arange(-6.0, 6.01, 0.5)
                   for dy in np.arange(7.0, 16.01, 0.5)])
     sp_a = _spot(ax, C.fmt_irr(rb['irr_pct']),
-                 dict(fontsize=fs, color=P['relay'], ha='center',
+                 dict(fontsize=fs, color=P['relay_text'], ha='center',
                       va='bottom'),
                  np.c_[sx + o[:, 0] * pt, sy + o[:, 1] * pt],
                  cost=(np.hypot(o[:, 0], o[:, 1] - 7.0) + 6.0) * pt, **common)
@@ -767,7 +797,8 @@ def panel_b(fig, F):
                          f"all TRY-informed co-production",
                          f"{n296} designs\nabove {bs}:\nall TRY-informed"
                          f"\nco-production"],
-                    dict(fontsize=fs, color=P['relay'], ha='left', va='top'),
+                    dict(fontsize=fs, color=P['relay_text'], ha='left',
+                         va='top'),
                     A, (abb.y1 - A[:, 1]) + 0.3 * (A[:, 0] - abb.x0),
                     avoid=placed, **common)
     _put(ax, sp, placed)
@@ -819,7 +850,7 @@ def panel_b(fig, F):
                     lss=BLOCK_LS, key_pts=outl,
                     grow_px=BLOCK_BOX_PAD * fs * pt, avoid=placed, **common)
     assert sp['score'][0] == 0, f"block: {sp['score']}"
-    _put(ax, sp, placed, boxed=True)
+    BLOCK_TEXT.append(_put(ax, sp, placed, boxed=True))
     hb = sp['box'].padded(0.0)
     BLOCK_HIDDEN.update(
         outlined=int(_n_touch(outl, hb.extents[None], 0.0)[0]),
@@ -830,9 +861,36 @@ def panel_b(fig, F):
     # the design the block quotes ('best ...') stays visible
     top = outl[[int(np.argmax(outl[:, 1]))]]
     assert _n_touch(top, hb.extents[None], LABEL_PAD_PT * pt)[0] == 0,         'the block hides the best outlined design'
-    print(f"b block: box hides {BLOCK_HIDDEN['outlined']} of {n_ui} "
-          f"outlined designs + {BLOCK_HIDDEN['other']} other dots "
-          f"(score {sp['score'][:4]})")
+    print(f"b block: translucent box (alpha {BLOCK_BOX['alpha']}) over "
+          f"{BLOCK_HIDDEN['outlined']} of {n_ui} outlined designs + "
+          f"{BLOCK_HIDDEN['other']} other dots (score {sp['score'][:4]})")
+
+    # fresh round 1: the isobutanol-only scout designs above the plateau
+    # overplot into one stroke at 100 % share; their number beside it
+    d = pd.concat([C.complete(k) for k in C.SCOUT_KEYS], ignore_index=True)
+    a = d[C.above_plateau(d['IRR'], F['U'])]
+    col = a[a['ibo_share_pct'] >= COL_SHARE_MIN]
+    n_col = len(col)
+    assert n_col and (col['etoh'] < C.ETOH_THRESHOLD).all()
+    assert n_col <= g['n_try_gt_U_ibo_only']
+    COLUMN_COUNT.update(n=n_col, n_ibo_only=g['n_try_gt_U_ibo_only'])
+    cx, _ = to_px((100.0, 0.0))
+    r_dot = np.sqrt(4.0) / 2 * pt
+    y0, y1 = to_px((0, U))[1], to_px((0, best_seed))[1]
+    ys = np.arange(y0, y1, 1.0)
+    xs = cx - r_dot - np.arange(2.0, 6.01, 0.5) * pt
+    A = np.array([(x, y) for x in xs for y in ys])
+    # the free spot nearest the plateau line, never level with the titer
+    # best visit's square (beside it, a bare count read as its label)
+    bv = camp['it']['best_visit']
+    qx, qy = to_px((bv['share_pct'], bv['irr_pct']))
+    sq = mtransforms.Bbox([[qx - 8 * pt, qy - 5 * pt], [cx, qy + 5 * pt]])
+    sp = _spot(ax, C.fmt_int(n_col),
+               dict(fontsize=fs, color=P['ibo_dark'], ha='right',
+                    va='center'), A,
+               cost=np.abs(A[:, 1] - y0) + 0.2 * (cx - A[:, 0]),
+               avoid=placed + [sq], **common)
+    _put(ax, sp, placed)
     S.style_ticks(ax)
     return ax
 
@@ -1038,9 +1096,10 @@ def panel_c(fig, F):
     U, start = F['U_pct'], F['start_irr_pct']
     camp = F['campaigns']
     ax = _row_axes(fig, 'c')
-    # the '0' label is dropped (as in Fig. S1b): 'loss' and '0' abutted as
-    # 'loss0' on this narrow axis; the 0 line still marks it
-    S.irr_axis(ax, 'x', step=10, zero_label=False)
+    # fresh round 1: '0' labelled like a, b and f; 'loss' (full size, as in
+    # Fig. S1b) moves left inside the band, clear of it
+    S.irr_axis(ax, 'x', step=10,
+               loss_at=S.loss_label_x(L['c'][2]))
     S.tint_above(ax, U, which='x')
     S.plateau_line(ax, U, which='x')
     S.start_line(ax, start, which='x')
@@ -1068,7 +1127,11 @@ def panel_c(fig, F):
             'irr_pct'])
         ln, = ax.plot([xr, xb], [ROW_Y[k]] * 2, zorder=4, **CONNECTOR)
         _ring(ax, xb, ROW_Y[k], c.marker, dark, s=S_RING, lw=1.4, z=5)
-        _filled(ax, xr, ROW_Y[k], c.marker, dark, s=S_FILLED, z=5.5)
+        # fresh round 1: the returned (filled) marker drawn ABOVE the open
+        # one with a white edge, so a close pair (ethanol-TRY titer: 12.7
+        # vs 14.4 %) shows both outlines
+        _filled(ax, xr, ROW_Y[k], c.marker, dark, s=S_FILLED, z=5.8,
+                edge='white', lw=0.8)
     _mark(ax, U, ROW_Y['unin'], 'D', S_DIAMOND_C, P['unin'], 'white', 0.7,
           z=6)
     _mark(ax, F['relay']['best']['irr_pct'], ROW_Y['relay'], '*', S_STAR_C,
@@ -1097,7 +1160,7 @@ def row_labels(fig, F, ax_c):
     for k in C.MAIN_KEYS:
         c = C.campaign(k)
         if c.family == 'profit':
-            col = P['relay'] if c.is_relay else P['unin_text']
+            col = P['relay_text'] if c.is_relay else P['unin_text']
             fig.text(ROW_LABEL_X, ROW_Y[k], c.label, transform=tr, ha='right',
                      va='center', fontsize=fs, fontweight='bold', color=col)
             mcol = P['relay'] if c.is_relay else P['unin']
@@ -1217,10 +1280,13 @@ F_ETOH_LABEL_Y = 10.0             # 'ethanol TRY' label centre (IRR, %)
 F_RIGHT_PT = 5.0                  # right-aligned labels: pt left of the spine
 # round 4: f's IRR axis stops at the shared S.IRR_LIM like a, b and c (it
 # had 4.5 points of label headroom), so the TRY-informed label moved under
-# its star, between the star and the isobutanol-yield ring; the seeds ->
-# star arrow ends F_ARROW_END_IN left of the star's centre (pointing at it
-# from the lower left), so it passes left of that label
-F_ARROW_END_IN = (-0.15, 0.01)
+# its star, between the star and the isobutanol-yield ring. Fresh round 1:
+# the seeds -> star arrow ENDS ON the star (it stopped in empty space
+# between the replicate diamond and the star, readable as seeds ->
+# replicate, an unseeded run); it bows up-left (F_ARROW_RAD) past the
+# TRY-informed label's top-left corner
+F_ARROW_RAD = -0.20
+F_ARROW_SHRINK_PT = 7.5           # the star's radius + 1.5 pt
 F_TRY_LABEL_Y = 24.8              # 'TRY-informed' label centre (IRR, %)
 
 
@@ -1267,11 +1333,11 @@ def panel_f(fig, F):
     yr = F['relay']['best']['irr_pct']
     _mark(ax, xr, yr, '*', 150, P['relay'], 'white', 0.8, z=7)
 
-    end = ax.transData.inverted().transform(
-        ax.transData.transform((xr, yr)) + np.array(F_ARROW_END_IN) * fig.dpi)
-    arr = FancyArrowPatch((xs, ys), tuple(end), arrowstyle='-|>',
+    arr = FancyArrowPatch((xs, ys), (xr, yr), arrowstyle='-|>',
                           color=GREY_ARROW, lw=1.0, ls=(0, (3, 2)),
-                          mutation_scale=9, shrinkA=6, shrinkB=0,
+                          mutation_scale=9, shrinkA=6,
+                          shrinkB=F_ARROW_SHRINK_PT,
+                          connectionstyle=f'arc3,rad={F_ARROW_RAD}',
                           zorder=6.5)
     ax.add_patch(arr)
     MARKS.append(arr)
@@ -1288,7 +1354,10 @@ def panel_f(fig, F):
     # round 4: the replicate is named as the OTHER uninformed run, with its
     # speed (first trial >= 25 %; the TRY-informed campaign's is in a and
     # caption (f)), left of its diamond at its height
-    _ann(ax, f"uninformed replicate\n(Fig. S1): ≥ 25 % only\nat "
+    # fresh round 1: 'reached 25 % at trial 104' (the old '≥ 25 % only' /
+    # 'at trial 104' break read as 'only >= 25 %'); the TRY-informed
+    # campaign's trial 18 is marked in a and quoted in caption (f)
+    _ann(ax, f"uninformed replicate\n(Fig. S1): reached\n25 % at "
              f"{C.fmt_trial(rep['unin_rep']['first_ge25'])}",
          (xq, yq), (-7, -1), ha='right', va='center', fontsize=nfs,
          color=P['unin_text'], linespacing=1.1)
@@ -1311,7 +1380,7 @@ def panel_f(fig, F):
          (-7, -0.5), ha='right', va='top', **note)
     # the TRY-informed label under its star, right-aligned at the spine
     _ann(ax, 'TRY-informed', (L_F_XLIM[1], F_TRY_LABEL_Y), (-F_RIGHT_PT, 0),
-         ha='right', va='center', fontsize=nfs, color=P['relay'])
+         ha='right', va='center', fontsize=nfs, color=P['relay_text'])
     S.style_ticks(ax)
     return ax
 
@@ -1331,20 +1400,26 @@ def key_c(fig):
 
 
 def key_de(fig, x0):
-    """Shared d/e colour key: aligned columns of swatch + text."""
-    rows = [[('etoh', 'ethanol / Pdc'), ('adh1', 'Adh1'), ('gly', 'glycolysis')],
-            [('ibo', 'isobutanol / ALS→Aro10'), ('adh6', 'Adh6'),
-             ('tca', 'TCA/acetate')]]
+    """Shared d/e colour key in three rows: two aligned columns (carbon-
+    committing enzyme + product, its light Adh shade), then glycolysis and
+    TCA/acetate inline. Fresh round 1: the old two-row, three-column key
+    ran past e into f's column. Returns the right end (inches)."""
+    rows = [[('etoh', 'ethanol / Pdc'), ('adh1', 'Adh1')],
+            [('ibo', 'isobutanol / ALS→Aro10'), ('adh6', 'Adh6')]]
     fs, sw, gap, cgap = S.FS['key'], 0.11, 0.04, 0.12
     widths = [max(sw + gap + _text_w_in(fig, r[j][1], fs) for r in rows)
-              for j in range(3)]
-    xs = np.r_[x0, x0 + np.cumsum(np.array(widths) + cgap)[:-1]]
-    for y, r in zip(BAND_Y, rows):
+              for j in range(2)]
+    xs = np.r_[x0, x0 + widths[0] + cgap]
+    for y, r in zip(BAND_Y_DE, rows):
         for x, (ck, txt) in zip(xs, r):
             S.inline_key(fig, x, y, [{'swatch': P[ck], 'text': txt,
                                       'size_in': sw}], fontsize=fs,
                          gap_in=gap)
-    return xs[-1] + widths[-1]
+    x3, _ = S.inline_key(fig, x0, BAND_Y_DE[2], [
+        {'swatch': P['gly'], 'text': 'glycolysis', 'size_in': sw},
+        {'swatch': P['tca'], 'text': 'TCA/acetate', 'size_in': sw}],
+        fontsize=fs, gap_in=gap)
+    return max(xs[-1] + widths[-1], x3)
 
 
 def key_f(fig, x0):
@@ -1430,6 +1505,8 @@ def build(F):
     ANNOT.clear()
     MARKS.clear()
     BLOCK_HIDDEN.clear()
+    BLOCK_TEXT.clear()
+    COLUMN_COUNT.clear()
     A_TEXTS.clear()
     fig = S.new_figure(*S.MAIN_SIZE)
     ax_a, strip, ins = panel_a(fig, F)
@@ -1443,10 +1520,14 @@ def build(F):
     key_b(fig)
     key_c(fig)
     x_de = key_de(fig, KEY_DE_X)
+    assert x_de <= KEY_DE_MAX_X, f'd/e key runs to {x_de:.2f} in'
     x_f0 = max(L['f'][0], x_de + KEY_GAP_IN)
     x_fk = key_f(fig, x_f0)
-    print(f'header band: d/e key {KEY_DE_X:.2f}-{x_de:.2f} in, '
-          f'f key {x_f0:.2f}-{x_fk:.2f} in')
+    # the d/e key clear of c's table header (fresh round 1: 2 mm apart)
+    hdr_end = TABLE_X[1] + 0.5 * _text_w_in(fig, 'losing', S.FS['note'])
+    assert KEY_DE_X - hdr_end >= 0.15, f'table header ends {hdr_end:.2f} in'
+    print(f'header band: table header ends {hdr_end:.2f} in, d/e key '
+          f'{KEY_DE_X:.2f}-{x_de:.2f} in, f key {x_f0:.2f}-{x_fk:.2f} in')
     assert x_fk <= S.MAIN_SIZE[0] - 0.05, f'f key runs to {x_fk:.2f} in'
 
     rel = F['relay']
@@ -1520,7 +1601,8 @@ def inset_clearance(fig, axes, gap_pt=INSET_GAP_PT):
 
 
 def run_checks(fig, axes, raise_on_fail=True):
-    res = S.check_figure(fig, size=S.MAIN_SIZE, raise_on_fail=False)
+    res = S.check_figure(fig, size=S.MAIN_SIZE, raise_on_fail=False,
+                         marker_exempt=tuple(BLOCK_TEXT))
     fig.canvas.draw()
     inset_bb = axes['inset'].get_tightbbox(fig.canvas.get_renderer())
     clashes = mark_clashes(fig, ANNOT, MARKS, regions=[('inset', inset_bb)])
@@ -1545,7 +1627,7 @@ def _eb():
 METHODS_MARK = '*Methods notes (not part of the legend).*'
 
 
-def caption(F, hidden=None):
+def caption(F):
     """The legend (title + panels + synthesis, every number from the facts)
     followed by a short block of methods notes that belong in Methods, not
     in the legend (round 2: the legend was 788 words)."""
@@ -1560,6 +1642,7 @@ def caption(F, hidden=None):
     unit = 'g·L⁻¹'
     pr = F['proteome']
     pi25, pi_best = rel['sims'][25]['PI'], rel['bsf_PI'][rb['sim']]
+    assert pi25 == rel['bsf_PI'][25]
     ratio = (pi_best - pi25) / REPRO_MARGIN_PI
     ratio_word = WORDS.get(int(round(ratio)), f'{ratio:.0f}')
     ibo_ret = [camp[k]['returned']['irr_pct'] for k in C.IBO_SCOUTS]
@@ -1602,43 +1685,63 @@ def caption(F, hidden=None):
     n_cop_word = WORDS.get(seeds['n_coprod_gt_U'], str(seeds['n_coprod_gt_U']))
     best_cop = C.fmt_irr(seeds['best_coprod_irr_pct'])
     n_pw = sd['relay_rep']['n_pw']
+    # fresh round 1: the headline in two short sentences, one per finding
+    # (the one-sentence, 50-word headline nested 'four of them ... above its
+    # plateau'); the seeded co-producers and their best move to (a)
+    sobol = F['sobol']
+    n_seeded_sims = g['n_try'] + camp['relay']['max_sim']
+    fails = {k: camp[k]['n_fail'] for k in C.MAIN_KEYS}
+    role_order = ' / '.join(C.campaign(k).role for k in C.ETOH_SCOUTS)
+    v25 = rel['sims'][rel['first_ge25']]['bsf_pct']
+    col = COLUMN_COUNT
+    pi_gain = pi_best - pi25
     legend = [
-        f"**Figure N | Isobutanol TRY campaigns visit designs more "
-        f"profitable than any design this work's uninformed profitability "
-        f"campaign reached; seeded with the scouts' trials, {n_cop_word} of "
-        f"them co-producers above its plateau (best {best_cop}), "
-        f"profitability search beats every seed within "
-        f"{rel['first_gt_best_seed']} trials and reaches a "
-        f"{C.fmt_irr(rb['irr_pct'])} co-producer.** "
+        f"**Figure N | Isobutanol TRY scouts visit designs above the {U} "
+        f"ethanol-only plateau of this work's uninformed profitability "
+        f"campaign but return low-IRR designs. Seeded with the scouts' "
+        f"trials, profitability search co-produces above that plateau on "
+        f"{C.fmt_trial(rel['first_gt_U'])}, beats every seed by "
+        f"{C.fmt_trial(rel['first_gt_best_seed'])} and reaches "
+        f"{C.fmt_irr(rb['irr_pct'])}.** "
         f"Eight Gaussian-process campaigns searched one "
         f"{n_dec}-dimensional strain-design and feeding space. Two maximized "
         f"profitability (profitability index, shown as internal rate of "
         f"return, IRR): **uninformed** (cyan, "
         f"{C.fmt_int(camp['unin']['max_sim'])} trials) and **TRY-informed** "
-        f"(teal, {C.fmt_int(camp['relay']['max_sim'])} trials, starting from "
-        f"{C.fmt_int(seeds['n'])} scout trials: the "
-        f"{seeds['n_keep_above']} at least as profitable as the starting "
-        f"strain plus {seeds['n_maximin']} space-filling ones). Six TRY "
-        f"campaigns (the scouts) each maximized one titer, rate or yield of "
-        f"ethanol ({fam['etoh']}, amber) or isobutanol ({fam['ibo']}, "
-        f"violet); trial counts exclude their {C.fmt_int(g['n_try'])} "
-        f"simulations. Dashed cyan: uninformed plateau, {U} (tinted above); "
-        f"dotted grey: starting strain, {start}; dotted violet: best seed, "
-        f"{best_seed}; loss: IRR < 0 or none. Making isobutanol: ≥ {thr} "
-        f"{unit}; co-production: ≥ {thr} {unit} of each alcohol.",
+        f"(teal, {C.fmt_int(camp['relay']['max_sim'])} trials, started from "
+        f"{C.fmt_int(seeds['n'])} seeds). The seeds were "
+        f"{seeds['n_keep_above']} of the {seeds['n_eligible_above']} scout "
+        f"trials at least as profitable as the starting strain "
+        f"({seeds['n_quarantined_above']} convergence-quarantined and "
+        f"{WORDS[seeds['n_duplicate_above']]} duplicate dropped) and "
+        f"{seeds['n_maximin']} space-filling ones. Six TRY campaigns (the "
+        f"scouts) each maximized one titer, rate or yield of ethanol "
+        f"({fam['etoh']}, amber) or isobutanol ({fam['ibo']}, violet). The "
+        f"TRY-informed campaign's {C.fmt_int(camp['relay']['max_sim'])} "
+        f"trials do not count the scouts' {C.fmt_int(g['n_try'])} "
+        f"simulations. Trial: simulated index, 1-based (preloaded seeds "
+        f"excluded); only completed trials are shown. Dashed cyan: "
+        f"uninformed plateau, {U} (tinted above); dotted grey: starting "
+        f"strain, {start}; dotted violet: best seed, {best_seed}; loss: "
+        f"IRR < 0 or none. Making isobutanol: ≥ {thr} {unit}; "
+        f"co-production: ≥ {thr} {unit} of each alcohol.",
         '',
         f"**(a)** Best IRR so far. The uninformed campaign plateaued at {U} "
         f"(ethanol only) from {C.fmt_trial(ui['plateau_sim'])} to "
-        f"{C.fmt_int(camp['unin']['max_sim'])} (cyan band: its space-filling "
-        f"start-up). Left: the seeds; all {seeds['n_gt_U']} above {U} are "
-        f"from {fam['ibo']} campaigns, {n_cop_word} of them co-producers "
-        f"(teal rings). The TRY-informed campaign {first_word} on "
-        f"{C.fmt_trial(1)}, co-produced at {C.fmt_irr(s2['irr_pct'])} on "
-        f"{C.fmt_trial(2)}, beat every seed on "
-        f"{C.fmt_trial(rel['first_gt_best_seed'])} "
-        f"({C.fmt_irr(s_seed['irr_pct'])}) and co-produced from then on. "
-        f"Inset (linear trial axis): refinement to {C.fmt_irr(rb['irr_pct'])}"
-        f" at {C.fmt_trial(rb['sim'])}, {ratio_word} times the "
+        f"{C.fmt_int(camp['unin']['max_sim'])} (cyan strip: its "
+        f"space-filling start-up; the TRY-informed campaign had none). "
+        f"Left: the seeds by scout family; all {seeds['n_gt_U']} above {U} "
+        f"are from {fam['ibo']} campaigns, {n_cop_word} of them co-producers "
+        f"(teal rings; best {best_cop}). The TRY-informed campaign "
+        f"{first_word} on {C.fmt_trial(1)}, co-produced at "
+        f"{C.fmt_irr(s2['irr_pct'])} on {C.fmt_trial(2)}, beat every seed "
+        f"on {C.fmt_trial(rel['first_gt_best_seed'])} "
+        f"({C.fmt_irr(s_seed['irr_pct'])}) and reached "
+        f"{C.fmt_irr(v25)} on {C.fmt_trial(rel['first_ge25'])}; every later "
+        f"improvement co-produced. Inset (linear trial axis): refinement "
+        f"from {C.fmt_irr(rel['sims'][25]['bsf_pct'])} ({C.fmt_trial(25)}) "
+        f"to {C.fmt_irr(rb['irr_pct'])} ({C.fmt_trial(rb['sim'])}), a PI "
+        f"gain of {pi_gain:.3f}, {ratio_word} times the {REPRO_MARGIN_PI} "
         f"reproducibility margin.",
         '',
         f"**(b)** IRR vs isobutanol's share of the alcohol titer, all "
@@ -1647,10 +1750,12 @@ def caption(F, hidden=None):
         f"campaign's {ib5['n']} isobutanol-making designs, all worse (best "
         f"{C.fmt_irr(ib5['max_irr_pct'])}) and more often losing money "
         f"({_pct0(ib5['pct_losing'])} vs "
-        f"{_pct0(ui['ibo_lt5']['pct_losing'])}). Open violet ○ □ △: "
-        f"{fam['ibo']} best visits (as in c); ○ is the best seed. ◆, ★: "
-        f"uninformed and TRY-informed bests (★: {rb['etoh']:.0f} {unit} "
-        f"ethanol + {rb['ibo']:.0f} {unit} isobutanol); all "
+        f"{_pct0(ui['ibo_lt5']['pct_losing'])}). Number beside the "
+        f"100 % column: the {col['n']} isobutanol-only scout designs above "
+        f"{U} that overlap there. Open violet ○ □ △: {fam['ibo']} best "
+        f"visits (as in c); ○ is the best seed. ◆, ★: uninformed and "
+        f"TRY-informed bests (★: {rb['etoh']:.0f} {unit} ethanol + "
+        f"{rb['ibo']:.0f} {unit} isobutanol); all "
         f"{g['n_relay_gt_best_seed']} designs above {best_seed} are "
         f"TRY-informed co-producers.",
         '',
@@ -1660,25 +1765,34 @@ def caption(F, hidden=None):
         f"returned {ret_txt}; the {fam['etoh']} campaigns never exceeded "
         f"{C.fmt_irr(etoh_bv)}. –: not applicable.",
         '',
-        f"**(d, e)** Titers and metabolic proteome of each returned design. "
-        f"Dotted: the penalty-free budget, "
-        f"{F['budget']:.3f} g·(g DCW)⁻¹; designs beyond it grow more slowly "
-        f"(×: growth factor). The TRY-informed co-producer keeps a reduced ethanol branch "
-        f"(Pdc {pdc_ratio:.2f}× the starting strain's) within the budget.",
+        f"**(d, e)** Titers and metabolic proteome of each returned design: "
+        f"the returned strains differ in products and proteome. Dotted: the "
+        f"penalty-free budget, {F['budget']:.3f} g·(g DCW)⁻¹; designs beyond "
+        f"it grow more slowly (×: growth factor). The TRY-informed "
+        f"co-producer keeps a reduced ethanol branch (Pdc {pdc_ratio:.2f}× "
+        f"the starting strain's) and stays within the budget. In e, the "
+        f"light amber and light violet are the enzymes Adh1 and Adh6, not "
+        f"the scout families.",
         '',
         f"**(f)** Share of trials making isobutanol (logit) vs IRR of each "
-        f"campaign's best visit and returned design; hexagon: the "
-        f"seeds, from which the TRY-informed campaign starts (arrow). Light "
-        f"diamond: a replicate uninformed campaign (Fig. S1), which returned "
-        f"a {C.fmt_irr(rps['best_irr_pct'])} co-producer but reached 25 % "
-        f"only at {C.fmt_trial(rep['unin_rep']['first_ge25'])} (TRY-informed: "
-        f"{C.fmt_trial(rel['first_ge25'])}).",
+        f"campaign's best visit (open) and returned design (filled). "
+        f"Hexagon: the seeds (x, share of seeds making isobutanol, "
+        f"{seeds['exploration_pct']:.1f} %; y, best seed, {best_seed}), from "
+        f"which the TRY-informed campaign starts (arrow). Light diamond: a "
+        f"replicate uninformed campaign (Fig. S1), which returned a "
+        f"{C.fmt_irr(rps['best_irr_pct'])} co-producer but reached 25 % "
+        f"only at {C.fmt_trial(rep['unin_rep']['first_ge25'])} "
+        f"(TRY-informed: {C.fmt_trial(rel['first_ge25'])}; see a).",
         '',
         f"Neither objective alone reliably returned a profitable co-producer "
         f"here (unseeded profitability search plateaued on ethanol in "
         f"{WORDS[n_unseeded_plateau]} of two runs); seeded search beat its "
         f"best seed within {beat} trials in both seeded runs (Fig. S1; the "
-        f"replicate's seeds also held {n_pw} price-weighted-yield trials).",
+        f"replicate's seeds also held {n_pw} price-weighted-yield trials). "
+        f"The seeded route used {C.fmt_int(n_seeded_sims)} simulations "
+        f"({C.fmt_int(g['n_try'])} scout + "
+        f"{C.fmt_int(camp['relay']['max_sim'])}), the uninformed campaign "
+        f"{C.fmt_int(camp['unin']['max_sim'])}.",
     ]
     methods = [
         METHODS_MARK,
@@ -1689,6 +1803,13 @@ def caption(F, hidden=None):
         f"the {fam['ibo']} and {C.fmt_int(seeds['n_etoh'])} from the "
         f"{fam['etoh']} campaigns) exceeded its start-up count, so it had no "
         f"space-filling start-up: its GP proposed every trial.",
+        f"* Trial = CSV trial_number + 1 (TRY-informed: trial_number − "
+        f"{rel['sim_offset']}; its best, {C.fmt_trial(rb['sim'])}, is "
+        f"trial_number {C.fmt_int(rb['sim'] + rel['sim_offset'])}). FAIL "
+        f"rows, excluded everywhere: uninformed {fails['unin']}, "
+        f"TRY-informed {fails['relay']}, {fam['etoh']} "
+        f"{'/'.join(str(fails[k]) for k in C.ETOH_SCOUTS)} and {fam['ibo']} "
+        f"{'/'.join(str(fails[k]) for k in C.IBO_SCOUTS)} ({role_order}).",
         f"* PI = net present value at a {HURDLE_PCT} % hurdle rate / total "
         f"capital investment. The reproducibility margin is the "
         f"cross-process margin of the deterministic PI objective, ΔPI "
@@ -1697,14 +1818,31 @@ def caption(F, hidden=None):
         f"* The seeds were preloaded with their recorded objective values, "
         f"without re-simulation; the {g['n_try_gt_U']} scout trials above "
         f"{U} are among them ({g['n_try_gt_U_ibo_only']} isobutanol-only, "
-        f"< {thr} {unit} ethanol; {g['n_try_gt_U_coprod']} co-producers).",
+        f"< {thr} {unit} ethanol; {g['n_try_gt_U_coprod']} co-producers). "
+        f"The {seeds['n_keep_above']} were picked by PI, so the seed set is "
+        f"not blind to profitability.",
+        f"* No compute-matched control (e.g. "
+        f"{C.fmt_int(n_seeded_sims)} random or space-filling seeds) was run. "
+        f"Two {C.fmt_int(sobol['campaign']['n'])}-design Sobol' random "
+        f"samples of the same space bracket it: under the campaigns' own "
+        f"sampling measure no design exceeded the {HURDLE_PCT} % hurdle "
+        f"(best {C.fmt_irr(sobol['campaign']['max_irr_pct'])}); under a "
+        f"linear engineering prior {sobol['screening']['n_gt_hurdle']} did "
+        f"(best {C.fmt_irr(sobol['screening']['max_irr_pct'])}, below the "
+        f"best seed). Seeding is shown to buy speed and reliability here, "
+        f"not unique access to designs above the plateau.",
         f"* (b) omits the {C.fmt_int(g['n_alcohol_lt1'])} designs making < "
         f"{C.SHARE_MIN_ALCOHOL:g} {unit} alcohol (none has an IRR); "
         f"{fam['etoh']} designs lie mostly under the uninformed column. The "
         f"uninformed campaign proposed {ib5['n_after_plateau']} of its "
         f"{ib5['n']} isobutanol-making designs after "
         f"{C.fmt_trial(ui['plateau_sim'])} "
-        f"({ib5['pct_of_post_plateau']:.0f} % of its later trials). (c) The "
+        f"({ib5['pct_of_post_plateau']:.0f} % of its later trials). No "
+        f"design making < {thr} {unit} isobutanol exceeds {U} (b's title). "
+        f"The {WORDS[col['n_ibo_only'] - col['n']]} other isobutanol-only "
+        f"scout design above {U} is the titer best visit (□). The outlined "
+        f"designs' label sits on a translucent white backing that dims, but "
+        f"does not hide, the designs behind it. (c) The "
         f"{fam['etoh']} campaigns returned {min(etoh_ret):.1f}–"
         f"{C.fmt_irr(max(etoh_ret))}.",
         f"* (f) The replicate uninformed campaign made isobutanol in "
@@ -1712,24 +1850,12 @@ def caption(F, hidden=None):
         f"design at {C.fmt_trial(rep['unin_rep']['best_sim'])}; the unseeded "
         f"runs reached 25 % {un25_txt}. The seeded runs' best seeds were "
         f"{beat_seeds}.",
-        f"* (a) Inset: {C.fmt_irr(rel['sims'][25]['bsf_pct'])} at "
-        f"{C.fmt_trial(25)} to {C.fmt_irr(rb['irr_pct'])} at "
-        f"{C.fmt_trial(rb['sim'])}, PI {pi25:.2f} → {pi_best:.2f}. (b) No "
-        f"design making < {thr} {unit} isobutanol exceeds {U} (b's title).",
-        *(["* (b) The outlined designs' label sits on "
-           + ("an opaque white box" if hidden['alpha'] >= 0.999 else
-              f"a white box ({hidden['alpha'] * 100:.0f} % opaque)")
-           + f" (no position between IRR 0 and the starting strain is free "
-           f"of designs) that hides "
-           f"{WORDS.get(hidden['outlined'], hidden['outlined'])} of the "
-           f"{ib5['n']} outlined designs, none the best, and "
-           f"{hidden['other']} other designs."] if hidden else []),
-        f"* (e) Pdc and ALS→Aro10 commit carbon to ethanol and isobutanol; "
-        f"light shades: Adh1, Adh6. Constant proteome sectors are omitted; "
-        f"the "
-        f"{WORDS[len(tagged)]} designs beyond the budget grow at {growth} "
-        f"of their penalty-free rate. The scouts' {C.fmt_int(g['n_try'])} "
-        f"simulations are by-products of the TRY campaigns.",
+        f"* (e) Pdc and ALS→Aro10 commit carbon to ethanol and isobutanol. "
+        f"The translation (φ_T = {F['phi_T']:.3f}) and housekeeping sectors "
+        f"are omitted; the {WORDS[len(tagged)]} designs beyond the budget "
+        f"grow at {growth} of their penalty-free rate. The scouts' "
+        f"{C.fmt_int(g['n_try'])} simulations are by-products of the TRY "
+        f"campaigns.",
         f"* The best design lies at {WORDS.get(n_hits, n_hits)} search "
         f"bounds, so higher IRR may exist outside the searched ranges.",
         f"* IRRs are at default prices under the model version used for the "
@@ -1737,6 +1863,21 @@ def caption(F, hidden=None):
         f"{C.fmt_irr(100 * START_IRR_CURRENT_MODEL)} under the current model "
         f"version).",
     ]
+    # fresh round 1 claims: the seed-selection arithmetic, the compute
+    # caveat's bracket, the column count, the PI gain vs the margin
+    assert (seeds['n_eligible_above'] - seeds['n_quarantined_above']
+            - seeds['n_duplicate_above'] == seeds['n_keep_above'])
+    assert seeds['n_quarantined_kept'] == 0
+    assert seeds['duplicate_max_rel_diff'] < 1e-9
+    assert sobol['campaign']['n_gt_hurdle'] == 0
+    assert (0 < sobol['screening']['n_gt_hurdle']
+            and sobol['screening']['max_irr_pct'] < seeds['best_irr_pct'])
+    assert col['n_ibo_only'] - col['n'] == 1
+    assert camp['it']['best_visit']['share_pct'] < COL_SHARE_MIN
+    assert camp['it']['best_visit']['etoh'] < C.ETOH_THRESHOLD
+    assert abs(pi_gain / REPRO_MARGIN_PI - ratio) < 1e-12
+    assert all(rel['sims'][k]['class'] == 'coprod'
+               for k in (rel['first_gt_best_seed'], rel['first_ge25']))
     # the caption's quoted claims must agree with the figure's facts
     assert ratio > 1, ratio
     assert n_unseeded_plateau == 1
@@ -1778,7 +1919,7 @@ def main(argv=None):
         print(f'DRAFT: {n_bad} render-check problem(s); not a release render')
         sys.exit(1)
     if not args.no_caption:
-        txt = caption(F, hidden=dict(BLOCK_HIDDEN))
+        txt = caption(F)
         with open(CAPTION_PATH, 'w', encoding='utf-8') as fh:
             fh.write(txt)
         n_leg = len(txt.split(METHODS_MARK)[0].split())

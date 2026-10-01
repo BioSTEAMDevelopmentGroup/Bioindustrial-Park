@@ -81,6 +81,8 @@ Facts
     Expect, E(value, tol=None)  (a str literal sets tol from its decimals)
     fact_table(facts=None) -> list of FactRow(path, computed, expected, tol, ok)
     check_facts(verbose=False, raise_on_fail=True) -> facts
+    sobol_reference() -> the two Sobol' random designs of the same space
+        (SOBOL_STEMS: campaign / screening measure; facts['sobol'])
     FactsMismatch (AssertionError subclass)
     literal_scan(paths=None) -> hits of the forbidden annotation literals
 Formatting (build ALL annotation text from facts with these)
@@ -131,7 +133,8 @@ __all__ = [
     'compute_facts', 'EXPECTED', 'Expect', 'E', 'FactRow', 'fact_table',
     'check_facts', 'FactsMismatch', 'literal_scan', 'FORBIDDEN_LITERALS',
     'fmt_pct', 'fmt_irr', 'fmt_int', 'fmt_num', 'fmt_trial',
-    'assert_sim_safe', 'FORBIDDEN_MODULES',
+    'assert_sim_safe', 'FORBIDDEN_MODULES', 'SOBOL_STEMS',
+    'sobol_reference',
 ]
 
 # %% Paths ---------------------------------------------------------------------
@@ -838,6 +841,32 @@ def _compute_facts():
         'best_coprod_ibo': float(bc['ibo']),
         'best_coprod_etoh': float(bc['etoh']),
     })
+    # fresh round 1: the 327 kept seeds are NOT all the scout trials at
+    # least as profitable as the starting strain: 330 COMPLETE scout rows
+    # reach RELAY_KEEP_ABOVE; the relay selection dropped the convergence-
+    # quarantined ones (n_sims_run == 5 and final_drift > 1e-4, ko's rule)
+    # and exact duplicates of a kept row (unit-cube dedupe)
+    sc = pd.concat([complete(k).assign(donor_key=k) for k in SCOUT_KEYS],
+                   ignore_index=True)
+    pl = sc['PI (log-tail)'].to_numpy(float)
+    el = sc[np.isfinite(pl) & (pl >= RELAY_KEEP_ABOVE)]
+    quar = ((el['n_sims_run'] == 5) & (el['final_drift'] > 1e-4)).to_numpy()
+    kept = man[keep]
+    kset = set(zip(kept['donor_key'], kept['trial_number'].astype(int)))
+    in_kept = np.array([(a, int(b)) in kset for a, b in
+                        zip(el['donor_key'], el['trial_number'])])
+    rest = el[~in_kept & ~quar]
+    dec = list(DECISION_VARS)
+    X = kept[dec].to_numpy(float)
+    dup_rel = [float((np.abs(X - r) / np.maximum(np.abs(r), 1e-12)).max(1)
+                     .min()) for r in rest[dec].to_numpy(float)]
+    facts['seeds'].update({
+        'n_eligible_above': int(len(el)),
+        'n_quarantined_above': int(quar.sum()),
+        'n_quarantined_kept': int((quar & in_kept).sum()),
+        'n_duplicate_above': int(len(rest)),
+        'duplicate_max_rel_diff': max(dup_rel) if dup_rel else 0.0,
+    })
 
     # --- the relay (TRY-informed) campaign
     rel_d = load_trajectory('relay')
@@ -993,7 +1022,41 @@ def _compute_facts():
         'baseline_sector_sum_err': abs(sum(base['sectors'].values())
                                        - float(base['Phi_M'])),
     }
+    facts['sobol'] = sobol_reference()
     return facts
+
+
+# Space-filling random designs of the SAME 12-d split space (the Sobol'
+# sensitivity runs, sensitivity_analysis / evaluate_sobol_split12d.py): the
+# closest thing to a compute-matched random-seed control (fresh round 1,
+# skeptic). 'campaign' = the campaigns' own sampling measure, 'screening' =
+# the linear engineering-prior measure. Read-only CSV reads
+SOBOL_STEMS = {
+    'campaign': 'kin_sobol_ethanol_isobutanol_metabolic_split_12d_'
+                'rb0.001-4_ib0.75-1.5_aA_burden_seed20260920',
+    'screening': 'kin_sobol_ethanol_isobutanol_metabolic_split_12d_'
+                 'screening_rb0.1-4_lin0_ib0.75-1.5_aA_burden_seed20260920',
+}
+HURDLE = 0.15                     # PI > 0  <=>  IRR > the 15 % hurdle
+
+
+def sobol_reference():
+    """{measure: {'n' COMPLETE rows, 'n_gt_hurdle' (PI > 0), 'max_irr_pct',
+    'n_gt_U'}} of the two Sobol' designs."""
+    U = plateau()
+    out = {}
+    for m, stem in SOBOL_STEMS.items():
+        d = pd.read_csv(os.path.join(RESULTS, stem + '_trajectory.csv'),
+                        low_memory=False)
+        d = d[d['state'] == 'COMPLETE']
+        irr = d['IRR'].to_numpy(float)
+        fin = irr[np.isfinite(irr)]
+        out[m] = {'n': int(len(d)),
+                  'n_gt_hurdle': int((d['PI'].to_numpy(float) > 0).sum()),
+                  'n_irr_gt_hurdle': int((fin > HURDLE).sum()),
+                  'n_gt_U': int((fin > U + ABOVE_EPS).sum()),
+                  'max_irr_pct': _pct(fin.max())}
+    return out
 
 
 def compute_facts():
@@ -1129,6 +1192,9 @@ EXPECTED = {
         'n_coprod': E(23), 'n_coprod_gt_U': E(4),
         'best_coprod_irr_pct': E('21.15'), 'best_coprod_donor': E('ip'),
         'best_coprod_ibo': E('29.9'), 'best_coprod_etoh': E('50.1'),
+        'n_eligible_above': E(330), 'n_quarantined_above': E(2),
+        'n_quarantined_kept': E(0), 'n_duplicate_above': E(1),
+        'duplicate_max_rel_diff': E(0.0, 1e-9),
     },
     'relay': {
         'sim_offset': E(999), 'sim_offset_unique': E(1),
@@ -1271,6 +1337,15 @@ EXPECTED = {
         'shared_startup_rows': E(51),
         'nan_irr_complete_rows': E(0),
         'baseline_sector_sum_err': E(0.0, tol=1e-6),
+    },
+    # fresh round 1: the random space-filling reference designs
+    'sobol': {
+        'campaign': {'n': E(4091), 'n_gt_hurdle': E(0),
+                     'n_irr_gt_hurdle': E(0), 'n_gt_U': E(0),
+                     'max_irr_pct': E('13.68')},
+        'screening': {'n': E(4091), 'n_gt_hurdle': E(19),
+                      'n_irr_gt_hurdle': E(19), 'n_gt_U': E(15),
+                      'max_irr_pct': E('21.51')},
     },
 }
 

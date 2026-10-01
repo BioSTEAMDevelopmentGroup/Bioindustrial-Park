@@ -53,10 +53,13 @@ IRR axes
     irr_plot(v, rng=None)          IRR fraction -> plot coordinate (% if
                                    >= 0; a loss -> -3, jittered +-2.4 if rng)
     irr_axis(ax, which='y', step=5, title='IRR [%]', band=True,
-             loss_fs=None, zero_label=True)
+             loss_fs=None, zero_label=True, loss_at=None)
                                    limits -6..31, ticks 'loss', 0, step..30,
                                    minors outside the band, loss band + 0
-                                   line (narrow horizontal axis: loss_fs=9)
+                                   line (narrow horizontal axis: loss_at=
+                                   loss_label_x(width_in) keeps 'loss' and
+                                   '0' at full size, apart)
+    loss_label_x(width_in, fontsize=None)  the 'loss' tick x clear of '0'
     log_trial_axis(ax, which='x', lim=(1, 2200))  log trial axis, majors
                                    '1', '10', '100', '1,000', log minors
     logit_pct_axis(ax, which='x', ticks_pct=(1, 2, 5, ..., 90),
@@ -85,7 +88,9 @@ Render checks (call after building the figure)
                                    annotation's window extent (per axes,
                                    insets included) and is not hidden under
                                    an opaque backing box (BACKING_MIN_ALPHA)
-    check_figure(fig, size=None, raise_on_fail=True, exempt=()) -> dict
+    check_figure(fig, size=None, raise_on_fail=True, exempt=(),
+                 marker_exempt=()) -> dict  (marker_exempt: texts the
+                                   marker check alone skips)
     FigureCheckError (AssertionError subclass)
 Palette checks
     cvd_check(pairs=CVD_PAIRS, min_de=12, raise_on_fail=True,
@@ -151,7 +156,13 @@ PALETTE = {
                                 # white / 4.6:1 on the tint, bluer than
                                 # the relay teal (CIE76 dE 10.8; the
                                 # suggested #08798A was dE 5.3)
-    'relay': '#0B6E7A',         # TRY-informed lines / markers / text
+    'relay': '#0B6E7A',         # TRY-informed lines / markers
+    'relay_text': '#0A5056',    # TRY-informed text (fresh round 1): the
+                                # line teal printed text 5.8 OKLab x 100
+                                # from unin_text, one colour to the eye;
+                                # this darker teal of the same hue is 15.7
+                                # (dL* 17.6), checked in CVD_PAIRS /
+                                # GRAY_PAIRS
     'etoh': '#E0A030',          # ethanol product (d), Pdc (e)
     'etoh_dark': '#A86F0C',     # ethanol-scout markers (edge), headers
     'etoh_light': '#F0CF8E',    # ethanol-scout dots / strips (alpha 0.55)
@@ -395,20 +406,24 @@ def loss_band(ax, which='y'):
 
 
 def irr_axis(ax, which='y', step=5, title='IRR [%]', band=True,
-             loss_fs=None, zero_label=True):
+             loss_fs=None, zero_label=True, loss_at=None):
     """An IRR axis: limits -6..31 %, major ticks 'loss' (at -3), 0, step, ..
     30, minors (step/5) outside the loss band, the loss band and 0 line, and
     the bold title (None = no title). Call style_ticks(ax) afterwards.
 
     On a HORIZONTAL IRR axis narrower than ~2.8 in the 'loss' and '0' tick
     labels collide at 12 pt (check_figure reports it as a tick collision):
-    pass loss_fs=9 (fits down to ~2.0 in) or zero_label=False."""
+    pass loss_fs=9 (fits down to ~2.0 in) or zero_label=False -- or, to
+    keep both labels at full size (fresh round 1: a smaller 'loss' or a
+    missing '0' read as inconsistent), loss_at = loss_label_x(ax, ...): the
+    'loss' tick moves left inside the band, clear of '0'."""
     axis = ax.yaxis if which == 'y' else ax.xaxis
     majors = list(range(0, 31, step))
     labels = ['loss'] + [str(m) for m in majors]
     if not zero_label:
         labels[1] = ''
-    axis.set_major_locator(FixedLocator([LOSS_CENTER] + majors))
+    axis.set_major_locator(FixedLocator(
+        [LOSS_CENTER if loss_at is None else float(loss_at)] + majors))
     axis.set_major_formatter(FixedFormatter(labels))
     mstep = step / 5.0
     minors = [m for m in np.arange(0, IRR_LIM[1] + 1e-9, mstep)
@@ -425,6 +440,26 @@ def irr_axis(ax, which='y', step=5, title='IRR [%]', band=True,
     if title:
         (ax.set_ylabel if which == 'y' else ax.set_xlabel)(
             bold_axis_title(title))
+
+
+def loss_label_x(width_in, fontsize=None, gap_in=None):
+    """x (IRR %) of the 'loss' tick on a HORIZONTAL IRR axis `width_in`
+    inches wide such that the 'loss' and '0' tick labels (at `fontsize`,
+    default the tick size) are TICK_LABEL_GAP_IN + 0.01 in apart: the band
+    centre (-3) when that already fits, else further left (never past the
+    band's left edge)."""
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    from matplotlib.figure import Figure
+    apply_style()
+    fs = FS['tick'] if fontsize is None else fontsize
+    gap = (TICK_LABEL_GAP_IN + 0.01) if gap_in is None else gap_in
+    fig = Figure(dpi=DPI)
+    r = FigureCanvasAgg(fig).get_renderer()
+    w = {t: fig.text(0, 0, t, fontsize=fs).get_window_extent(r).width / DPI
+         for t in ('loss', '0')}
+    per_in = (IRR_LIM[1] - IRR_LIM[0]) / float(width_in)
+    x = -(w['loss'] / 2 + w['0'] / 2 + gap) * per_in
+    return max(min(LOSS_CENTER, x), LOSS_BAND[0])
 
 
 def log_trial_axis(ax, which='x', lim=(1, 2200), title='Simulated trials'):
@@ -508,7 +543,7 @@ def campaign_style(c):
                 'light': PALETTE['base'], 'text': NOTE, 'marker': 'D'}
     if c.family == 'profit':
         col = PALETTE['relay'] if c.is_relay else PALETTE['unin']
-        txt = PALETTE['relay'] if c.is_relay else PALETTE['unin_text']
+        txt = PALETTE['relay_text'] if c.is_relay else PALETTE['unin_text']
         return {'color': col, 'dark': col, 'light': col, 'text': txt,
                 'marker': c.marker}
     fam = {'etoh': 'etoh', 'ibo': 'ibo', 'pw': 'pw'}[c.family]
@@ -848,19 +883,24 @@ def marker_text_hits(fig, pad_pt=MARKER_TEXT_PAD_PT, exempt=()):
     return msgs
 
 
-def check_figure(fig, size=None, raise_on_fail=True, exempt=()):
+def check_figure(fig, size=None, raise_on_fail=True, exempt=(),
+                 marker_exempt=()):
     """Draw and run the render checks: text_overlaps, tick_label_collisions,
     min_font_check, glyph_check, marker_text_hits (no scatter / marker point
     under an annotation unless an opaque backing box hides it) and the
     canvas size if `size` = (w, h) inches is given. `exempt` Text artists
-    are skipped by the overlap and marker checks. Prints every problem;
+    are skipped by the overlap and marker checks, `marker_exempt` ones by
+    the marker check only (a label deliberately drawn over data on a
+    translucent backing, whose dots stay visible). Prints every problem;
     raises FigureCheckError if any (unless raise_on_fail=False). Returns
     {'overlaps', 'ticks', 'fonts', 'glyphs', 'markers', 'size'} (lists of
     messages)."""
     res = {'overlaps': text_overlaps(fig, exempt=exempt),
            'ticks': tick_label_collisions(fig),
            'fonts': min_font_check(fig), 'glyphs': glyph_check(fig),
-           'markers': marker_text_hits(fig, exempt=exempt), 'size': []}
+           'markers': marker_text_hits(
+               fig, exempt=tuple(exempt) + tuple(marker_exempt)),
+           'size': []}
     if size is not None:
         got = tuple(round(float(v), 4) for v in fig.get_size_inches())
         if got != tuple(round(float(v), 4) for v in size):
@@ -897,9 +937,10 @@ _D65 = np.array([0.95047, 1.0, 1.08883])
 # co-occurring pairs (spec section 2) and the grayscale pairs (6.B.9)
 CVD_PAIRS = (('unin', 'relay'), ('unin', 'etoh_light'), ('relay', 'ibo_light'),
              ('etoh', 'ibo'), ('adh1', 'adh6'), ('gly', 'tca'),
-             ('etoh_light', 'ibo_light'))
+             ('etoh_light', 'ibo_light'), ('unin_text', 'relay_text'))
 CVD_MIN_DE = 12.0
-GRAY_PAIRS = {('unin', 'relay'): 15.0, ('etoh', 'ibo'): 20.0}
+GRAY_PAIRS = {('unin', 'relay'): 15.0, ('etoh', 'ibo'): 20.0,
+              ('unin_text', 'relay_text'): 15.0}
 
 
 def _hex2lin(h):

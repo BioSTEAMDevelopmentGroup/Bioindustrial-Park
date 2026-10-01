@@ -743,9 +743,11 @@ def draw(facts, items):
             color=S.NOTE, ha='right', va='center')
     ax.text(xr, ky - KEY_PITCH, 'bold growth: derated by more than 1 %',
             fontsize=FS_HEAD, color=S.NOTE, ha='right', va='center')
-    ax.text(xr, ky - 2 * KEY_PITCH, f'growth is derated once '
-            f'Φ$_\\mathrm{{M}}$ > {facts["budget"]:.4f}', fontsize=FS_HEAD,
-            color=S.NOTE, ha='right', va='center')
+    # fresh round 1: the two-tone Phi_M column explained (dark = above the
+    # budget, where growth is derated; grey = within it)
+    ax.text(xr, ky - 2 * KEY_PITCH, f'dark Φ$_\\mathrm{{M}}$: > '
+            f'{facts["budget"]:.4f}, growth derated',
+            fontsize=FS_HEAD, color=S.NOTE, ha='right', va='center')
 
     # --- colour bars under the heatmap, one per block
     for b in BLOCKS:
@@ -886,7 +888,8 @@ def write_caption(facts, f2, path=CAPTION_PATH):
         '* **Right.** IRR ("loss" = negative or no IRR; bold = above the '
         f'uninformed campaign\'s plateau, {C.fmt_pct(facts["U_pct"])}); the '
         "campaign's own objective; the metabolic proteome "
-        f'{ph} [g·(g DCW)<sup>−1</sup>]; and the growth factor (bold = '
+        f'{ph} [g·(g DCW)<sup>−1</sup>; dark = above the budget, grey = '
+        'within it]; and the growth factor (bold = '
         'derated by more than 1 %; growth is derated above '
         f'{ph} = {budget:.4f}, the penalty-free budget). The '
         f'starting strain\'s IRR ({C.fmt_pct(facts["start_irr_pct"])}) is '

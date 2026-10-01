@@ -106,6 +106,8 @@ All files are in `analyses/results/`. Study stems have the form
 | `unin_rep`, `relay_rep` | `pi_log-tail` / none and `_rlba1b2315` | Fig. S1 replicates |
 | `rep_iy` … `rep_ep`, `rep_pw` | the untagged scouts + `price-weighted_yield` | Fig. S1 replicate scouts |
 
+* The two Sobol' random designs of the same 12-d space (`kin_sobol_..._split_12d_{rb0.001-4_ib0.75-1.5,screening_rb0.1-4_lin0_ib0.75-1.5}_aA_burden_seed20260920_trajectory.csv`, `SOBOL_STEMS`) are read by `sobol_reference()` (`facts['sobol']`) for the main methods notes' compute caveat: no compute-matched random-seed control was run.
+
 * The scenario-A starting strain comes from `pk.baseline_set()` and `pk.BASELINE_A`. Its
   IRR is 12.60 % under the model version the campaigns ran with (12.79 % under the
   current one).
@@ -119,6 +121,8 @@ All files are in `analyses/results/`. Study stems have the form
 * `sim` is the simulated index: `trial_number - min(trial_number) + 1`, 1-based. For the
   relay this is `trial_number - 999`.
 * In figure text, "trial N" means `sim`.
+* The figure legends say this too: trial = CSV `trial_number` + 1 (TRY-informed:
+  `trial_number` − 999), and the per-campaign FAIL counts are in the main methods notes.
 * The `trial` fields in the facts are CSV trial numbers. For the 2,000-trial campaigns,
   `sim = trial + 1`; for example, the isobutanol-yield best visit is trial 842 = sim 843.
 
@@ -169,12 +173,17 @@ All files are in `analyses/results/`. Study stems have the form
 
 * House hexes are used for the uninformed (cyan `#18C4DC`) and TRY-informed (teal
   `#0B6E7A`) campaigns and for the baseline grey.
+* Text has its own two colours: uninformed `unin_text` `#087D98` and TRY-informed
+  `relay_text` `#0A5056` (a darker teal of the line's hue). The line teal as text was
+  only 5.8 OKLab×100 from `unin_text`, so the two read as one colour. The text pair is
+  in `CVD_PAIRS` and `GRAY_PAIRS` (ΔL* 17.7).
 * The scouts are coloured by product family: ethanol amber, isobutanol violet. Within a
   family, the role is the marker: ○ yield, □ titer, △ productivity.
-* `cvd_check()` requires CIE76 ΔE ≥ 12 for the seven co-occurring pairs. This holds under
+* `cvd_check()` requires CIE76 ΔE ≥ 12 for the eight co-occurring pairs. This holds under
   normal vision and under simulated deutan, protan and tritan vision (Machado 2009). The
   worst pair is adh1/adh6 under tritan, at 17.7.
-* The grayscale lightness gaps are 30.6 for cyan/teal and 25.5 for amber/violet.
+* The grayscale lightness gaps are 30.6 for cyan/teal, 25.5 for amber/violet and 17.7
+  for the two text colours.
 * The dataviz skill's validator is run as an advisory check when it is available.
 * All text is in Arial, at 9 pt or larger on the 10-in canvas (6.4 pt at the 180-mm print
   width).
@@ -183,11 +192,15 @@ All files are in `analyses/results/`. Study stems have the form
 * Ticks follow the house rule: all four sides, left/bottom in-and-out, top/right inward,
   major 4 pt, minor 2 pt.
 * On a horizontal IRR axis narrower than about 2.8 in, the "loss" and "0" tick labels
-  collide. Use `irr_axis(ax, 'x', loss_fs=9)`.
+  collide at the band centre. Use `irr_axis(ax, 'x', loss_at=loss_label_x(width_in))`:
+  both labels stay at the tick size and "loss" moves left inside the band (main c,
+  S1b).
 * No data marker may cross a letter. `marker_text_hits` (run by `check_figure`) flags
   every scatter or marker point whose centre falls inside an annotation's text extent
   (1-pt pad), per axes, insets included, plus figure-level text over any axes. A point
   under an opaque backing box (face alpha ≥ 0.85, drawn above the point's layer) is
-  hidden and passes. Put labels on empty spots first; use a backing box only where no
-  spot is free, and say in the caption's methods notes what it hides. The main figure's
-  panel-b labels are placed this way by `_spot` / `_best_spot`.
+  hidden and passes. Put labels on empty spots first. Where no spot is free, prefer a
+  translucent backing (alpha 0.7) that dims rather than hides the data, and pass that
+  label as `check_figure(..., marker_exempt=...)`; it is still placed to cover the
+  fewest key points. The main figure's panel-b labels are placed this way by `_spot` /
+  `_best_spot`; only the outlined-designs block uses the translucent backing.

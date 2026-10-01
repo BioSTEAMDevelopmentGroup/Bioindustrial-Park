@@ -94,11 +94,13 @@ CIRC25_S, CIRC25_LW = 30, 1.3                     # first-25 % circles
 CP_GAP_X_PT = 1.5                                 # circle edge -> text left
 CP_GAP_Y_PT = 1.2                                 # line edge -> text top
 # Best-design markers sit at their TRUE positions. The two TRY-informed bests
-# (trials 913 / 824, IRR 27.3 / 27.1 %) are ~4 pt apart on the log axis, so
-# this work's filled star is drawn larger and the replicate's smaller
-# white-faced star ON TOP of it (zorder), both readable, neither moved
-STAR_S_FILLED = 230                               # this work's star (s, pt^2)
-STAR_S_OPEN = 80                                 # replicate's open star
+# (trials 913 / 824, IRR 27.3 / 27.1 %) are ~4 pt apart on the log axis.
+# Fresh round 1: the small open star on top of the large filled one read as
+# one smudge; now the replicate's open star is drawn LARGE (a ring-like
+# outline on a white face) and this work's smaller filled star sits inside
+# it, on top: two concentric-looking stars, neither moved
+STAR_S_FILLED = 100                               # this work's star (s, pt^2)
+STAR_S_OPEN = 260                                 # replicate's open star
 OPEN_STAR_LW = 1.2                                # its outline (pt)
 OPEN_STAR_HALO_LW = 2.4                           # its white halo (pt)
 DIAMOND_S = 42                                    # unseeded best diamonds
@@ -454,26 +456,25 @@ def draw_panel_a(fig, facts, F):
             size = DIAMOND_S
         x_b, y_b = prog[key]['best_sim'], prog[key]['best_pct']
         if mk == '*' and not filled:
-            # the replicate's open star overlaps this work's same-coloured
-            # filled star: its white face goes UNDER the filled star (it
-            # hides the lines, not the other star), its outline OVER it on
-            # a white halo, so both stars stay whole and readable
+            # the replicate's LARGE open star: white face (hides the lines
+            # under it), outline on a white halo, all UNDER this work's
+            # smaller filled star (z 7.6), which sits inside it
             ax.scatter([x_b], [y_b], s=size, marker=mk, facecolor='white',
                        edgecolor='none', lw=0, zorder=6.8)
-            for ec, lw, z in (('white', OPEN_STAR_HALO_LW, 7.4),
-                              (P[ckey], OPEN_STAR_LW, 7.5)):
+            for ec, lw, z in (('white', OPEN_STAR_HALO_LW, 6.9),
+                              (P[ckey], OPEN_STAR_LW, 7.0)):
                 ax.scatter([x_b], [y_b], s=size, marker=mk,
                            facecolor='none', edgecolor=ec, lw=lw, zorder=z)
             continue
         ax.scatter([x_b], [y_b], s=size,
                    marker=mk, facecolor=P[ckey] if filled else 'white',
                    edgecolor='white' if filled else P[ckey],
-                   lw=0.8 if filled else 1.2, zorder=7 if filled else 7.5)
+                   lw=0.8 if filled else 1.2, zorder=7.6 if filled else 7.5)
 
     # direct labels; the seeded label hangs from just below the axes top,
     # in the empty corner left of the seeded lines' climb
     ax.text(1.18, S.IRR_LIM[1] - SEEDED_LABEL_TOP_GAP,
-            'TRY-informed (seeded)', color=P['relay'],
+            'TRY-informed (seeded)', color=P['relay_text'],
             fontsize=S.FS['annot'], fontweight='bold', ha='left',
             va='top', zorder=8)
     U_pct = facts['U_pct']
@@ -556,13 +557,13 @@ def draw_panel_a(fig, facts, F):
     S.fig_text(fig, A_X, r0, 'this work / replicate', fontsize=fs,
                color=S.NOTE, style='italic', va='center', ha='left')
     S.fig_text(fig, x_c1, r0, 'TRY-informed', fontsize=fs, fontweight='bold',
-               color=P['relay'], va='center', ha='left')
+               color=P['relay_text'], va='center', ha='left')
     S.fig_text(fig, x_c2, r0, 'uninformed', fontsize=fs, fontweight='bold',
                color=P['unin_text'], va='center', ha='left')
     row_y = BAND_ROWS[1:1 + len(rows)]
     for (lab, v1, v2), y in zip(rows, row_y):
         S.fig_text(fig, A_X, y, lab, va='center', ha='left', **lab_kw)
-        S.fig_text(fig, x_c1, y, v1, fontsize=fs, color=P['relay'],
+        S.fig_text(fig, x_c1, y, v1, fontsize=fs, color=P['relay_text'],
                    va='center', ha='left')
         no_seed = v2 in ('no seeds', '–')
         S.fig_text(fig, x_c2, y, v2, fontsize=fs,
@@ -656,9 +657,9 @@ def draw_panel_b(fig, facts, F):
     if b_w < B_MIN_W:
         raise S.FigureCheckError(f'panel b strip axes only {b_w:.2f} in')
     ax = S.inch_axes(fig, B_X, AX_Y, b_w, AX_H)
-    # 'loss' and '0' touch on a 2-in IRR axis even at loss_fs=9: the band
-    # edge marks 0, so its label is dropped
-    S.irr_axis(ax, 'x', step=10, loss_fs=9, zero_label=False)
+    # fresh round 1: 'loss' at the tick size (it was 9 pt) and '0'
+    # labelled, as in main panel c: 'loss' moves left inside the band
+    S.irr_axis(ax, 'x', step=10, loss_at=S.loss_label_x(b_w))
     ax.set_ylim(*B_YLIM)
     S.tint_above(ax, U_pct, which='x')
     S.plateau_line(ax, U_pct, which='x')
@@ -826,9 +827,12 @@ def build_caption(facts, F):
         f'work\'s campaigns: the uninformed campaign and the TRY-informed '
         f'campaign seeded with {C.fmt_int(seeds["n"])} trials of the six '
         f'TRY scouts ({C.fmt_int(seeds["n_ibo"])} isobutanol-scout and '
-        f'{C.fmt_int(seeds["n_etoh"])} ethanol-scout trials: all '
-        f'{C.fmt_int(seeds["n_keep_above"])} scout trials with a '
-        f'profitability index at least the starting strain\'s, plus '
+        f'{C.fmt_int(seeds["n_etoh"])} ethanol-scout trials: '
+        f'{C.fmt_int(seeds["n_keep_above"])} of the '
+        f'{C.fmt_int(seeds["n_eligible_above"])} scout trials with a '
+        f'profitability index at least the starting strain\'s, '
+        f'{seeds["n_quarantined_above"]} convergence-quarantined trials and '
+        f'{seeds["n_duplicate_above"]} duplicate dropped, plus '
         f'{C.fmt_int(seeds["n_maximin"])} space-filling ones). Dashed lines '
         f'are replicates: an uninformed campaign (run {REPLICATE_RUN_DATE}) '
         f'whose {F["rep_startup_rows"]}-trial space-filling start-up design, '
@@ -845,8 +849,8 @@ def build_caption(facts, F):
         f'trials {C.fmt_int(pr["best_sim"])} and '
         f'{C.fmt_int(prr["best_sim"])} ({C.fmt_pct(pr["best_pct"])} and '
         f'{C.fmt_pct(prr["best_pct"])}), so their stars nearly coincide: '
-        f'this work\'s filled star is drawn larger and the replicate\'s open '
-        f'star on top of it. Italic labels give the products of every '
+        f'this work\'s smaller filled star is drawn inside the replicate\'s '
+        f'larger open star. Italic labels give the products of every '
         f'best-so-far '
         f'design of the two unseeded campaigns (co-producing = at least '
         f'{C.IBO_THRESHOLD:g} g·L⁻¹ each of isobutanol and ethanol; ethanol '
@@ -906,38 +910,40 @@ def build_caption(facts, F):
         '',
         '**What does not replicate.**',
         '',
-        f'* The unseeded plateau. Every improvement of this work\'s '
-        f'uninformed campaign was an ethanol-only design (all '
-        f'{F["n_steps"]["unin"]} best-so-far steps; first positive-IRR '
-        f'design at trial {F["unin_first_profitable_sim"]}, after its '
-        f'{F["main_startup_rows"]}-trial space-filling start-up design), '
-        f'and it stayed at {U} '
-        f'from trial {facts["U_sim"]} to trial '
-        f'{C.fmt_int(facts["campaigns"]["unin"]["max_sim"])}. The '
-        f'replicate\'s {F["rep_startup_rows"]}-trial space-filling start-up '
-        f'design already contained a co-production design with a positive '
-        f'IRR, though below the {HURDLE_PCT} % hurdle '
-        f'(trial {F["unin_rep_first_profitable_sim"]}: '
+        f'* The unseeded plateau: this work\'s uninformed campaign stayed at '
+        f'{U} (ethanol only) from trial {facts["U_sim"]} to trial '
+        f'{C.fmt_int(facts["campaigns"]["unin"]["max_sim"])}; every '
+        f'improvement of the replicate co-produced, from a start-up design '
+        f'on, and it passed 25 % at trial {w_25["sim"]}. With two runs this '
+        f'is an observation, not '
+        f'a test: 1 of 2 unseeded runs stayed on the ethanol-only plateau, '
+        f'while seeded search was fast in 2 of 2.',
+        '',
+        '*Methods notes (not part of the legend).*',
+        f'* Every improvement of this work\'s uninformed campaign was an '
+        f'ethanol-only design (all {F["n_steps"]["unin"]} best-so-far steps; '
+        f'first positive-IRR design at trial '
+        f'{F["unin_first_profitable_sim"]}, after its '
+        f'{F["main_startup_rows"]}-trial space-filling start-up design). The '
+        f'replicate\'s {F["rep_startup_rows"]}-trial start-up design already '
+        f'held a co-production design with a positive IRR below the '
+        f'{HURDLE_PCT} % hurdle (trial {F["unin_rep_first_profitable_sim"]}: '
         f'{C.fmt_pct(F["unin_rep_first_profitable_pct"])} with '
         f'{g(F["unin_rep_first_profitable_ibo"])} isobutanol + '
-        f'{g(F["unin_rep_first_profitable_etoh"])} ethanol), and every '
-        f'later improvement kept co-producing (all '
-        f'{F["n_steps"]["unin_rep"]} steps): it passed {U} at trial '
-        f'{w_esc["sim"]} ({C.fmt_pct(w_esc["irr_pct"])}; '
-        f'{g(w_esc["ibo"])} + {g(w_esc["etoh"])}), 25 % at trial '
-        f'{w_25["sim"]} ({C.fmt_pct(w_25["irr_pct"])}; {g(w_25["ibo"])} + '
-        f'{g(w_25["etoh"])}) and {C.fmt_pct(pur["best_pct"])} only at '
-        f'trial {C.fmt_int(pur["best_sim"])}.',
-        f'* In both unseeded runs every improvement kept the product class '
-        f'of the campaign\'s first positive-IRR design (in the start-up '
-        f'design for the replicate, trial '
-        f'{F["unin_rep_first_profitable_sim"]}; trial '
-        f'{F["unin_first_profitable_sim"]} here). With two runs this is an '
-        f'observation, not a test: 1 of 2 unseeded runs stayed on the '
-        f'ethanol-only plateau, while seeded search was fast in 2 of 2.',
-        '',
-        '"Trial" is the simulated index (preloaded seeds excluded); only '
-        'completed trials are used. IRRs are at default prices; a loss '
+        f'{g(F["unin_rep_first_profitable_etoh"])} ethanol), and every later '
+        f'improvement kept co-producing (all {F["n_steps"]["unin_rep"]} '
+        f'steps): it passed {U} at trial {w_esc["sim"]} '
+        f'({C.fmt_pct(w_esc["irr_pct"])}; {g(w_esc["ibo"])} + '
+        f'{g(w_esc["etoh"])}), 25 % at trial {w_25["sim"]} '
+        f'({C.fmt_pct(w_25["irr_pct"])}; {g(w_25["ibo"])} + '
+        f'{g(w_25["etoh"])}) and {C.fmt_pct(pur["best_pct"])} only at trial '
+        f'{C.fmt_int(pur["best_sim"])}. In both unseeded runs every '
+        f'improvement kept the product class of the campaign\'s first '
+        f'positive-IRR design.',
+        '* "Trial" is the simulated index, 1-based: CSV trial_number + 1, '
+        'or, for a TRY-informed campaign, trial_number minus its preload '
+        'size + 1 (preloaded seeds excluded); only completed trials are '
+        'used. IRRs are at default prices; a loss '
         '(IRR < 0, or no IRR for an outright money-loser) is drawn in the '
         'grey band. The replicate uninformed and scout campaigns ran before '
         'the model version was pinned; the replicate uninformed campaign\'s '
