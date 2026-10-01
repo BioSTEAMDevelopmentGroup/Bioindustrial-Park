@@ -15,12 +15,17 @@ honesty check (spec section 5.1, validated per sections 6 and 7).
     (dashed) -- and the two seeded (TRY-informed) campaigns: this work's
     `_rl15c111dc` relay (solid) and the 2026-09-23 `_rlba1b2315` relay seeded
     from the seven replicate scouts (dashed). A summary table above the axes
-    gives trials to >= 25 %, the IRR after 25 trials and the best IRR.
-(b) The seven replicate scouts (isobutanol TRY, price-weighted yield, ethanol
-    TRY): every COMPLETE trial's IRR as a strip, the best visit (open role
-    marker), the returned design (filled; argmax of the campaign's own
-    objective) and a connector; table of trials above this work's uninformed
-    plateau and the returned IRR.
+    gives the best preloaded seed and the trials to beat it (seeded only:
+    the like-for-like speed, since the replicate's seeds already held a
+    > 25 % design), trials to >= 25 %, the IRR after 25 trials and the best
+    IRR. The replicate TRY-informed best (trial 824, next to this work's
+    913) is drawn on a pin above the lines, its foot at the true point.
+(b) The seven replicate scouts in main panel c's family order (ethanol TRY,
+    isobutanol TRY, then price-weighted yield): every COMPLETE trial's IRR as
+    a strip, the best visit (open role marker), the returned design (filled;
+    argmax of the campaign's own objective) and a connector; table of trials
+    above this work's uninformed plateau and trials losing (main c's two
+    columns) and the returned IRR.
 
 Writes `kinBO_S1_replicates_<stamp>.{png,pdf}` (+ `_latest`) to
 `analyses/results/publication/Optimization-figures/` and the caption draft
@@ -61,28 +66,40 @@ REPLICATE_RUN_DATE = '2026-09-16'                 # replicate uninformed launch
 RELAY_REP_RUN_DATE = '2026-09-23'                 # _rlba1b2315 relay launch
 
 # %% Layout (inches, origin bottom-left) ------------------------------------
-AX_Y, AX_H = 0.62, 2.20
+AX_Y, AX_H = 0.62, 2.04
 A_X, A_W = 0.75, 4.10                             # panel a axes
-B_HDR_X = 5.20                                    # b group headers (left)
-B_LAB_R = 6.62                                    # b row labels (right edge)
-B_MRK_X = 6.73                                    # b role marker centre
-B_X, B_W = 6.86, 2.00                             # b strip axes
-B_COL1, B_COL2 = 9.19, 9.71                       # b table header centres
-B_COL1_R, B_COL2_R = 9.30, 9.97                   # b table value right edges
+B_HDR_X = 5.17                                    # b group headers (left)
+B_LAB_R = 6.10                                    # b row labels (right edge)
+B_MRK_X = 6.22                                    # b role marker centre
+B_X = 6.36                                        # b strip axes (left)
+B_TABLE_R = 9.97                                  # b table right edge
+B_COL_GAP = 0.13                                  # b gap between columns
+B_AX_GAP = 0.14                                   # b strip axes -> table
+B_MIN_W = 1.70                                    # narrowest b strip axes
 LETTER_Y = 3.68                                   # panel letters / titles
 LETTER_A_X, LETTER_B_X = 0.06, 5.02
-BAND_ROWS = (3.43, 3.27, 3.11, 2.95)              # header-band text rows
+# header-band text rows (centres): r0 = column heads, r1..r5 = table rows
+BAND_ROWS = (3.50, 3.355, 3.21, 3.065, 2.92, 2.775)
 LINE_LW = 2.2                                     # step-line width (a)
 DASH = (0, (4, 2))                                # replicate line style
+LEADER = dict(lw=0.7, solid_capstyle='butt')      # label / pin leaders (a)
+# The replicate TRY-informed best (trial 824) sits 0.05 in left of this
+# work's (913) on the log axis, at the same IRR: its open star is drawn at
+# (true trial / 10**PIN_DX_DEC, PIN_Y) on a leader from its true point, which
+# is marked by a small white-ringed dot (the caption says so)
+PIN_Y = 29.5                                      # IRR [%] of the pinned star
+PIN_DX_DEC = 0.2                                  # decades left of the point
+PIN_SIZE = 80                                     # pinned open star (s)
 
-# panel b rows (y increases downward); (kind, key or label, y)
+# panel b rows (y increases downward); (kind, key or label, y). Family order
+# as in main panel c (ethanol TRY, then isobutanol TRY), price-weighted last
 B_ROWS = (
-    ('header', 'ibo', 0.0),
-    ('row', 'rep_iy', 0.8), ('row', 'rep_it', 1.8), ('row', 'rep_ip', 2.8),
-    ('header', 'pw', 3.8),
-    ('row', 'rep_pw', 4.6),
-    ('header', 'etoh', 5.6),
-    ('row', 'rep_ey', 6.4), ('row', 'rep_et', 7.4), ('row', 'rep_ep', 8.4),
+    ('header', 'etoh', 0.0),
+    ('row', 'rep_ey', 0.8), ('row', 'rep_et', 1.8), ('row', 'rep_ep', 2.8),
+    ('header', 'ibo', 3.8),
+    ('row', 'rep_iy', 4.6), ('row', 'rep_it', 5.6), ('row', 'rep_ip', 6.6),
+    ('header', 'pw', 7.6),
+    ('row', 'rep_pw', 8.4),
 )
 B_YLIM = (8.9, -0.5)
 B_HEADER_TEXT = {'ibo': 'Isobutanol TRY', 'pw': 'Price-weighted',
@@ -224,6 +241,14 @@ def s1_facts(facts):
         bad.append('a best visit below its returned design')
     if facts['replicates']['unin_rep_startup_identical']:
         bad.append('replicate start-up identical to this work')
+    # caption: the replicate's best seed was already above 25 %, so its
+    # 'trials to 25 %' and 'trials to beat every seed' are the same event
+    prr = facts['replicates']['progress']['relay_rep']
+    if not (F['rep_best_seed_pct'] >= 25.0
+            and prr['first_ge25'] == F['relay_rep_first_gt_best_seed']):
+        bad.append('replicate best seed / first >= 25 % wording is stale')
+    if facts['seeds']['best_irr_pct'] >= 25.0:
+        bad.append("this work's best seed reached 25 %")
     if bad:
         raise C.FactsMismatch('S1 facts: ' + '; '.join(bad))
     return F
@@ -360,14 +385,24 @@ def draw_panel_a(fig, facts, F):
         s, b = series[key]
         ax.scatter([f25], [100.0 * C.bsf_at(s, b, f25)], s=30, marker='o',
                    facecolor='white', edgecolor=P[ckey], lw=1.3, zorder=6)
-    # best design: filled marker for this work, white-faced for the replicate
-    # (drawn on top: the two TRY-informed stars sit 0.05 in apart, so the
-    # open outline stays whole and the filled star shows beside it)
+    # best design: filled marker for this work, white-faced for the
+    # replicate. The two TRY-informed bests (trials 913 / 824) sit 0.05 in
+    # apart on the log axis, so the replicate's open star is lifted to PIN_Y
+    # on a leader that ends at its true point (no value is moved: the leader
+    # foot is the data point; the caption states the pin)
     for key, ckey, ls in A_LINES:
         mk = '*' if C.campaign(key).is_relay else 'D'
         filled = not C.campaign(key).replicate
         size = (100 if mk == '*' else 42)
-        ax.scatter([prog[key]['best_sim']], [prog[key]['best_pct']], s=size,
+        x_b, y_b = prog[key]['best_sim'], prog[key]['best_pct']
+        if mk == '*' and not filled:
+            x_p = x_b / 10 ** PIN_DX_DEC
+            ax.plot([x_b, x_p], [y_b, PIN_Y], color=P[ckey], zorder=6.5,
+                    label='_pin', **LEADER)
+            ax.scatter([x_b], [y_b], s=13, marker='o', color=P[ckey],
+                       edgecolor='white', lw=0.6, zorder=7.6)
+            x_b, y_b, size = x_p, PIN_Y, PIN_SIZE
+        ax.scatter([x_b], [y_b], s=size,
                    marker=mk, facecolor=P[ckey] if filled else 'white',
                    edgecolor='white' if filled else P[ckey],
                    lw=0.8 if filled else 1.2, zorder=7 if filled else 7.5)
@@ -378,30 +413,60 @@ def draw_panel_a(fig, facts, F):
             va='bottom', zorder=8)
     U_pct = facts['U_pct']
     x_end = facts['campaigns']['unin']['max_sim']
-    ax.text(x_end, U_pct + 0.45, 'ethanol only', color=P['unin_text'],
-            fontsize=S.FS['note'], style='italic', ha='right', va='bottom',
-            zorder=8)
-    ax.text(x_end, U_pct + 2.95, 'uninformed (unseeded)',
+    # product labels of the two unseeded lines, each naming its line
+    # ("this work" / "replicate") and attached to it: the solid line's label
+    # sits on the line; the dashed line's hangs below it with a leader up
+    # to the line at x_lead, where no other line runs (the TRY-informed
+    # lines end at trial 1,000)
+    ax.text(x_end, U_pct + 0.45, 'this work: ethanol only',
+            color=P['unin_text'], fontsize=S.FS['note'], style='italic',
+            ha='right', va='bottom', zorder=8)
+    ax.text(x_end, U_pct + 2.9, 'uninformed (unseeded)',
             color=P['unin_text'], fontsize=S.FS['annot'], fontweight='bold',
             ha='right', va='bottom', zorder=8)
-    # every best-so-far step of the replicate co-produced (from its first
-    # profitable design, inside its start-up): label the dashed line from
-    # just below its right part (its lowest level over the label's span)
     s_r, b_r = series['unin_rep']
-    lo = 100.0 * float(b_r[np.searchsorted(s_r, x_end / 4.0) - 1:].min())
-    ax.text(x_end, lo - 0.6, 'co-producing', color=P['unin_text'],
+    cp_txt = 'replicate: co-producing'
+    cp_w = _text_w_in(fig, cp_txt, fontsize=S.FS['note'], style='italic')
+    # data x of the label's left end (display -> data on the log axis)
+    px_end = ax.transData.transform((x_end, 0.0))[0]
+    x_left = ax.transData.inverted().transform(
+        (px_end - cp_w * fig.dpi, 0.0))[0]
+    lo = 100.0 * float(b_r[np.searchsorted(s_r, x_left) - 1:].min())
+    y_cp = lo - 0.6                                  # text top
+    ax.text(x_end, y_cp, cp_txt, color=P['unin_text'],
             fontsize=S.FS['note'], style='italic', ha='right', va='top',
             zorder=8)
+    relay_end = max(C.complete(k)['sim'].max() for k in ('relay',
+                                                          'relay_rep'))
+    x_lead = float(relay_end * (x_end / relay_end) ** 0.4)
+    y_line = 100.0 * C.bsf_at(s_r, b_r, x_lead)
+    if not relay_end < x_lead < x_end:
+        raise C.FactsMismatch('co-producing leader not clear of the '
+                              'TRY-informed lines')
+    ax.plot([x_lead, x_lead], [y_cp + 0.45, y_line], color=P['unin_text'],
+            zorder=2.9, label='_leader', **LEADER)
     ax.text(x_end, facts['start_irr_pct'] - 0.7,
             f"starting strain {C.fmt_pct(facts['start_irr_pct'])}",
             color=S.NOTE, fontsize=S.FS['note'], ha='right', va='top',
             zorder=8)
 
-    # --- header band: summary table (values: this work / replicate)
+    # --- header band: summary table (values: this work / replicate). The
+    # seed rows make the seeded speed comparable: the replicate's seed pool
+    # already held a design at 25 %, so 'trials to beat it' (its best seed)
+    # is the like-for-like speed of the two seeded campaigns
     fs = S.FS['note']
-    r0, r1, r2, r3 = BAND_ROWS
+    r0 = BAND_ROWS[0]
     lab_kw = dict(fontsize=fs, color=S.TEXT)
+    seeds = facts['seeds']
     rows = (
+        ('best seed IRR',
+         pair(C.fmt_pct(seeds['best_irr_pct']).replace(' %', ''),
+              C.fmt_pct(F['rep_best_seed_pct'])),
+         'no seeds'),
+        ('trials to beat it',
+         pair(fmt_trials(facts['relay']['first_gt_best_seed']),
+              fmt_trials(F['relay_rep_first_gt_best_seed'])),
+         '–'),
         ('trials to ≥ 25 %',
          pair(fmt_trials(prog['relay']['first_ge25']),
               fmt_trials(prog['relay_rep']['first_ge25'])),
@@ -419,7 +484,9 @@ def draw_panel_a(fig, facts, F):
               C.fmt_irr(prog['unin_rep']['best_pct']))),
     )
     glyph_gap, glyph_w = 0.06, 0.10
-    n_glyphs = (1, 0, 2)                 # o after row 1, star + diamond row 3
+    # glyphs tying rows to plot markers: o (first >= 25 %), star + diamond
+    n_glyphs = tuple({'trials to ≥ 25 %': 1, 'best IRR': 2}.get(r[0], 0)
+                     for r in rows)
     lab_w = max(_text_w_in(fig, r[0], **lab_kw)
                 + (glyph_gap + n * glyph_w if n else 0.0)
                 for r, n in zip(rows, n_glyphs))
@@ -434,27 +501,40 @@ def draw_panel_a(fig, facts, F):
                color=P['relay'], va='center', ha='left')
     S.fig_text(fig, x_c2, r0, 'uninformed', fontsize=fs, fontweight='bold',
                color=P['unin_text'], va='center', ha='left')
-    for (lab, v1, v2), y in zip(rows, (r1, r2, r3)):
+    row_y = BAND_ROWS[1:1 + len(rows)]
+    for (lab, v1, v2), y in zip(rows, row_y):
         S.fig_text(fig, A_X, y, lab, va='center', ha='left', **lab_kw)
         S.fig_text(fig, x_c1, y, v1, fontsize=fs, color=P['relay'],
                    va='center', ha='left')
-        S.fig_text(fig, x_c2, y, v2, fontsize=fs, color=P['unin_text'],
+        no_seed = v2 in ('no seeds', '–')
+        S.fig_text(fig, x_c2, y, v2, fontsize=fs,
+                   color=S.NOTE if no_seed else P['unin_text'],
+                   style='italic' if v2 == 'no seeds' else 'normal',
                    va='center', ha='left')
-    # glyphs tying the rows to the plot markers
     g = '#444444'
-    x_g = A_X + _text_w_in(fig, rows[0][0], **lab_kw) + glyph_gap + 0.045
-    _fig_marker(fig, x_g, r1, 'o', 5.0, 'white', g, mew=1.1)
-    x_g = A_X + _text_w_in(fig, rows[2][0], **lab_kw) + glyph_gap + 0.05
-    _fig_marker(fig, x_g, r3, '*', 8.0, g, g, mew=0.4)
-    _fig_marker(fig, x_g + glyph_w, r3, 'D', 4.2, g, g, mew=0.4)
+    for (lab, _, _), y, n in zip(rows, row_y, n_glyphs):
+        if not n:
+            continue
+        x_g = A_X + _text_w_in(fig, lab, **lab_kw) + glyph_gap + 0.05
+        if n == 1:
+            _fig_marker(fig, x_g - 0.005, y, 'o', 5.0, 'white', g, mew=1.1)
+        else:
+            _fig_marker(fig, x_g, y, '*', 8.0, g, g, mew=0.4)
+            _fig_marker(fig, x_g + glyph_w, y, 'D', 4.2, g, g, mew=0.4)
 
-    # line-style key, right-aligned to the axes
+    # line-style key, right-aligned to the axes, on the two seed rows (their
+    # uninformed cells are short)
     x_r = A_X + A_W
     seg = 0.34
     key_kw = dict(fontsize=fs, color=S.TEXT, va='center', ha='left')
-    for lab, ls, y in (('this work', '-', r1), ('replicate', DASH, r2)):
-        tw = _text_w_in(fig, lab, fontsize=fs)
-        x0 = x_r - tw - 0.06 - seg
+    key_rows = (('this work', '-', row_y[0]), ('replicate', DASH, row_y[1]))
+    tw = max(_text_w_in(fig, lab, fontsize=fs) for lab, _, _ in key_rows)
+    x0 = x_r - tw - 0.06 - seg                    # one column of segments
+    key_cells_right = x_c2 + max(_text_w_in(fig, r[2], fontsize=fs)
+                                 for r in rows[:2])
+    if x0 < key_cells_right + 0.15:
+        raise S.FigureCheckError('S1a line-style key meets the table')
+    for lab, ls, y in key_rows:
         _fig_line(fig, x0, x0 + seg, y, color='#444444', lw=LINE_LW, ls=ls,
                   solid_capstyle='butt', dash_capstyle='butt')
         S.fig_text(fig, x0 + seg + 0.06, y, lab, **key_kw)
@@ -469,11 +549,52 @@ def _family_colors(fam):
     return {'dot': P[fam + '_light'], 'dark': P[fam + '_dark'], 'alpha': 0.5}
 
 
+def _pct0(v):
+    """Share in % for a table cell (as main panel c): '76 %'."""
+    return f'{float(v):.0f} %'
+
+
+def b_table_columns(fig, facts):
+    """The panel-b table: main panel c's two columns ('trials > U',
+    'trials losing') then S1's 'returned IRR', laid out right to left from
+    B_TABLE_R by measured widths. Returns [(header, {key: (text, bold)},
+    centre_in, value_right_in)] and the left edge of the first column."""
+    rep = facts['replicates']['scouts']
+    keys = [k for kind, k, _ in B_ROWS if kind == 'row']
+    max_gt = max(rep[k]['n_gt_U'] for k in keys)
+    cols = [
+        (f'trials\n> {C.fmt_pct(facts["U_pct"])}',
+         {k: (C.fmt_int(rep[k]['n_gt_U']), rep[k]['n_gt_U'] == max_gt)
+          for k in keys}),
+        ('trials\nlosing',
+         {k: (_pct0(rep[k]['pct_losing']), False) for k in keys}),
+        ('returned\nIRR',
+         {k: (fmt_signed_irr(rep[k]['returned_irr_pct']), False)
+          for k in keys}),
+    ]
+    out, right = [], B_TABLE_R
+    for head, vals in reversed(cols):
+        wh = max(_text_w_in(fig, ln, fontsize=S.FS['note'])
+                 for ln in head.split('\n'))
+        wv = max(_text_w_in(fig, t, fontsize=S.FS['table'],
+                            fontweight='bold' if b else 'normal')
+                 for t, b in vals.values())
+        w = max(wh, wv)
+        cx = right - w / 2.0
+        out.append((head, vals, cx, cx + wv / 2.0))
+        right -= w + B_COL_GAP
+    return out[::-1], right + B_COL_GAP
+
+
 def draw_panel_b(fig, facts, F):
     P = S.PALETTE
     U_pct = facts['U_pct']
     rep = facts['replicates']['scouts']
-    ax = S.inch_axes(fig, B_X, AX_Y, B_W, AX_H)
+    cols, table_left = b_table_columns(fig, facts)
+    b_w = table_left - B_AX_GAP - B_X
+    if b_w < B_MIN_W:
+        raise S.FigureCheckError(f'panel b strip axes only {b_w:.2f} in')
+    ax = S.inch_axes(fig, B_X, AX_Y, b_w, AX_H)
     # 'loss' and '0' touch on a 2-in IRR axis even at loss_fs=9: the band
     # edge marks 0, so its label is dropped
     S.irr_axis(ax, 'x', step=10, loss_fs=9, zero_label=False)
@@ -488,34 +609,35 @@ def draw_panel_b(fig, facts, F):
         if kind != 'row':
             continue
         c = C.campaign(key)
-        cols = _family_colors(c.family)
+        cols_f = _family_colors(c.family)
         d = C.complete(key)
         xs = S.irr_plot(d['IRR'].to_numpy(float), rng)
         ys = y + rng.uniform(-STRIP_HALF, STRIP_HALF, len(xs))
-        ax.scatter(xs, ys, s=2.5, color=cols['dot'], alpha=cols['alpha'],
+        ax.scatter(xs, ys, s=2.5, color=cols_f['dot'], alpha=cols_f['alpha'],
                    lw=0, rasterized=True, zorder=2)
         n_n[key] = (int(np.sum((xs >= S.LOSS_BAND[0])
                                & (xs <= S.LOSS_BAND[1]))),
-                    int(C.is_loss(d['IRR'].to_numpy(float)).sum()))
+                    int(C.is_loss(d['IRR'].to_numpy(float)).sum()),
+                    int(round(rep[key]['pct_losing'] * len(d) / 100.0)))
         bv = S.irr_plot(rep[key]['best_visit_irr_pct'] / 100.0)
         rt = S.irr_plot(rep[key]['returned_irr_pct'] / 100.0)
         ax.plot([rt, bv], [y, y], color='0.25', lw=1.1, zorder=3,
                 solid_capstyle='butt')
         ax.scatter([bv], [y], s=44, marker=c.marker, facecolor='white',
-                   edgecolor=cols['dark'], lw=1.4, zorder=5)
+                   edgecolor=cols_f['dark'], lw=1.4, zorder=5)
         # white edge lifts the filled marker off a dense strip
-        ax.scatter([rt], [y], s=40, marker=c.marker, facecolor=cols['dark'],
+        ax.scatter([rt], [y], s=40, marker=c.marker, facecolor=cols_f['dark'],
                    edgecolor='white', lw=0.7, zorder=6)
-    # every loss is drawn in the band, and nothing else is (spec 6.B.6)
-    for key, (in_band, n_loss) in n_n.items():
-        if in_band != n_loss:
+    # every loss is drawn in the band, and nothing else is (spec 6.B.6); the
+    # 'trials losing' column counts exactly those dots
+    for key, (in_band, n_loss, n_col) in n_n.items():
+        if not in_band == n_loss == n_col:
             raise C.FactsMismatch(f'{key}: {in_band} dots in the loss band '
-                                  f'vs {n_loss} losses')
+                                  f'vs {n_loss} losses vs {n_col} in table')
 
     # row labels, headers, markers, separators, table
     y2fig = lambda yy: (AX_Y + AX_H * (B_YLIM[0] - yy)  # noqa: E731
                         / (B_YLIM[0] - B_YLIM[1]))
-    max_gt = max(rep[k]['n_gt_U'] for k in C.REP_SCOUT_KEYS)
     for kind, key, y in B_ROWS:
         yf = y2fig(y)
         if kind == 'header':
@@ -525,27 +647,25 @@ def draw_panel_b(fig, facts, F):
                        ha='left')
             if y > 0:
                 ys = y2fig(y - 0.45)
-                _fig_line(fig, B_HDR_X, 9.98, ys, color='0.85', lw=0.6)
+                _fig_line(fig, B_HDR_X, B_TABLE_R + 0.01, ys, color='0.85',
+                          lw=0.6)
             continue
         c = C.campaign(key)
-        cols = _family_colors(c.family)
+        cols_f = _family_colors(c.family)
         S.fig_text(fig, B_LAB_R, yf, c.role, fontsize=S.FS['row'],
                    color=S.TEXT, va='center', ha='right')
         ms = 7.0 if c.marker != '^' else 7.6
-        _fig_marker(fig, B_MRK_X, yf, c.marker, ms, 'white', cols['dark'],
+        _fig_marker(fig, B_MRK_X, yf, c.marker, ms, 'white', cols_f['dark'],
                     mew=1.3)
-        n = rep[key]['n_gt_U']
-        S.fig_text(fig, B_COL1_R, yf, C.fmt_int(n), fontsize=S.FS['table'],
-                   color=S.TEXT, va='center', ha='right',
-                   fontweight='bold' if n == max_gt else 'normal')
-        S.fig_text(fig, B_COL2_R, yf,
-                   fmt_signed_irr(rep[key]['returned_irr_pct']),
-                   fontsize=S.FS['table'], color=S.TEXT, va='center',
-                   ha='right')
+        for _, vals, _, x_r in cols:
+            txt, bold = vals[key]
+            S.fig_text(fig, x_r, yf, txt, fontsize=S.FS['table'],
+                       color=S.TEXT, va='center', ha='right',
+                       fontweight='bold' if bold else 'normal')
 
-    # header band: marker key, plateau label, table headers
+    # header band: marker key, table headers, plateau label
     fs = S.FS['note']
-    r0, r1, r2, r3 = BAND_ROWS
+    r0 = BAND_ROWS[0]
     g = '#444444'
     S.inline_key(fig, B_HDR_X, r0, [
         {'marker': 'o', 'ms': 6.5, 'mfc': 'white', 'mec': g, 'mew': 1.3,
@@ -553,15 +673,16 @@ def draw_panel_b(fig, facts, F):
         {'marker': 'o', 'ms': 6.0, 'mfc': g, 'mec': g, 'mew': 0.6,
          'text': 'returned design (argmax of own objective)'},
     ], fontsize=fs)
-    x_u = B_X + B_W * (U_pct - S.IRR_LIM[0]) / (S.IRR_LIM[1] - S.IRR_LIM[0])
-    S.fig_text(fig, x_u, r3, f'uninformed plateau {C.fmt_pct(U_pct)}',
+    y_head = (BAND_ROWS[2] + BAND_ROWS[3]) / 2 + 0.005
+    for head, _, cx, _ in cols:
+        S.fig_text(fig, cx, y_head, head, fontsize=fs, color=S.NOTE,
+                   va='center', ha='center', linespacing=1.15)
+    # the reference is THIS work's plateau (S1a: the plateau did not
+    # replicate), named as such over its line
+    x_u = B_X + b_w * (U_pct - S.IRR_LIM[0]) / (S.IRR_LIM[1] - S.IRR_LIM[0])
+    S.fig_text(fig, x_u, BAND_ROWS[-1],
+               f"this work's uninformed plateau {C.fmt_pct(U_pct)}",
                fontsize=fs, color=P['unin_text'], va='center', ha='center')
-    S.fig_text(fig, B_COL1, (r1 + r2) / 2 + 0.005,
-               f'trials\n> {C.fmt_pct(U_pct)}', fontsize=fs, color=S.NOTE,
-               va='center', ha='center', linespacing=1.15)
-    S.fig_text(fig, B_COL2, (r1 + r2) / 2 + 0.005, 'returned\nIRR',
-               fontsize=fs, color=S.NOTE, va='center', ha='center',
-               linespacing=1.15)
     return ax
 
 
@@ -615,45 +736,60 @@ def build_caption(facts, F):
         f'{C.fmt_int(fam["etoh"])} ethanol-scout and {C.fmt_int(fam["pw"])} '
         f'price-weighted-yield trials). Open circles: first trial with IRR '
         f'≥ 25 %; stars and diamonds: each campaign\'s best design (filled '
-        f'for this work, open for the replicate). Italic labels give the '
-        f'products of every best-so-far design of the two unseeded campaigns '
-        f'(co-producing = at least {C.IBO_THRESHOLD:g} g·L⁻¹ each of '
-        f'isobutanol and ethanol; ethanol only = less than '
-        f'{C.IBO_THRESHOLD:g} g·L⁻¹ isobutanol). The table above the axes '
-        f'gives, for each pair, this work / replicate.',
+        f'for this work, open for the replicate). The two seeded campaigns '
+        f'found their best designs at trials {C.fmt_int(pr["best_sim"])} '
+        f'and {C.fmt_int(prr["best_sim"])}, too close on the log axis for '
+        f'two markers, so the replicate\'s open star is drawn above the '
+        f'lines on a thin leader whose foot (small dot) is its true '
+        f'position. Italic labels give the products of every best-so-far '
+        f'design of the two unseeded campaigns (co-producing = at least '
+        f'{C.IBO_THRESHOLD:g} g·L⁻¹ each of isobutanol and ethanol; ethanol '
+        f'only = less than {C.IBO_THRESHOLD:g} g·L⁻¹ isobutanol); the '
+        f'replicate\'s label hangs from its dashed line on a leader. The '
+        f'table above the axes gives, for each pair, this work / replicate. '
+        f'Its first two rows apply to the seeded campaigns only: the IRR of '
+        f'the best preloaded seed and the first simulated trial that beat '
+        f'it, which compares the two seeded campaigns like for like (the '
+        f'replicate\'s seeds already held a design above 25 %).',
         '',
         f'**(b)** The seven replicate scouts, drawn as in panel c of the '
-        f'main figure: every '
+        f'main figure and in its family order (ethanol TRY, then isobutanol '
+        f'TRY; the price-weighted-yield campaign, which has no counterpart '
+        f'in this work, last): every '
         f'completed trial (dots), the best-IRR trial visited (open marker), '
         f'the design returned (filled marker; argmax of the campaign\'s own '
         f'objective) and their connector. Marker shape gives the objective: '
         f'circle yield, square titer, triangle productivity. The dashed line '
         f'and the tint mark this work\'s uninformed plateau ({U}), kept as '
-        f'the reference; the table counts trials above it and gives the '
-        f'returned design\'s IRR.',
+        f'the reference although the replicate did not stay on it (a). The '
+        f'table gives, as in main panel c, the trials above that plateau and '
+        f'the share of trials losing money, and then the returned design\'s '
+        f'IRR.',
         '',
         '**What replicates.**',
         '',
-        f'* Seeded search passed 25 % within '
-        f'{pr["first_ge25"]} and {prr["first_ge25"]} trials and reached '
+        f'* Seeded search beat every seed within '
+        f'{facts["relay"]["first_gt_best_seed"]} and '
+        f'{F["relay_rep_first_gt_best_seed"]} trials (best seeds '
+        f'{C.fmt_pct(seeds["best_irr_pct"])} and '
+        f'{C.fmt_pct(F["rep_best_seed_pct"])}; the replicate\'s was its '
+        f'isobutanol-yield scout\'s best visit, already above 25 %, so its '
+        f'{prr["first_ge25"]} trials to 25 % are the same event and not a '
+        f'second measure of speed). This work\'s seeded campaign passed '
+        f'25 % at trial {pr["first_ge25"]}. The two reached '
         f'{C.fmt_pct(pr["best_pct"])} and {C.fmt_pct(prr["best_pct"])} '
         f'(trials {C.fmt_int(pr["best_sim"])} and '
         f'{C.fmt_int(prr["best_sim"])}). After 25 trials the seeded '
         f'campaigns stood at {C.fmt_pct(pr["at25_pct"])} and '
         f'{C.fmt_pct(prr["at25_pct"])}; the unseeded ones at '
-        f'{_irr_words(pu["at25_pct"])} and {_irr_words(pur["at25_pct"])}. '
-        f'The replicate\'s seeds already contained a '
-        f'{C.fmt_pct(F["rep_best_seed_pct"])} design (its '
-        f'isobutanol-yield scout\'s best visit, vs '
-        f'{C.fmt_pct(seeds["best_irr_pct"])} for this work); its first '
-        f'simulated trial above that was trial '
-        f'{F["relay_rep_first_gt_best_seed"]}.',
+        f'{_irr_words(pu["at25_pct"])} and {_irr_words(pur["at25_pct"])}.',
         f'* The isobutanol scouts visited designs above {U} '
         f'({ibo_n} trials for yield, titer and productivity; price-weighted '
         f'yield {C.fmt_int(rep["rep_pw"]["n_gt_U"])}), while the ethanol '
         f'scouts '
         f'never did (best {C.fmt_pct(F["rep_etoh_max_visit_pct"])}).',
-        f'* Every scout returned a design below the uninformed plateau '
+        f'* Every replicate scout returned a design below this work\'s '
+        f'uninformed plateau '
         f'(highest: {C.fmt_pct(F["rep_max_returned_pct"])}).',
         f'* All three campaigns that passed 27 % returned co-production '
         f'designs: this work\'s TRY-informed '
