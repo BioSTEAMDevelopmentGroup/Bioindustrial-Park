@@ -49,11 +49,35 @@ OUTPUT_DIR = os.path.join(RESULTS_DIR, 'publication', 'Kinetic-sweeps')
 
 # Default colour scale (MESP, $/GGE): the feeding-strategy figure's levels, so
 # the figures read on one scale; values past the top take the over-colour. A
-# figure may override all three (SweepFigure.mesp_*); the colormap is sized to
-# the levels (at least 90 colours).
+# figure may override all three (SweepFigure.levels / cbar_ticks /
+# cbar_minor_step); the colormap is sized to the levels (at least 90 colours).
 MESP_LEVELS = fs.MESP_LEVELS
 MESP_CBAR_TICKS = fs.MESP_CBAR_TICKS
 MESP_CBAR_MINOR_STEP = fs.MESP_CBAR_MINOR_STEP
+
+# Default IRR colour scale [%]: 0-14 % (the sweeps top out below the 15 %
+# hurdle); the colormap is the MESP one reversed (high IRR = yellow, as low
+# MESP), and every money-losing cell -- IRR < 0, or -inf where solve_TEA finds
+# no IRR at all -- takes the light-grey under-colour.
+IRR_LEVELS = np.arange(0., 14.00001, 0.25)
+IRR_CBAR_TICKS = np.arange(0., 14.00001, 2.)
+IRR_CBAR_MINOR_STEP = 0.5
+IRR_UNDER_COLOR = (0.82, 0.82, 0.82)
+
+# Colour axes: the sweep metric read, its unit conversion, default scale,
+# which end extends, the colorbar title and its tick format
+COLOR_AXES = {
+    'MESP': dict(sweep_metric='MPSP', scale=USD_PER_KG_TO_USD_PER_GGE,
+                 levels=MESP_LEVELS, cbar_ticks=MESP_CBAR_TICKS,
+                 cbar_minor_step=MESP_CBAR_MINOR_STEP, extend='max',
+                 reverse=False, under_color=None,
+                 title=fs.bold_title('MESP', fs.USD_PER_GGE), tick_fmt='{:.2f}'),
+    'IRR': dict(sweep_metric='IRR', scale=100.,
+                levels=IRR_LEVELS, cbar_ticks=IRR_CBAR_TICKS,
+                cbar_minor_step=IRR_CBAR_MINOR_STEP, extend='min',
+                reverse=True, under_color=IRR_UNDER_COLOR,
+                title=fs.bold_title('IRR', '%'), tick_fmt='{:.0f}'),
+}
 
 # Ethanol market price range, the one plots/plot_uncertainty_MPSP_vs_TCI.py
 # (ETHANOL_MARKET_RANGE) and uncertainties_IBO_EtOH.py use: Jan 2021 - Dec 2025
@@ -84,9 +108,11 @@ class SweepFigure:
     colour, size [pt], label offset from the marker [pt], arrow curvature); a
     label is left-/right-aligned by the sign of its x offset unless
     `label_ha` overrides it; `marker_nudge` fans co-located optima apart
-    [pt]. `mesp_levels` / `mesp_cbar_ticks` / `mesp_cbar_minor_step` override
-    the default colour scale; `comparison_range` = (low, high) $/GGE hatches
-    the region whose MESP lies in that range (e.g. ETHANOL_MARKET_RANGE);
+    [pt]. `color_axis` picks the coloured metric ('MESP' or 'IRR', see
+    COLOR_AXES); `levels` / `cbar_ticks` / `cbar_minor_step` override its
+    default colour scale; `comparison_range` = (low, high), in the colour
+    axis's units, hatches the region whose value lies in that range (e.g.
+    ETHANOL_MARKET_RANGE on MESP);
     `baseline` = (x, y) marks the baseline point with a white diamond, and
     `baseline_callout` = (label, label offset [pt], arrow curvature) labels it
     in the optima's callout style (None = no label)."""
@@ -107,9 +133,10 @@ class SweepFigure:
     label_color: dict = field(default_factory=dict)
     marker_nudge: dict = field(default_factory=dict)
     figsize: tuple = (5.6, 4.2)
-    mesp_levels: np.ndarray = None
-    mesp_cbar_ticks: np.ndarray = None
-    mesp_cbar_minor_step: float = None
+    color_axis: str = 'MESP'
+    levels: np.ndarray = None
+    cbar_ticks: np.ndarray = None
+    cbar_minor_step: float = None
     comparison_range: tuple = None
     baseline: tuple = None
     baseline_callout: tuple = None
@@ -156,17 +183,27 @@ def fill_failed_cells(figure, arr):
 #%% Figure
 
 def draw_panel(figure, fig, ax, cax):
-    mesp = fill_failed_cells(
-        figure, load_sweep_metric(figure, 'MPSP') * USD_PER_KG_TO_USD_PER_GGE)
-    levels = MESP_LEVELS if figure.mesp_levels is None else figure.mesp_levels
-    cbar_ticks = MESP_CBAR_TICKS if figure.mesp_cbar_ticks is None else figure.mesp_cbar_ticks
-    minor_step = figure.mesp_cbar_minor_step or MESP_CBAR_MINOR_STEP
-    # at least one colour per band plus the over-colour (BoundaryNorm with
-    # extend='max'); the default 90 unless a figure's levels need more
+    axis = COLOR_AXES[figure.color_axis]
+    levels = axis['levels'] if figure.levels is None else figure.levels
+    cbar_ticks = axis['cbar_ticks'] if figure.cbar_ticks is None else figure.cbar_ticks
+    minor_step = figure.cbar_minor_step or axis['cbar_minor_step']
+    extend = axis['extend']
+    values = load_sweep_metric(figure, axis['sweep_metric']) * axis['scale']
+    if axis['under_color'] is not None:
+        # contourf masks non-finite cells: push -inf (no IRR, money-losing)
+        # below the lowest level so it takes the under-colour, not a blank
+        values[np.isneginf(values)] = levels[0] - (levels[1] - levels[0])
+    values = fill_failed_cells(figure, values)
+    # at least one colour per band plus the extend colour (BoundaryNorm with
+    # extend); the default 90 unless a figure's levels need more
     cmap = fs.JBEI_UCB_colormap(max(90, len(levels)))
-    norm = BoundaryNorm(levels, cmap.N, extend='max')
-    cs = ax.contourf(figure.spec_1, figure.spec_2, mesp, levels=levels,
-                     cmap=cmap, norm=norm, extend='max', zorder=1)
+    if axis['reverse']:
+        cmap = cmap.reversed()
+    if axis['under_color'] is not None:
+        cmap.set_under(axis['under_color'])
+    norm = BoundaryNorm(levels, cmap.N, extend=extend)
+    cs = ax.contourf(figure.spec_1, figure.spec_2, values, levels=levels,
+                     cmap=cmap, norm=norm, extend=extend, zorder=1)
     cs.set_edgecolor('face')  # no hairline seams between bands in the PDF
     ax.set_xlim(*(figure.xlim or (figure.spec_1[0], figure.spec_1[-1])))
     ax.set_ylim(*(figure.ylim or (figure.spec_2[0], figure.spec_2[-1])))
@@ -175,10 +212,10 @@ def draw_panel(figure, fig, ax, cax):
     if figure.comparison_range is not None:
         with matplotlib.rc_context({'hatch.color': COMPARISON_HATCH_RGBA,
                                     'hatch.linewidth': COMPARISON_HATCH_LINE_WIDTH}):
-            ax.contourf(figure.spec_1, figure.spec_2, mesp,
+            ax.contourf(figure.spec_1, figure.spec_2, values,
                         levels=list(figure.comparison_range), colors='none',
                         hatches=[COMPARISON_HATCH], zorder=2)
-        ax.contour(figure.spec_1, figure.spec_2, mesp,
+        ax.contour(figure.spec_1, figure.spec_2, values,
                    levels=list(figure.comparison_range),
                    colors=[COMPARISON_LINE_RGBA], linewidths=COMPARISON_LINE_WIDTH,
                    zorder=3)
@@ -225,10 +262,10 @@ def draw_panel(figure, fig, ax, cax):
     ax.set_ylabel(figure.ylabel, fontsize=FONTS['axis_title'])
 
     sm = ScalarMappable(norm=norm, cmap=cmap)
-    cbar = fig.colorbar(sm, cax=cax, spacing='proportional', extend='max',
+    cbar = fig.colorbar(sm, cax=cax, spacing='proportional', extend=extend,
                         extendfrac=0.04)
     cbar.set_ticks(cbar_ticks)
-    cbar.set_ticklabels([f'{t:.2f}' for t in cbar_ticks])
+    cbar.set_ticklabels([axis['tick_fmt'].format(t) for t in cbar_ticks])
     cbar.ax.yaxis.set_minor_locator(FixedLocator(
         [v for v in np.arange(levels[0], levels[-1] + 1e-9, minor_step)
          if not np.any(np.isclose(v, cbar_ticks))]))
@@ -241,7 +278,7 @@ def draw_panel(figure, fig, ax, cax):
     cbar.ax.tick_params(which='major', labelsize=FONTS['tick'],
                         length=TICK_LEN['major'])
     cbar.ax.tick_params(which='minor', length=TICK_LEN['minor'])
-    cbar.set_label(fs.bold_title('MESP', fs.USD_PER_GGE), fontsize=FONTS['axis_title'])
+    cbar.set_label(axis['title'], fontsize=FONTS['axis_title'])
     return optima
 
 

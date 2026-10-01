@@ -26,9 +26,12 @@ growth).
 
 Sim-safe: reads the sweep CSVs only and never imports the package.
 
-Output: analyses/results/publication/Kinetic-sweeps/glycolysis_inhib_ethanol_A.{png,pdf}
+A twin figure colours the same grid by IRR at default prices (FIGURE_IRR).
+
+Output: analyses/results/publication/Kinetic-sweeps/glycolysis_inhib_ethanol_A{,_IRR}.{png,pdf}
 """
 
+import dataclasses
 import importlib.util
 import os
 
@@ -77,9 +80,9 @@ FIGURE = ksf.SweepFigure(
     label_ha={'productivity': 'center'},
     # MESP axis 3.5-8 $/GGE (the sweep spans 3.79-16.1; past 8 = over-colour),
     # 45 levels of 0.1
-    mesp_levels=np.arange(3.5, 8.00001, 0.1),
-    mesp_cbar_ticks=np.arange(3.5, 8.00001, 0.5),
-    mesp_cbar_minor_step=0.1,
+    levels=np.arange(3.5, 8.00001, 0.1),
+    cbar_ticks=np.arange(3.5, 8.00001, 0.5),
+    cbar_minor_step=0.1,
     # hatched: MESP within the ethanol market price range (2.31-5.15 $/GGE)
     comparison_range=ksf.ETHANOL_MARKET_RANGE,
     # scenario-A baseline (both multipliers 1x)
@@ -87,5 +90,17 @@ FIGURE = ksf.SweepFigure(
     baseline_callout=('baseline', (-8, 26), 0.3),
 )
 
+# The same figure coloured by IRR at default prices (0-14 %; every
+# money-losing cell, IRR < 0 or -inf, in the light-grey under-colour), with
+# the same optimum and baseline markers; no market-range hatching
+FIGURE_IRR = dataclasses.replace(
+    FIGURE,
+    output_stem='glycolysis_inhib_ethanol_A_IRR',
+    color_axis='IRR',
+    levels=None, cbar_ticks=None, cbar_minor_step=None,
+    comparison_range=None,
+)
+
 if __name__ == '__main__':
     ksf.main(FIGURE)
+    ksf.main(FIGURE_IRR)
