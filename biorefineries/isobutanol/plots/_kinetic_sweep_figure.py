@@ -123,7 +123,10 @@ class SweepFigure:
     ETHANOL_MARKET_RANGE on MESP);
     `baseline` = (x, y) marks the baseline point with a white diamond, and
     `baseline_callout` = (label, label offset [pt], arrow curvature) labels it
-    in the optima's callout style (None = no label)."""
+    in the optima's callout style (None = no label); `arrow_relpos` = {label:
+    (rx, ry)} starts that label's arrow at that fraction of its text box
+    (e.g. (0, 0.5) = the left edge's middle; default the box centre, clipped
+    to the box edge)."""
     output_stem: str
     csv_prefix: str
     spec_1: np.ndarray
@@ -148,6 +151,7 @@ class SweepFigure:
     comparison_range: tuple = None
     baseline: tuple = None
     baseline_callout: tuple = None
+    arrow_relpos: dict = field(default_factory=dict)
 
 #%% Sweep data
 
@@ -229,14 +233,17 @@ def draw_panel(figure, fig, ax, cax):
                    zorder=3)
 
     def callout(label, xy, where, offset, rad, size):
+        # the arrow takes the label's colour (white labels over dark cells)
+        color = figure.label_color.get(label, 'black')
         ax.annotate(label, xy=xy, xycoords=where, xytext=offset,
                     textcoords='offset points', fontsize=FONTS['annotation'],
-                    color=figure.label_color.get(label, 'black'),
+                    color=color,
                     ha=figure.label_ha.get(label, 'left' if offset[0] >= 0 else 'right'),
                     va='bottom' if offset[1] >= 0 else 'top', zorder=11,
                     annotation_clip=False,
-                    arrowprops=dict(arrowstyle='-|>', mutation_scale=9, color='black', lw=0.9,
+                    arrowprops=dict(arrowstyle='-|>', mutation_scale=9, color=color, lw=0.9,
                                     shrinkA=1, shrinkB=size/2 + 1,
+                                    relpos=figure.arrow_relpos.get(label, (0.5, 0.5)),
                                     connectionstyle=f'arc3,rad={rad}'))
 
     # baseline point: white diamond, black outline, + its callout
