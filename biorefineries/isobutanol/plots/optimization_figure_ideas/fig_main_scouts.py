@@ -110,10 +110,6 @@ STEM = 'kinBO_main_scouts'
 CAPTION_PATH = os.path.join(C.FIGDIR, 'kinBO_main_scouts_caption.md')
 EB_PATH = os.path.join(C.PKG, 'enzyme_burden.py')
 
-# cross-process reproducibility margin of the (deterministic) PI objective:
-# the relay campaign's reproduction of its best trial (project memory
-# relay-campaign-12d); differences below it are never called real
-REPRO_MARGIN_PI = 0.0105
 # scenario-A IRR under the CURRENT model version (CLAUDE.md "Current
 # baseline", hensmith 6d4776f); the campaigns ran under the 2b5b27d export
 START_IRR_CURRENT_MODEL = 0.1279
@@ -1462,15 +1458,15 @@ def panel_f(fig, F):
          ha='right', va='bottom', fontsize=fs, color=P['ibo_dark'])
     _ann(ax, 'alone: visits, returns low IRR', (pos['ip'][0], S.LOSS_CENTER),
          (-7, -0.5), ha='right', va='top', **note)
-    # the TRY-informed label centred above its star (F_YLIM headroom; it
-    # was right-aligned at the spine beside a second, replicate label, now
-    # dropped), with its speed: the first trial >= 25 % (also marked in a);
-    # the uninformed campaign never reached 25 % (its 'alone: plateau'
-    # note). Its fit inside f is asserted in build()
+    # the TRY-informed label centred above its star (F_YLIM headroom), with
+    # its speed: the first trial >= 25 % (also marked in a), worded as a
+    # threshold so it is not read as the star's own IRR; the uninformed
+    # campaign never reached 25 % (its 'alone: plateau' note). Its fit
+    # inside f is asserted in build()
     r_star = np.sqrt(150) / 2
     F_LABELS.clear()
     F_LABELS.append(_ann(
-        ax, f"TRY-informed:\n25 % at {C.fmt_trial(F['relay']['first_ge25'])}",
+        ax, f"TRY-informed:\n≥ 25 % by {C.fmt_trial(F['relay']['first_ge25'])}",
         (xr, yr), (0, r_star + 1.5), ha='center', va='bottom', fontsize=nfs,
         color=P['relay_text'], linespacing=1.1))
     S.style_ticks(ax)
@@ -1745,7 +1741,11 @@ def caption(F):
     pr = F['proteome']
     pi25, pi_best = rel['sims'][25]['PI'], rel['bsf_PI'][rb['sim']]
     assert pi25 == rel['bsf_PI'][25]
-    ratio = (pi_best - pi25) / REPRO_MARGIN_PI
+    # the reproducibility margin, from the eight campaigns' own duplicate
+    # designs (facts['repro']; round-1 fixer)
+    rp = F['repro']
+    margin = rp['max_dPI']
+    ratio = (pi_best - pi25) / margin
     ratio_word = WORDS.get(int(round(ratio)), f'{ratio:.0f}')
     ibo_ret = [camp[k]['returned']['irr_pct'] for k in C.IBO_SCOUTS]
     ibo_fin = [v for v in ibo_ret if np.isfinite(v) and v >= 0]
@@ -1776,7 +1776,9 @@ def caption(F):
     # (the one-sentence, 50-word headline nested 'four of them ... above its
     # plateau'); the seeded co-producers and their best move to (a)
     sobol = F['sobol']
-    n_seeded_sims = g['n_try'] + camp['relay']['max_sim']
+    # one basis for every simulation count: simulated trials, FAIL rows
+    # included (max_sim; round-1 fixer)
+    n_seeded_sims = g['n_try_sims'] + camp['relay']['max_sim']
     fails = {k: camp[k]['n_fail'] for k in C.MAIN_KEYS}
     role_order = ' / '.join(C.campaign(k).role for k in C.ETOH_SCOUTS)
     v25 = rel['sims'][rel['first_ge25']]['bsf_pct']
@@ -1785,8 +1787,7 @@ def caption(F):
     # fresh round 2: the legend cut to <= LEGEND_MAX_WORDS (it was 653):
     # definitions, the seed selection and the compute stay; the per-panel
     # numeric recaps the panels already show move to the methods notes.
-    # The synthesis speaks of these single runs only (no replicate runs
-    # are used)
+    # The synthesis speaks of these single runs only
     n_cop = _first_coprod_run(C.complete('relay').sort_values('sim'))
     s3 = rel['sims'][3]
     bh = BLOCK_HIDDEN
@@ -1806,8 +1807,9 @@ def caption(F):
         f"(teal, {C.fmt_int(camp['relay']['max_sim'])} trials after "
         f"{C.fmt_int(seeds['n'])} preloaded seeds). Six TRY campaigns (the "
         f"scouts) each maximized one titer, rate or yield of ethanol (amber) "
-        f"or isobutanol (violet); their {C.fmt_int(g['n_try'])} simulations, "
-        f"by-products of those campaigns, supplied the seeds: "
+        f"or isobutanol (violet); their {C.fmt_int(g['n_try_sims'])} "
+        f"simulations, by-products of those campaigns, supplied the "
+        f"seeds: "
         f"{seeds['n_keep_above']} scout trials at least as profitable as "
         f"the starting strain and {seeds['n_maximin']} space-filling "
         f"(maximin) ones. Trial: simulated index. Dashed cyan: plateau "
@@ -1817,7 +1819,8 @@ def caption(F):
         f"alcohol.",
         '',
         f"**(a)** Best IRR so far; strip: the seeds (teal rings: "
-        f"co-producers). Inset: refinement, linear trial axis.",
+        f"co-producers above the plateau). Inset: refinement, linear trial "
+        f"axis.",
         '',
         f"**(b)** IRR vs isobutanol share of the alcohol titer, every design "
         f"making ≥ {C.SHARE_MIN_ALCOHOL:g} {unit} alcohol (the 100 % column "
@@ -1843,7 +1846,8 @@ def caption(F):
         f"profitability campaign beat every seed by "
         f"{C.fmt_trial(rel['first_gt_best_seed'])} and reached "
         f"{C.fmt_irr(rb['irr_pct'])}. The seeded route used "
-        f"{C.fmt_int(n_seeded_sims)} simulations ({C.fmt_int(g['n_try'])} scout + "
+        f"{C.fmt_int(n_seeded_sims)} simulations "
+        f"({C.fmt_int(g['n_try_sims'])} scout + "
         f"{C.fmt_int(camp['relay']['max_sim'])}), the uninformed campaign "
         f"{C.fmt_int(camp['unin']['max_sim'])}.",
     ]
@@ -1873,12 +1877,16 @@ def caption(F):
         f"rows, excluded everywhere: uninformed {fails['unin']}, "
         f"TRY-informed {fails['relay']}, {fam['etoh']} "
         f"{'/'.join(str(fails[k]) for k in C.ETOH_SCOUTS)} and {fam['ibo']} "
-        f"{'/'.join(str(fails[k]) for k in C.IBO_SCOUTS)} ({role_order}).",
+        f"{'/'.join(str(fails[k]) for k in C.IBO_SCOUTS)} ({role_order}); "
+        f"simulation counts include them.",
         f"* PI = net present value at a {HURDLE_PCT} % hurdle rate / total "
-        f"capital investment. The reproducibility margin is the "
-        f"cross-process margin of the deterministic PI objective, ΔPI "
-        f"{REPRO_MARGIN_PI} (about 0.2 IRR points); smaller differences are "
-        f"not interpreted.",
+        f"capital investment. PI is deterministic but depends slightly on "
+        f"the converged state each simulation starts from (the previous "
+        f"trial's). The reproducibility margin, ΔPI {margin:.4f}, is the "
+        f"largest PI difference between two campaigns' simulations of the "
+        f"same design after different trial histories ({rp['n_pairs']} "
+        f"pairs; {rp['max_dIRR_pts']:.2f} IRR points at that pair); smaller "
+        f"differences are not interpreted.",
         f"* (a) The uninformed campaign plateaued at {U} (ethanol only) from "
         f"{C.fmt_trial(ui['plateau_sim'])} to "
         f"{C.fmt_int(camp['unin']['max_sim'])}; the cyan strip is its "
@@ -1921,7 +1929,7 @@ def caption(F):
         f"* (c) The {fam['ibo']} campaigns visited {ibo_counts} designs above "
         f"{U} but returned {ret_txt}; the {fam['etoh']} campaigns never "
         f"exceeded {C.fmt_irr(etoh_bv)} and returned {min(etoh_ret):.1f}–"
-        f"{C.fmt_irr(max(etoh_ret))}. –: not applicable.",
+        f"{C.fmt_irr(max(etoh_ret))}.",
         f"* (d, e) The returned strains differ in products and proteome. The "
         f"TRY-informed co-producer keeps a reduced ethanol branch (Pdc "
         f"{pdc_ratio:.2f}× the starting strain's) and stays within the "
@@ -1971,7 +1979,10 @@ def caption(F):
     assert col['n_ibo_only'] - col['n'] == 1
     assert camp['it']['best_visit']['share_pct'] < COL_SHARE_MIN
     assert camp['it']['best_visit']['etoh'] < C.ETOH_THRESHOLD
-    assert abs(pi_gain / REPRO_MARGIN_PI - ratio) < 1e-12
+    assert abs(pi_gain / margin - ratio) < 1e-12
+    # the margin's basis: identical histories reproduce PI bitwise, so
+    # the margin is load-path drift, not objective noise
+    assert rp['startup_max_dPI'] < 1e-12 and rp['n_pairs'] > 0
     assert all(rel['sims'][k]['class'] == 'coprod'
                for k in (rel['first_gt_best_seed'], rel['first_ge25']))
     # the caption's quoted claims must agree with the figure's facts

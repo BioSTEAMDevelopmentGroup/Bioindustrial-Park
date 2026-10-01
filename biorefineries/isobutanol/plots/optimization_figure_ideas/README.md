@@ -110,6 +110,13 @@ All files are in `analyses/results/`. Study stems have the form
 
 * The two Sobol' random designs of the same 12-d space (`kin_sobol_..._split_12d_{rb0.001-4_ib0.75-1.5,screening_rb0.1-4_lin0_ib0.75-1.5}_aA_burden_seed20260920_trajectory.csv`, `SOBOL_STEMS`) are read by `sobol_reference()` (`facts['sobol']`) for the main methods notes' compute caveat: no compute-matched random-seed control was run.
 
+* The PI reproducibility margin quoted in the main methods notes is computed, not hard-coded:
+  `reproducibility_margin()` (`facts['repro']`) takes every pair of COMPLETE rows of two of the
+  eight campaigns at an identical decision vector. Pairs at the same simulated index in the
+  shared space-filling start-up ran after identical trial histories and agree bitwise. The
+  other 49 pairs ran after different histories; their largest |ΔPI| (0.0075, uninformed vs
+  ethanol-yield TRY) is the margin, i.e. load-path drift.
+
 * The scenario-A starting strain comes from `pk.baseline_set()` and `pk.BASELINE_A`. Its
   IRR is 12.60 % under the model version the campaigns ran with (12.79 % under the
   current one).

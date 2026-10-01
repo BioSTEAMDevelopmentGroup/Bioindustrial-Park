@@ -82,6 +82,9 @@ Facts
     check_facts(verbose=False, raise_on_fail=True) -> facts
     sobol_reference() -> the two Sobol' random designs of the same space
         (SOBOL_STEMS: campaign / screening measure; facts['sobol'])
+    reproducibility_margin() -> the PI reproducibility margin: largest
+        |dPI| of two campaigns' simulations of one design after different
+        trial histories (facts['repro'])
     FactsMismatch (AssertionError subclass)
     literal_scan(paths=None) -> hits of the forbidden annotation literals
 Formatting (build ALL annotation text from facts with these)
@@ -108,6 +111,7 @@ DERIVED COLUMNS (add_derived; trajectory CSVs and the manifest alike)
 """
 import ast
 import functools
+import itertools
 import importlib.util
 import math
 import os
@@ -737,6 +741,10 @@ def _compute_facts():
         'max_irr_ibo_lt5_pct': _pct(irr[lt5].max()),
         'n_gt_U_ibo_lt5': int((gtU & lt5).sum()),
         'n_try': int(is_try.sum()),
+        # every simulated scout trial, FAIL rows included (round-1 fixer:
+        # one basis with the profitability campaigns' max_sim counts)
+        'n_try_sims': int(sum(facts['campaigns'][k]['max_sim']
+                              for k in SCOUT_KEYS)),
         'n_try_gt_U': int((is_try & gtU).sum()),
         'n_try_gt_U_ibo_only': int((is_try & gtU & (cls == 'ibo')).sum()),
         'n_try_gt_U_coprod': int((is_try & gtU & (cls == 'coprod')).sum()),
@@ -960,7 +968,54 @@ def _compute_facts():
                                        - float(base['Phi_M'])),
     }
     facts['sobol'] = sobol_reference()
+    facts['repro'] = reproducibility_margin()
     return facts
+
+
+# The reproducibility margin of the (deterministic) PI objective, from the
+# eight campaigns themselves (round-1 fixer: the former hard-coded 0.0105 came
+# from duplicate designs of the excluded 2026-09-16 campaigns). Every pair of
+# COMPLETE rows of two DIFFERENT campaigns at an IDENTICAL decision vector:
+# the pairs at the same simulated index inside the shared space-filling
+# start-up ran after identical trial histories (bitwise-identical PI); the
+# others ran after different histories, so their |dPI| is the load-path
+# drift (each simulation converges, to sim_rtol 1e-4, from the previous
+# trial's state). The margin = the largest such |dPI|
+def reproducibility_margin():
+    """{'n_pairs', 'n_designs', 'max_dPI', 'max_dIRR_pts' (|dIRR| of the
+    max-|dPI| pair, IRR points), 'max_pair' (keys), 'n_startup_pairs',
+    'startup_max_dPI'}."""
+    dec = list(DECISION_VARS)
+    n_su = _leading_identical_rows(('unin',) + SCOUT_KEYS, dec)
+    shared = set(('unin',) + SCOUT_KEYS)
+    rows = pd.concat([complete(k).assign(key=k) for k in MAIN_KEYS],
+                     ignore_index=True)
+    key = rows['key'].to_numpy()
+    sim = rows['sim'].to_numpy(int)
+    pi = rows['PI'].to_numpy(float)
+    irr = rows['IRR'].to_numpy(float)
+    pairs, startup, designs = [], [], set()
+    for g, idx in rows.groupby(dec, sort=False).indices.items():
+        for i, j in itertools.combinations(sorted(idx), 2):
+            if key[i] == key[j]:
+                continue
+            d = abs(pi[i] - pi[j])
+            if (sim[i] == sim[j] <= n_su and key[i] in shared
+                    and key[j] in shared):
+                startup.append(d)
+            else:
+                pairs.append((d, i, j))
+                designs.add(g)
+    d, i, j = max(pairs)
+    return {
+        'n_pairs': int(len(pairs)),
+        'n_designs': int(len(designs)),
+        'max_dPI': float(d),
+        'max_dIRR_pts': 100.0 * float(abs(irr[i] - irr[j])),
+        'max_pair': sorted((str(key[i]), str(key[j]))),
+        'n_startup_pairs': int(len(startup)),
+        'startup_max_dPI': float(max(startup)),
+    }
 
 
 # Space-filling random designs of the SAME 12-d split space (the Sobol'
@@ -1007,7 +1062,7 @@ def compute_facts():
     baseline_decision,
     phi_T, F_flex, budget, campaigns{key}, global, unin, seeds, relay,
     iy_pair{841, 842}, progress{unin, relay}, proteome{row key}, checks,
-    sobol."""
+    sobol, repro."""
     return _compute_facts()
 
 
@@ -1096,7 +1151,8 @@ EXPECTED = {
         'n_complete': E(14963), 'n_alcohol_ge1': E(13611),
         'n_alcohol_lt1': E(1352), 'n_alcohol_lt1_with_irr': E(0),
         'n_ibo_lt5': E(9885), 'max_irr_ibo_lt5_pct': E('15.825'),
-        'n_gt_U_ibo_lt5': E(0), 'n_try': E(11968), 'n_try_gt_U': E(112),
+        'n_gt_U_ibo_lt5': E(0), 'n_try': E(11968), 'n_try_sims': E(12000),
+        'n_try_gt_U': E(112),
         'n_try_gt_U_ibo_only': E(108), 'n_try_gt_U_coprod': E(4),
         'n_try_gt_20': E(16),
         'n_nonrelay_gt_best_seed': E(0), 'n_relay_gt_best_seed': E(296),
@@ -1229,6 +1285,11 @@ EXPECTED = {
         'screening': {'n': E(4091), 'n_gt_hurdle': E(19),
                       'n_irr_gt_hurdle': E(19), 'n_gt_U': E(15),
                       'max_irr_pct': E('21.51')},
+    },
+    'repro': {
+        'n_pairs': E(49), 'max_dPI': E('0.00753'), 'max_dIRR_pts': E('0.13'),
+        'max_pair': E(['ey', 'unin']), 'n_startup_pairs': E(1050),
+        'startup_max_dPI': E(0.0, 1e-12),
     },
 }
 
