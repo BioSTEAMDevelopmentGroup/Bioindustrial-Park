@@ -95,7 +95,7 @@ FIGURE = ksf.SweepFigure(
 # in the dark-grey under-colour), with the highest-IRR point marked in place
 # of the MESP optimum; no market-range hatching
 OPTIMA_IRR = [row if row[0] != 'MPSP' else
-              ('IRR', 'max', 'IRR', '*', '#33ccff', 14, (12, 24), -0.3)
+              ('IRR', 'max', 'profitability', '*', '#33ccff', 14, (12, 24), -0.3)
               for row in OPTIMA]
 
 FIGURE_IRR = dataclasses.replace(
