@@ -109,7 +109,7 @@ import math
 import os
 import re
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
@@ -825,6 +825,19 @@ def _compute_facts():
         'n_maximin': int((~keep).sum()),
         'exploration_pct': 100.0 * float(man['makes_ibo'].mean()),
     }
+    # the co-producing seeds (round 4: the preload already held profitable
+    # co-producers, so the TRY-informed campaign's first co-producers are
+    # not new by themselves; main caption (a) and the seed-strip rings)
+    cop = man['coprod'].to_numpy(bool)
+    bc = man.loc[man.loc[man['coprod'], 'IRR'].idxmax()]
+    facts['seeds'].update({
+        'n_coprod': int(cop.sum()),
+        'n_coprod_gt_U': int((cop & (mi > U + ABOVE_EPS)).sum()),
+        'best_coprod_irr_pct': _pct(bc['IRR']),
+        'best_coprod_donor': str(bc['donor_key']),
+        'best_coprod_ibo': float(bc['ibo']),
+        'best_coprod_etoh': float(bc['etoh']),
+    })
 
     # --- the relay (TRY-informed) campaign
     rel_d = load_trajectory('relay')
@@ -898,7 +911,10 @@ def _compute_facts():
         bs_k = float(m['IRR'].max())
         seeded[k] = {'best_seed_pct': _pct(bs_k),
                      'first_gt_best_seed': first_sim(
-                         complete(k), bs_k + ABOVE_EPS, strict=True)}
+                         complete(k), bs_k + ABOVE_EPS, strict=True),
+                     # price-weighted-yield seeds (a revenue-weighted, not a
+                     # TRY, objective; replicate only; main caption)
+                     'n_pw': int((m['family'] == 'pw').sum())}
     facts['replicates'] = {
         'progress': rep_prog,
         'seeded': seeded,
@@ -1110,6 +1126,9 @@ EXPECTED = {
         'best_donor_trial': E(842), 'best_ibo': E('37.3'),
         'best_etoh': E('0.0'), 'n_keep_above': E(327), 'n_maximin': E(673),
         'exploration_pct': E('27.9'),
+        'n_coprod': E(23), 'n_coprod_gt_U': E(4),
+        'best_coprod_irr_pct': E('21.15'), 'best_coprod_donor': E('ip'),
+        'best_coprod_ibo': E('29.9'), 'best_coprod_etoh': E('50.1'),
     },
     'relay': {
         'sim_offset': E(999), 'sim_offset_unique': E(1),
@@ -1177,9 +1196,9 @@ EXPECTED = {
         },
         'seeded': {
             'relay': {'best_seed_pct': E('22.898'),
-                      'first_gt_best_seed': E(13)},
+                      'first_gt_best_seed': E(13), 'n_pw': E(0)},
             'relay_rep': {'best_seed_pct': E('25.13'),
-                          'first_gt_best_seed': E(19)},
+                          'first_gt_best_seed': E(19), 'n_pw': E(201)},
         },
         'unin_rep_walk': {
             63: {'irr_pct': E('17.25'), 'ibo': E('11.8'), 'etoh': E('110.2')},

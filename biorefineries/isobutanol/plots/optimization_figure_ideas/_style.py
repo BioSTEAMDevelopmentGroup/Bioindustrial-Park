@@ -140,7 +140,11 @@ __all__ = [
 # darkened.
 PALETTE = {
     'unin': '#18C4DC',          # uninformed lines / markers; dots alpha 0.65
-    'unin_text': '#0E8FA1',     # cyan text (legible at 9-10 pt)
+    'unin_text': '#087D98',     # cyan text; darkened round 4 from
+                                # #0E8FA1 (3.8:1 on white) to 4.8:1 on
+                                # white / 4.6:1 on the tint, bluer than
+                                # the relay teal (CIE76 dE 10.8; the
+                                # suggested #08798A was dE 5.3)
     'relay': '#0B6E7A',         # TRY-informed lines / markers / text
     'etoh': '#E0A030',          # ethanol product (d), Pdc (e)
     'etoh_dark': '#A86F0C',     # ethanol-scout markers (edge), headers
