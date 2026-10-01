@@ -88,6 +88,9 @@ Facts
 Formatting (build ALL annotation text from facts with these)
     fmt_pct(v, nd=1) '15.8 %';  fmt_irr(irr_pct, nd=1) -> '15.8 %' | 'loss'
     fmt_int(n) '1,896';  fmt_num(v, nd) ;  fmt_trial(sim) 'trial 104'
+    fmt_budget(v) '0.1347' (the penalty-free budget, one precision in every
+    figure and caption); fmt_phi(v, budget) Phi_M at 3 decimals, 4 when
+    within BUDGET_CLOSE of the budget (so it never reads as equal to it)
 Safety
     assert_sim_safe() raises if a forbidden simulation package is imported
 
@@ -132,7 +135,8 @@ __all__ = [
     'at_bound', 'bound_hits', 'baseline_record', 'baseline_A',
     'compute_facts', 'EXPECTED', 'Expect', 'E', 'FactRow', 'fact_table',
     'check_facts', 'FactsMismatch', 'literal_scan', 'FORBIDDEN_LITERALS',
-    'fmt_pct', 'fmt_irr', 'fmt_int', 'fmt_num', 'fmt_trial',
+    'fmt_pct', 'fmt_irr', 'fmt_int', 'fmt_num', 'fmt_trial', 'fmt_budget',
+    'fmt_phi', 'BUDGET_CLOSE',
     'assert_sim_safe', 'FORBIDDEN_MODULES', 'SOBOL_STEMS',
     'sobol_reference',
 ]
@@ -1521,3 +1525,21 @@ def fmt_num(v, nd=1):
 def fmt_trial(sim):
     """'trial 104' (a simulated index, thousands separated)."""
     return f'trial {fmt_int(sim)}'
+
+
+BUDGET_CLOSE = 1e-3               # fmt_phi: 4 decimals this close to it
+
+
+def fmt_budget(v):
+    """The penalty-free budget, '0.1347' (fresh round 2: main e printed
+    0.135 and Fig. S2 0.1347)."""
+    return f'{float(v):.4f}'
+
+
+def fmt_phi(v, budget=None):
+    """Phi_M at 3 decimals ('0.153'); at 4 when within BUDGET_CLOSE of
+    `budget` ('0.1348' just over 0.1347, not '0.135')."""
+    v = float(v)
+    if budget is not None and abs(v - float(budget)) < BUDGET_CLOSE:
+        return f'{v:.4f}'
+    return f'{v:.3f}'

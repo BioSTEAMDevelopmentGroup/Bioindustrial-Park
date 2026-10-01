@@ -34,6 +34,10 @@ Constants
     PLATEAU_LINE / START_LINE / ZERO_LINE (line kwargs)
     UNIT_TITER 'g·L$^{-1}$', UNIT_PROD, UNIT_PROTEOME 'g·(g DCW)$^{-1}$'
     CVD_PAIRS, CVD_MIN_DE = 12, GRAY_PAIRS {pair: min dL*}
+    B_DOTS {name: {'face', 'edge', 's', 'lw', 'alpha'}}  the dot clouds of
+                                   main b / the a seed strip; DOT_PAIRS
+                                   (their rendered pairs, in cvd_check)
+    ADH_HATCH                      hatch of main e's Adh1 / Adh6 segments
 Set-up and placement
     apply_style()                  house rcParams (Arial, mathtext Arial,
                                    stixsans fallback, pdf/ps fonttype 42)
@@ -46,8 +50,8 @@ Set-up and placement
     style_ticks(ax, x=True, y=True, minor_x=True, minor_y=True)
                                    ticks on all four sides; left/bottom
                                    in+out, top/right in; major 4 / minor 2;
-                                   log axes keep log minors, logit axes get
-                                   none; x=False / y=False removes that
+                                   log axes keep log minors, logit axes keep
+                                   only fixed minors; x=False / y=False removes that
                                    axis's ticks (categorical rows)
 IRR axes
     irr_plot(v, rng=None)          IRR fraction -> plot coordinate (% if
@@ -58,12 +62,16 @@ IRR axes
                                    minors outside the band, loss band + 0
                                    line (narrow horizontal axis: loss_at=
                                    loss_label_x(width_in) keeps 'loss' and
-                                   '0' at full size, apart)
+                                   '0' at full size, apart, with a break
+                                   mark on the spine between them)
     loss_label_x(width_in, fontsize=None)  the 'loss' tick x clear of '0'
+                                   (LOSS_ZERO_GAP_IN apart)
     log_trial_axis(ax, which='x', lim=(1, 2200))  log trial axis, majors
                                    '1', '10', '100', '1,000', log minors
     logit_pct_axis(ax, which='x', ticks_pct=(1, 2, 5, ..., 90),
-                   lim_pct=(0.8, 93))  logit share axis (plot FRACTIONS)
+                   lim_pct=(0.8, 93), minor_pct=())  logit share axis
+                                   (plot FRACTIONS); unlabelled minors at
+                                   minor_pct show the non-linear scale
     loss_band(ax, which='y'), plateau_line(ax, U_pct, which='y', **kw),
     halo(text, lw=2) white stroke behind a label over dots (no bbox)
     start_line(ax, start_pct, which='y', **kw), tint_above(ax, U_pct,
@@ -75,7 +83,9 @@ Campaign encodings
 Keys
     inline_key(fig, x, y, items, fontsize=9, ...)  one line of marker /
                                    swatch + text items in figure inches
-                                   (glyphs drawn as markers, not Unicode)
+                                   (glyphs drawn as markers, not Unicode;
+                                   a swatch may carry 'hatch' /
+                                   'hatchcolor' / 'edgecolor' / 'lw')
 Render checks (call after building the figure)
     text_overlaps(fig, exempt=(), tol_px=0.5) -> [str]  (empty = pass)
     tick_label_collisions(fig, min_gap_in=0.03) -> [str]  same-axis tick
@@ -95,7 +105,10 @@ Render checks (call after building the figure)
 Palette checks
     cvd_check(pairs=CVD_PAIRS, min_de=12, raise_on_fail=True,
               verbose=False, dataviz=True) -> (ok, report)
-    delta_e76(h1, h2, kind=None), lstar(hex), darken(hex, dL=5)
+    delta_e76(h1, h2, kind=None), lstar(hex), darken(hex, dL=5),
+    blend_white(hex, alpha), dot_composite(spec) -> the hex a B_DOTS spec
+                                   renders as on white (fill / edge area
+                                   mix, then alpha)
 Saving
     save(fig, stem, out_dir=OUT_DIR, stamp=None, latest=True,
          max_pdf_mb=10) -> {'png', 'pdf', 'png_latest', 'pdf_latest',
@@ -138,7 +151,8 @@ __all__ = [
     'campaign_style', 'inline_key', 'text_overlaps', 'min_font_check',
     'glyph_check', 'check_figure', 'FigureCheckError', 'CVD_PAIRS',
     'CVD_MIN_DE', 'GRAY_PAIRS', 'cvd_check', 'delta_e76', 'lstar', 'darken',
-    'save',
+    'blend_white', 'dot_composite', 'B_DOTS', 'DOT_PAIRS', 'ADH_HATCH',
+    'LOSS_ZERO_GAP_IN', 'loss_break', 'save',
 ]
 
 # %% Palette (spec section 2) -----------------------------------------------------
@@ -186,6 +200,10 @@ PALETTE = {
     'note': '#666666',
 }
 TINT_ALPHA = 0.07
+# fresh round 2: the Adh1 / Adh6 segments of main e (and their key swatches)
+# are hatched in the branch's dark shade, so their light amber / violet
+# fills are not read as the scout families' dot colours
+ADH_HATCH = '//////'
 TEXT = PALETTE['text']
 NOTE = PALETTE['note']
 
@@ -204,6 +222,9 @@ FS = {'tick': 12, 'axis': 12, 'letter': 14, 'title': 12, 'row': 11,
       'table': 11, 'annot': 10, 'note': 9, 'key': 9}
 MIN_FONT_PT = 9
 TICK_LABEL_GAP_IN = 0.03          # min gap between same-axis tick labels
+LOSS_ZERO_GAP_IN = 0.08           # 'loss' <-> '0' tick labels on a narrow
+                                  # horizontal IRR axis (fresh round 2: at
+                                  # 0.04 in they read as one label, 'loss 0')
 HALO_LW = 2.0                     # white stroke behind text over dots (pt)
 MARKER_TEXT_PAD_PT = 1.0          # marker_text_hits: annotation bbox pad
 BACKING_MIN_ALPHA = 0.85          # a text's bbox patch at least this
@@ -346,12 +367,16 @@ def style_ticks(ax, x=True, y=True, minor_x=True, minor_y=True):
     .style_ticks). Call AFTER limits and locators: a linear axis whose minor
     locator is still the default NullLocator gets an AutoMinorLocator (a
     FixedLocator set by irr_axis is kept), a log axis keeps its log minors,
-    a logit axis gets none. x=False / y=False removes that axis's ticks and
+    a logit axis keeps only a FixedLocator of minors. x=False / y=False removes that axis's ticks and
     tick labels (categorical rows)."""
     for axis, on, minor in ((ax.xaxis, x, minor_x), (ax.yaxis, y, minor_y)):
         scale = axis.get_scale()
-        if not (on and minor) or scale == 'logit':
+        if not (on and minor):
             axis.set_minor_locator(NullLocator())
+        elif scale == 'logit':
+            # only minors set explicitly (logit_pct_axis(minor_pct=...))
+            if not isinstance(axis.get_minor_locator(), FixedLocator):
+                axis.set_minor_locator(NullLocator())
         elif scale == 'linear' and isinstance(axis.get_minor_locator(),
                                               NullLocator):
             axis.set_minor_locator(AutoMinorLocator())
@@ -440,23 +465,67 @@ def irr_axis(ax, which='y', step=5, title='IRR [%]', band=True,
     if title:
         (ax.set_ylabel if which == 'y' else ax.set_xlabel)(
             bold_axis_title(title))
+    if which == 'x' and loss_at is not None and zero_label:
+        loss_break(ax, float(loss_at))
+
+
+def _label_widths_in(fontsize):
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    from matplotlib.figure import Figure
+    apply_style()
+    fig = Figure(dpi=DPI)
+    r = FigureCanvasAgg(fig).get_renderer()
+    return {t: fig.text(0, 0, t, fontsize=fontsize).get_window_extent(r)
+            .width / DPI for t in ('loss', '0')}
+
+
+def loss_break(ax, loss_at, size_pt=3.2, gap_pt=1.5, lw=0.8):
+    """Axis-break mark on the bottom spine of a HORIZONTAL IRR axis, midway
+    between the 'loss' tick label (at `loss_at`) and the '0' label: two
+    short slanted strokes with the spine cut between them (fresh round 2:
+    the two labels read as one, 'loss 0'; the loss band is a category,
+    not a continuation of the IRR scale). Drawn in figure inches (the
+    layout is fixed), so the PNG and the PDF agree."""
+    from matplotlib.patches import Polygon
+    fig = ax.figure
+    w = _label_widths_in(FS['tick'])
+    pos = ax.get_position()
+    width_in = pos.width * fig.get_figwidth()
+    per_in = (IRR_LIM[1] - IRR_LIM[0]) / width_in
+    x_r = loss_at + w['loss'] / 2 * per_in          # 'loss' right edge
+    x_l = -w['0'] / 2 * per_in                      # '0' left edge
+    xm = 0.5 * (x_r + x_l)
+    x_in = (pos.x0 + (xm - IRR_LIM[0]) / (IRR_LIM[1] - IRR_LIM[0])
+            * pos.width) * fig.get_figwidth()
+    y_in = pos.y0 * fig.get_figheight()
+    h, g, sl = size_pt / 72.0, gap_pt / 72.0, 0.45 * size_pt / 72.0
+    tr = fig.dpi_scale_trans
+    cut = Polygon([(x_in - g / 2 - sl, y_in - h),
+                   (x_in + g / 2 - sl, y_in - h),
+                   (x_in + g / 2 + sl, y_in + h),
+                   (x_in - g / 2 + sl, y_in + h)],
+                  closed=True, transform=tr, fc='white', ec='none',
+                  zorder=3.1)
+    fig.add_artist(cut)
+    arts = [cut]
+    for dx in (-g / 2, g / 2):
+        ln = Line2D([x_in + dx - sl, x_in + dx + sl], [y_in - h, y_in + h],
+                    transform=tr, color='0.15', lw=lw, zorder=3.2,
+                    solid_capstyle='butt')
+        fig.add_artist(ln)
+        arts.append(ln)
+    return arts
 
 
 def loss_label_x(width_in, fontsize=None, gap_in=None):
     """x (IRR %) of the 'loss' tick on a HORIZONTAL IRR axis `width_in`
     inches wide such that the 'loss' and '0' tick labels (at `fontsize`,
-    default the tick size) are TICK_LABEL_GAP_IN + 0.01 in apart: the band
-    centre (-3) when that already fits, else further left (never past the
-    band's left edge)."""
-    from matplotlib.backends.backend_agg import FigureCanvasAgg
-    from matplotlib.figure import Figure
-    apply_style()
+    default the tick size) are LOSS_ZERO_GAP_IN apart: the band centre (-3)
+    when that already fits, else further left (never past the band's left
+    edge). irr_axis(loss_at=...) adds a break mark between them."""
     fs = FS['tick'] if fontsize is None else fontsize
-    gap = (TICK_LABEL_GAP_IN + 0.01) if gap_in is None else gap_in
-    fig = Figure(dpi=DPI)
-    r = FigureCanvasAgg(fig).get_renderer()
-    w = {t: fig.text(0, 0, t, fontsize=fs).get_window_extent(r).width / DPI
-         for t in ('loss', '0')}
+    gap = LOSS_ZERO_GAP_IN if gap_in is None else gap_in
+    w = _label_widths_in(fs)
     per_in = (IRR_LIM[1] - IRR_LIM[0]) / float(width_in)
     x = -(w['loss'] / 2 + w['0'] / 2 + gap) * per_in
     return max(min(LOSS_CENTER, x), LOSS_BAND[0])
@@ -482,17 +551,23 @@ def log_trial_axis(ax, which='x', lim=(1, 2200), title='Simulated trials'):
 
 
 def logit_pct_axis(ax, which='x', ticks_pct=(1, 2, 5, 10, 20, 50, 80, 90),
-                   lim_pct=(0.8, 93), title='Trials making\nisobutanol [%]'):
+                   lim_pct=(0.8, 93), title='Trials making\nisobutanol [%]',
+                   minor_pct=()):
     """Logit axis for a share in % (panel f's exploration): the data must be
     plotted as FRACTIONS (pct / 100); majors at `ticks_pct` with plain %
-    labels, no minors (style_ticks enforces none on a logit axis)."""
+    labels; unlabelled minors at `minor_pct` (fresh round 2: they show the
+    scale is not linear; style_ticks keeps a fixed minor locator)."""
     axis = ax.xaxis if which == 'x' else ax.yaxis
     (ax.set_xscale if which == 'x' else ax.set_yscale)('logit')
     (ax.set_xlim if which == 'x' else ax.set_ylim)(lim_pct[0] / 100,
                                                    lim_pct[1] / 100)
     axis.set_major_locator(FixedLocator([t / 100 for t in ticks_pct]))
     axis.set_major_formatter(FixedFormatter([f'{t:g}' for t in ticks_pct]))
-    axis.set_minor_locator(NullLocator())
+    if minor_pct:
+        axis.set_minor_locator(FixedLocator([t / 100 for t in minor_pct]))
+        axis.set_minor_formatter(FixedFormatter([]))
+    else:
+        axis.set_minor_locator(NullLocator())
     if title:
         (ax.set_xlabel if which == 'x' else ax.set_ylabel)(
             bold_axis_title(title))
@@ -513,7 +588,9 @@ def start_line(ax, start_pct, which='y', **kw):
 def tint_above(ax, U_pct, which='y'):
     """Faint cyan tint over IRR > U (the "above the plateau" region)."""
     span = ax.axhspan if which == 'y' else ax.axvspan
-    return span(U_pct, IRR_LIM[1], color=PALETTE['tint'], alpha=TINT_ALPHA,
+    hi = max(IRR_LIM[1], (ax.get_ylim() if which == 'y'
+                          else ax.get_xlim())[1])
+    return span(U_pct, hi, color=PALETTE['tint'], alpha=TINT_ALPHA,
                 lw=0, zorder=0.05)
 
 
@@ -588,9 +665,14 @@ def inline_key(fig, x, y, items, fontsize=None, gap_in=0.05, item_gap_in=0.16,
     for it, (gw, tw) in zip(specs, widths):
         if 'swatch' in it:
             s = it.get('size_in', 0.11)
+            kw = {}
+            if it.get('hatch'):
+                kw = dict(hatch=it['hatch'],
+                          hatchcolor=it.get('hatchcolor', TEXT))
             r = Rectangle((cx, y - s / 2), s, s, transform=tr,
                           facecolor=it['swatch'], edgecolor=it.get(
-                              'edgecolor', 'none'), lw=it.get('lw', 0.0))
+                              'edgecolor', 'none'), lw=it.get('lw', 0.0),
+                          **kw)
             fig.add_artist(r)
             artists.append(r)
         elif 'marker' in it:
@@ -941,6 +1023,10 @@ CVD_PAIRS = (('unin', 'relay'), ('unin', 'etoh_light'), ('relay', 'ibo_light'),
 CVD_MIN_DE = 12.0
 GRAY_PAIRS = {('unin', 'relay'): 15.0, ('etoh', 'ibo'): 20.0,
               ('unin_text', 'relay_text'): 15.0}
+# NOT in CVD_PAIRS: ('unin', 'ibo_light') -- deutan 8.7 / protan 4.4. As
+# FLAT fills they co-occur only in c's strips, which the row labels name;
+# main b's dot clouds are separated by the rendered styles in B_DOTS and
+# checked as DOT_PAIRS (fresh round 2).
 
 
 def _hex2lin(h):
@@ -999,6 +1085,57 @@ def darken(h, dL=5.0):
     return _lin2hex(_lab2lin(lab))
 
 
+def blend_white(h, alpha):
+    """The hex a colour renders as at `alpha` over white (sRGB compositing,
+    as matplotlib's Agg)."""
+    c = np.array([int(h.lstrip('#')[i:i + 2], 16) for i in (0, 2, 4)]) / 255.
+    c = alpha * c + (1.0 - alpha)
+    return '#' + ''.join(f'{int(round(v * 255)):02X}' for v in c)
+
+
+def dot_composite(spec):
+    """The single hex a scatter dot of `spec` (B_DOTS entry: 'face',
+    optional 'edge' + 'lw' [pt], 's' [pt^2], 'alpha') reads as on white:
+    the face / edge mix by visible area (the stroke is centred on the
+    disc's edge), then alpha over white."""
+    face = spec['face']
+    c = np.array([int(face.lstrip('#')[i:i + 2], 16) for i in (0, 2, 4)])
+    c = c / 255.0
+    lw = spec.get('lw', 0.0) if spec.get('edge') else 0.0
+    if lw > 0:
+        r = np.sqrt(spec['s']) / 2.0
+        ri, ro = max(r - lw / 2.0, 0.0), r + lw / 2.0
+        w = (ro ** 2 - ri ** 2) / ro ** 2
+        e = np.array([int(spec['edge'].lstrip('#')[i:i + 2], 16)
+                      for i in (0, 2, 4)]) / 255.0
+        c = (1.0 - w) * c + w * e
+    hexc = '#' + ''.join(f'{int(round(v * 255)):02X}' for v in c)
+    return blend_white(hexc, spec.get('alpha', 1.0))
+
+
+# Main b's dot clouds (and the a seed strip's scout dots). Fresh round 2:
+# the uninformed cyan and the isobutanol-scout violet collapsed to one
+# periwinkle under deutan / protan vision (rendered dE 10 / 3), so the
+# categories are separated by LIGHTNESS as rendered: scout dots light
+# (L* 80 / 86), uninformed dots mid (L* 62: a thin dark-cyan rim), the
+# TRY-informed dots dark (L* 48). Lavender tweaks alone could not do it
+# (every tested violet stayed < 12 under deutan or protan).
+B_DOTS = {
+    'unin': dict(face=PALETTE['unin'], edge=PALETTE['unin_text'], s=5.0,
+                 lw=0.5, alpha=0.9),
+    'unin_ibo': dict(face=PALETTE['unin'], edge=PALETTE['unin_text'],
+                     s=13.0, lw=0.6, alpha=1.0),
+    'relay': dict(face=PALETTE['relay'], s=5.0, alpha=0.9),
+    'etoh': dict(face=darken(PALETTE['etoh_light'], 8.0), s=4.0, alpha=0.6),
+    'ibo': dict(face=darken(PALETTE['ibo_light'], 8.0), s=4.0, alpha=0.6),
+}
+# every pair of b's clouds that a reader must tell apart (the two
+# uninformed styles are one campaign: size tells them apart)
+DOT_PAIRS = tuple((a, b) for i, a in enumerate(B_DOTS)
+                  for b in list(B_DOTS)[i + 1:]
+                  if {a, b} != {'unin', 'unin_ibo'})
+
+
 def _dataviz_validator():
     """The dataviz skill's validate_palette.py, loaded by file path if it is
     available ($DATAVIZ_VALIDATOR or the bundled-skills temp folder)."""
@@ -1031,6 +1168,11 @@ def cvd_check(pairs=CVD_PAIRS, min_de=CVD_MIN_DE, gray_pairs=GRAY_PAIRS,
     raise_on_fail=False."""
     P = PALETTE if palette is None else palette
     report, ok = [], True
+    # the dot clouds as rendered (B_DOTS composites), checked like palette
+    # pairs under the names 'dot:<name>'
+    P = {**P, **{f'dot:{k}': dot_composite(v) for k, v in B_DOTS.items()}}
+    pairs = tuple(pairs) + tuple((f'dot:{a}', f'dot:{b}')
+                                 for a, b in DOT_PAIRS)
     for a, b in pairs:
         d = {k or 'normal': delta_e76(P[a], P[b], k)
              for k in (None, 'deutan', 'protan', 'tritan')}
@@ -1065,7 +1207,7 @@ def cvd_check(pairs=CVD_PAIRS, min_de=CVD_MIN_DE, gray_pairs=GRAY_PAIRS,
         for r in report:
             if r['kind'] == 'cvd':
                 print(f"  {'ok  ' if r['ok'] else 'FAIL'} "
-                      f"{r['pair'][0]:>10s} / {r['pair'][1]:<10s} "
+                      f"{r['pair'][0]:>12s} / {r['pair'][1]:<12s} "
                       f"normal {r['normal']:5.1f}  deutan {r['deutan']:5.1f}"
                       f"  protan {r['protan']:5.1f}  tritan "
                       f"{r['tritan']:5.1f}")

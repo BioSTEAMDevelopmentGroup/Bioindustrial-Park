@@ -676,7 +676,8 @@ def draw(facts, items):
         table['obj'].append(ax.text(0, yc, r['obj'], fontsize=FS_ROW,
                                     ha='left', va='center', color=S.TEXT))
         table['phi'].append(ax.text(
-            0, yc, f'{r["Phi_M"]:.3f}', fontsize=FS_ROW, ha='right',
+            0, yc, C.fmt_phi(r["Phi_M"], facts["budget"]), fontsize=FS_ROW,
+            ha='right',
             va='center', color=S.TEXT if r['Phi_M'] > facts['budget']
             else S.NOTE))
         derated = r['growth'] < 0.99         # main-figure tag rule
@@ -704,7 +705,9 @@ def draw(facts, items):
                           ('growth', 'growth', 'right')):
         table[key].append(ax.text(0, y_head, head, fontsize=FS_HEAD,
                                   fontweight='bold', ha=ha, va='bottom'))
-    place_table(fig, table, x_end + TABLE_GAP, W - RIGHT_MARGIN)
+    # fresh round 2: the near-budget Phi_M at 4 decimals widens its column;
+    # the column gaps shrink to 0.07 in (5 pt) to keep the table in place
+    place_table(fig, table, x_end + TABLE_GAP, W - RIGHT_MARGIN, min_gap=0.07)
     fig.canvas.draw()
     renderer = fig.canvas.get_renderer()
     lab_top = max(_rotated_corners(t, renderer)[:, 1].max() for t in rotated)
@@ -746,7 +749,7 @@ def draw(facts, items):
     # fresh round 1: the two-tone Phi_M column explained (dark = above the
     # budget, where growth is derated; grey = within it)
     ax.text(xr, ky - 2 * KEY_PITCH, f'dark Φ$_\\mathrm{{M}}$: > '
-            f'{facts["budget"]:.4f}, growth derated',
+            f'{C.fmt_budget(facts["budget"])}, growth derated',
             fontsize=FS_HEAD, color=S.NOTE, ha='right', va='center')
 
     # --- colour bars under the heatmap, one per block
@@ -891,7 +894,7 @@ def write_caption(facts, f2, path=CAPTION_PATH):
         f'{ph} [g·(g DCW)<sup>−1</sup>; dark = above the budget, grey = '
         'within it]; and the growth factor (bold = '
         'derated by more than 1 %; growth is derated above '
-        f'{ph} = {budget:.4f}, the penalty-free budget). The '
+        f'{ph} = {C.fmt_budget(budget)}, the penalty-free budget). The '
         f'starting strain\'s IRR ({C.fmt_pct(facts["start_irr_pct"])}) is '
         'under the model version the campaigns ran with.',
         '* **Returned strains differ in products and proteome.** The '
@@ -900,10 +903,12 @@ def write_caption(facts, f2, path=CAPTION_PATH):
         f'{fmt_fold(f2["relay_k6_fold"])}) at baseline-like glycolysis '
         f'({fmt_fold(f2["relay_gly_fold"])}), puts ALS and Adh6 at their '
         f'upper bounds, and stays within the proteome '
-        f'budget ({ph} {rel["Phi_M"]:.3f}, growth ×{rel["growth"]:.2f}). The '
+        f'budget ({ph} {C.fmt_phi(rel["Phi_M"], budget)}, growth '
+        f'×{rel["growth"]:.2f}). The '
         f'uninformed design puts Pdc at its {fmt_fold(f2["unin_k3_fold"])} '
         'bound and switches the isobutanol pathway off (ALS and '
-        f'Ilv5/Ilv3/Aro10 at their floors); its {ph} ({uni["Phi_M"]:.3f}) '
+        f'Ilv5/Ilv3/Aro10 at their floors); its {ph} '
+        f'({C.fmt_phi(uni["Phi_M"], budget)}) '
         f'exceeds the budget (growth ×{uni["growth"]:.2f}).',
         "* **Returned vs best visit.** The isobutanol-yield scout's returned "
         f'design (trial {C.fmt_int(iy_r["sim"])}) and its best visit (trial '

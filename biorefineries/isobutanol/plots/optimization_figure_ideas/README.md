@@ -167,7 +167,9 @@ All files are in `analyses/results/`. Study stems have the form
 
 * The sectors sum to Φ_M.
 * φ_T = 0.11025 is constant.
-* The penalty-free budget is F_flex − φ_T = 0.13475.
+* The penalty-free budget is F_flex − φ_T = 0.13475, printed `0.1347` everywhere
+  (`_common.fmt_budget`); a Φ_M within 0.001 of it is printed to 4 decimals
+  (`_common.fmt_phi`), so it never reads as equal to the budget.
 
 ## Palette and render rules
 
@@ -179,9 +181,18 @@ All files are in `analyses/results/`. Study stems have the form
   in `CVD_PAIRS` and `GRAY_PAIRS` (ΔL* 17.7).
 * The scouts are coloured by product family: ethanol amber, isobutanol violet. Within a
   family, the role is the marker: ○ yield, □ titer, △ productivity.
-* `cvd_check()` requires CIE76 ΔE ≥ 12 for the eight co-occurring pairs. This holds under
-  normal vision and under simulated deutan, protan and tritan vision (Machado 2009). The
-  worst pair is adh1/adh6 under tritan, at 17.7.
+* `cvd_check()` requires CIE76 ΔE ≥ 12 for the eight co-occurring palette pairs and for
+  the `DOT_PAIRS` of the dot clouds as rendered (`B_DOTS` → `dot_composite`: fill / rim
+  area mix, then alpha over white). This holds under normal vision and under simulated
+  deutan, protan and tritan vision (Machado 2009).
+* The flat pair uninformed cyan / isobutanol-scout violet (`unin` / `ibo_light`) collapses
+  under deutan / protan vision (ΔE 8.7 / 4.4) and no lavender fixes it. As flat fills it
+  co-occurs only in main c's labelled strips. In main b the clouds are told apart by
+  lightness as rendered: scout dots light (L* 80 / 86), uninformed dots mid (L* 62, a
+  0.5-pt `unin_text` rim at alpha 0.9), TRY-informed dots dark (L* 48, alpha 0.9); the
+  b and a-strip key dots are drawn as the clouds render (`_key_dot`).
+* main e hatches the Adh1 / Adh6 segments (`ADH_HATCH`, in the branch's dark shade), so
+  their light fills are not read as the scout families' dot colours.
 * The grayscale lightness gaps are 30.6 for cyan/teal, 25.5 for amber/violet and 17.7
   for the two text colours.
 * The dataviz skill's validator is run as an advisory check when it is available.
@@ -193,14 +204,18 @@ All files are in `analyses/results/`. Study stems have the form
   major 4 pt, minor 2 pt.
 * On a horizontal IRR axis narrower than about 2.8 in, the "loss" and "0" tick labels
   collide at the band centre. Use `irr_axis(ax, 'x', loss_at=loss_label_x(width_in))`:
-  both labels stay at the tick size and "loss" moves left inside the band (main c,
-  S1b).
+  both labels stay at the tick size, "loss" moves left inside the band
+  (`LOSS_ZERO_GAP_IN` 0.08 in apart) and a break mark cuts the spine between them
+  (main c, S1b).
 * No data marker may cross a letter. `marker_text_hits` (run by `check_figure`) flags
   every scatter or marker point whose centre falls inside an annotation's text extent
   (1-pt pad), per axes, insets included, plus figure-level text over any axes. A point
   under an opaque backing box (face alpha ≥ 0.85, drawn above the point's layer) is
-  hidden and passes. Put labels on empty spots first. Where no spot is free, prefer a
-  translucent backing (alpha 0.7) that dims rather than hides the data, and pass that
-  label as `check_figure(..., marker_exempt=...)`; it is still placed to cover the
-  fewest key points. The main figure's panel-b labels are placed this way by `_spot` /
-  `_best_spot`; only the outlined-designs block uses the translucent backing.
+  hidden and passes. Put labels on empty spots first. Where no spot is free, use an
+  opaque backing placed to hide the fewest key points, and state what it hides in the
+  methods notes (a translucent backing, tried in fresh round 1, left the dimmed points
+  as specks inside the text at print size). The main figure's panel-b labels are placed
+  this way by `_spot` / `_best_spot`; only the large-dots block (the uninformed
+  campaign's isobutanol-making designs) uses the backing.
+* Main f has headroom above 30 % (`F_YLIM`) for the two runs' speed labels; it is the
+  only IRR axis that does not stop at `IRR_LIM`.

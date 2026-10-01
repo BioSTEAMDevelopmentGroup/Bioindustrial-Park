@@ -19,8 +19,9 @@ honesty check (spec section 5.1, validated per sections 6 and 7).
     the like-for-like speed, since the replicate's seeds already held a
     > 25 % design), trials to >= 25 %, the IRR after 25 trials and the best
     IRR. Every best-design marker sits at its true position; the replicate
-    TRY-informed best (trial 824, next to this work's 913) is a small open
-    star drawn on top of this work's larger filled one.
+    TRY-informed best (trial 824, 4 pt from this work's 913 on the log axis
+    and within the reproducibility margin of it) is not marked: the table's
+    'best IRR' row gives it (fresh round 2).
 (b) The seven replicate scouts in main panel c's family order (ethanol TRY,
     isobutanol TRY, then price-weighted yield): every COMPLETE trial's IRR as
     a strip, the best visit (open role marker), the returned design (filled;
@@ -95,14 +96,14 @@ CP_GAP_X_PT = 1.5                                 # circle edge -> text left
 CP_GAP_Y_PT = 1.2                                 # line edge -> text top
 # Best-design markers sit at their TRUE positions. The two TRY-informed bests
 # (trials 913 / 824, IRR 27.3 / 27.1 %) are ~4 pt apart on the log axis.
-# Fresh round 1: the small open star on top of the large filled one read as
-# one smudge; now the replicate's open star is drawn LARGE (a ring-like
-# outline on a white face) and this work's smaller filled star sits inside
-# it, on top: two concentric-looking stars, neither moved
-STAR_S_FILLED = 100                               # this work's star (s, pt^2)
-STAR_S_OPEN = 260                                 # replicate's open star
-OPEN_STAR_LW = 1.2                                # its outline (pt)
-OPEN_STAR_HALO_LW = 2.4                           # its white halo (pt)
+# Fresh round 1 drew the replicate's open star LARGE around this work's
+# filled one (two concentric stars), an encoding that needed a caption
+# sentence. Fresh round 2: the replicate's star is not drawn (4 pt apart, the
+# two stars always read as one glyph); the table's 'best IRR' row and the
+# dashed line's end give it
+STAR_S_FILLED = 120                               # this work's star (s, pt^2)
+LEGEND_MAX_WORDS = 350            # fresh round 2 (legend was 734 words)
+REPRO_MARGIN_PI = 0.0105          # cross-process PI margin (as the main figure)
 DIAMOND_S = 42                                    # unseeded best diamonds
 # bold 'TRY-informed (seeded)' label: top edge this far below the axes top
 # (IRR points), in the empty upper-left corner above the seeded lines
@@ -444,28 +445,15 @@ def draw_panel_a(fig, facts, F):
                    marker='o', facecolor='white', edgecolor=P[ckey],
                    lw=CIRC25_LW, zorder=6)
     # best design: filled marker for this work, white-faced for the
-    # replicate, every one at its true (trial, IRR). The two TRY-informed
-    # stars nearly coincide: this work's is larger, the replicate's smaller
-    # open star is drawn on top of it (no marker sits at a false position)
+    # replicate, every one at its true (trial, IRR). Fresh round 2: the
+    # replicate TRY-informed best (4 pt from this work's star) is not drawn
     for key, ckey, ls in A_LINES:
         mk = '*' if C.campaign(key).is_relay else 'D'
         filled = not C.campaign(key).replicate
-        if mk == '*':
-            size = STAR_S_FILLED if filled else STAR_S_OPEN
-        else:
-            size = DIAMOND_S
-        x_b, y_b = prog[key]['best_sim'], prog[key]['best_pct']
         if mk == '*' and not filled:
-            # the replicate's LARGE open star: white face (hides the lines
-            # under it), outline on a white halo, all UNDER this work's
-            # smaller filled star (z 7.6), which sits inside it
-            ax.scatter([x_b], [y_b], s=size, marker=mk, facecolor='white',
-                       edgecolor='none', lw=0, zorder=6.8)
-            for ec, lw, z in (('white', OPEN_STAR_HALO_LW, 6.9),
-                              (P[ckey], OPEN_STAR_LW, 7.0)):
-                ax.scatter([x_b], [y_b], s=size, marker=mk,
-                           facecolor='none', edgecolor=ec, lw=lw, zorder=z)
             continue
+        size = STAR_S_FILLED if mk == '*' else DIAMOND_S
+        x_b, y_b = prog[key]['best_sim'], prog[key]['best_pct']
         ax.scatter([x_b], [y_b], s=size,
                    marker=mk, facecolor=P[ckey] if filled else 'white',
                    edgecolor='white' if filled else P[ckey],
@@ -812,6 +800,10 @@ def build_caption(facts, F):
     if not F['unin_first_profitable_sim'] > F['main_startup_rows']:
         raise C.FactsMismatch("this work's first positive-IRR step is "
                               "inside its start-up design: caption stale")
+    # the two seeded bests are not called different (fresh round 2)
+    d_pi = abs(float(C.best_visit_row('relay')['PI'])
+               - float(C.best_visit_row('relay_rep')['PI']))
+    assert d_pi < REPRO_MARGIN_PI, d_pi
     lines = [
         '# Figure S1 | Replicate check',
         '',
@@ -821,106 +813,82 @@ def build_caption(facts, F):
         '**Figure S1 | Replicate check: seeding is fast in both runs; the '
         'unseeded plateau did not replicate.**',
         '',
-        f'**(a)** Best IRR found so far against simulated trials (log '
-        f'scale) for the two unseeded (uninformed) profitability campaigns '
-        f'and the two seeded (TRY-informed) ones. Solid lines are this '
-        f'work\'s campaigns: the uninformed campaign and the TRY-informed '
-        f'campaign seeded with {C.fmt_int(seeds["n"])} trials of the six '
-        f'TRY scouts ({C.fmt_int(seeds["n_ibo"])} isobutanol-scout and '
-        f'{C.fmt_int(seeds["n_etoh"])} ethanol-scout trials: '
-        f'{C.fmt_int(seeds["n_keep_above"])} of the '
-        f'{C.fmt_int(seeds["n_eligible_above"])} scout trials with a '
-        f'profitability index at least the starting strain\'s, '
-        f'{seeds["n_quarantined_above"]} convergence-quarantined trials and '
-        f'{seeds["n_duplicate_above"]} duplicate dropped, plus '
-        f'{C.fmt_int(seeds["n_maximin"])} space-filling ones). Dashed lines '
-        f'are replicates: an uninformed campaign (run {REPLICATE_RUN_DATE}) '
-        f'whose {F["rep_startup_rows"]}-trial space-filling start-up design, '
-        f'shared with seven replicate scouts, differs from this work\'s '
-        f'({F["main_startup_rows"]} trials, shared with the six scouts), and '
-        f'a TRY-informed campaign (run {RELAY_REP_RUN_DATE}) seeded with '
-        f'{C.fmt_int(F["rep_seeds_n"])} trials of those seven scouts '
-        f'({C.fmt_int(fam["ibo"])} isobutanol-scout, '
+        f'**(a)** Best IRR so far against simulated trials for the two '
+        f'unseeded (uninformed) and the two seeded (TRY-informed) '
+        f'profitability campaigns. Solid: this work\'s campaigns (main '
+        f'figure). Dashed: replicates, an uninformed campaign (run '
+        f'{REPLICATE_RUN_DATE}) with a different space-filling start-up '
+        f'design and a TRY-informed campaign (run {RELAY_REP_RUN_DATE}) '
+        f'seeded with {C.fmt_int(F["rep_seeds_n"])} trials of seven '
+        f'replicate scouts ({C.fmt_int(fam["ibo"])} isobutanol-scout, '
         f'{C.fmt_int(fam["etoh"])} ethanol-scout and {C.fmt_int(fam["pw"])} '
         f'price-weighted-yield trials). Open circles: first trial with IRR '
-        f'≥ 25 %; stars and diamonds: each campaign\'s best design (filled '
-        f'for this work, open for the replicate), every marker at its true '
-        f'position. The two seeded campaigns found their best designs at '
-        f'trials {C.fmt_int(pr["best_sim"])} and '
-        f'{C.fmt_int(prr["best_sim"])} ({C.fmt_pct(pr["best_pct"])} and '
-        f'{C.fmt_pct(prr["best_pct"])}), so their stars nearly coincide: '
-        f'this work\'s smaller filled star is drawn inside the replicate\'s '
-        f'larger open star. Italic labels give the products of every '
-        f'best-so-far '
-        f'design of the two unseeded campaigns (co-producing = at least '
-        f'{C.IBO_THRESHOLD:g} g·L⁻¹ each of isobutanol and ethanol; ethanol '
-        f'only = less than {C.IBO_THRESHOLD:g} g·L⁻¹ isobutanol). The '
-        f'table above the axes gives, for each pair, this work / replicate. '
-        f'Its first two rows apply to the seeded campaigns only: the IRR of '
-        f'the best preloaded seed and the first simulated trial that beat '
-        f'it, which compares the two seeded campaigns like for like (the '
-        f'replicate\'s seeds already held a design above 25 %).',
+        f'≥ 25 %; star and diamonds: best designs (open: the replicate\'s), '
+        f'at their true positions; the replicate TRY-informed best '
+        f'({C.fmt_pct(prr["best_pct"])} at trial {C.fmt_int(prr["best_sim"])}, '
+        f'beside this work\'s star) is given in the table only. Italic '
+        f'labels: products of the unseeded campaigns\' best-so-far designs '
+        f'(co-producing: ≥ {C.IBO_THRESHOLD:g} g·L⁻¹ of each alcohol). '
+        f'Table: this work / replicate; its first two rows (seeded only) '
+        f'give the best seed and the first trial that beat it.',
         '',
-        f'**(b)** The seven replicate scouts, drawn as in panel c of the '
-        f'main figure and in its family order (ethanol TRY, then isobutanol '
-        f'TRY; the price-weighted-yield campaign, which has no counterpart '
-        f'in this work, last): every '
-        f'completed trial (dots), the best-IRR trial visited (open marker), '
-        f'the design returned (filled marker; argmax of the campaign\'s own '
-        f'objective) and their connector. Marker shape gives the objective: '
-        f'circle yield, square titer, triangle productivity. The dashed line '
-        f'and the tint mark this work\'s uninformed plateau ({U}), kept as '
-        f'the reference although the replicate did not stay on it (a). The '
-        f'table gives, as in main panel c, the trials above that plateau and '
-        f'the share of trials losing money, and then the returned design\'s '
-        f'IRR, printed "loss" (as in the main figure and Fig. S2) for every '
-        f'returned design drawn in the loss band: {loss_ret}.',
+        f'**(b)** The seven replicate scouts as in main panel c (the '
+        f'price-weighted-yield campaign, without a counterpart in this work, '
+        f'last): trials (dots), best visit (open), returned design (filled; '
+        f'argmax of its own objective). Dashed line and tint: this work\'s '
+        f'uninformed plateau ({U}). Table: trials above it, share of trials '
+        f'losing money, returned IRR.',
         '',
-        '**What replicates.**',
-        '',
-        f'* Seeded search beat every seed within '
+        f'Seeded search beat its best seed within '
         f'{facts["relay"]["first_gt_best_seed"]} and '
-        f'{F["relay_rep_first_gt_best_seed"]} trials (best seeds '
-        f'{C.fmt_pct(seeds["best_irr_pct"])} and '
-        f'{C.fmt_pct(F["rep_best_seed_pct"])}; the replicate\'s was its '
-        f'isobutanol-yield scout\'s best visit, already above 25 %, so its '
-        f'{prr["first_ge25"]} trials to 25 % are the same event and not a '
-        f'second measure of speed). This work\'s seeded campaign passed '
-        f'25 % at trial {pr["first_ge25"]}. The two reached '
+        f'{F["relay_rep_first_gt_best_seed"]} trials in both runs, and the '
+        f'replicate isobutanol scouts again visited designs above {U} that '
+        f'they did not return. The unseeded plateau did not replicate: the '
+        f'replicate uninformed campaign co-produced from its start-up design '
+        f'on and passed 25 % at trial {w_25["sim"]}. With two runs this is '
+        f'an observation, not a test: 1 of 2 unseeded runs stayed on the '
+        f'ethanol-only plateau, while seeded search was fast in 2 of 2.',
+        '',
+        '*Methods notes (not part of the legend).*',
+        f'* Replicates: the uninformed campaign\'s '
+        f'{F["rep_startup_rows"]}-trial space-filling start-up design, shared '
+        f'with the seven replicate scouts, differs from this work\'s '
+        f'({F["main_startup_rows"]} trials, shared with the six scouts). This '
+        f'work\'s TRY-informed campaign was seeded as in the main figure '
+        f'({C.fmt_int(seeds["n_keep_above"])} of the '
+        f'{C.fmt_int(seeds["n_eligible_above"])} scout trials at least as '
+        f'profitable as the starting strain plus '
+        f'{C.fmt_int(seeds["n_maximin"])} space-filling ones). The '
+        f'replicate\'s best seed was its isobutanol-yield scout\'s best '
+        f'visit, already above 25 %, so its {prr["first_ge25"]} trials to '
+        f'25 % are the same event as beating its best seed, not a second '
+        f'measure of speed; this work\'s seeded campaign passed 25 % at '
+        f'trial {pr["first_ge25"]}.',
+        f'* (a) Best seeds {C.fmt_pct(seeds["best_irr_pct"])} and '
+        f'{C.fmt_pct(F["rep_best_seed_pct"])}; bests '
         f'{C.fmt_pct(pr["best_pct"])} and {C.fmt_pct(prr["best_pct"])} '
         f'(trials {C.fmt_int(pr["best_sim"])} and '
-        f'{C.fmt_int(prr["best_sim"])}). After 25 trials the seeded '
-        f'campaigns stood at {C.fmt_pct(pr["at25_pct"])} and '
-        f'{C.fmt_pct(prr["at25_pct"])}; the unseeded ones at '
-        f'{_irr_words(pu["at25_pct"])} and {_irr_words(pur["at25_pct"])}.',
-        f'* The isobutanol scouts visited designs above {U} '
-        f'({ibo_n} trials for yield, titer and productivity; price-weighted '
-        f'yield {C.fmt_int(rep["rep_pw"]["n_gt_U"])}), while the ethanol '
-        f'scouts '
-        f'never did (best {C.fmt_pct(F["rep_etoh_max_visit_pct"])}).',
-        f'* Every replicate scout returned a design below this work\'s '
-        f'uninformed plateau '
-        f'(highest: {C.fmt_pct(F["rep_max_returned_pct"])}).',
-        f'* All three campaigns that passed 27 % returned co-production '
-        f'designs: this work\'s TRY-informed '
+        f'{C.fmt_int(prr["best_sim"])}), within the reproducibility margin '
+        f'of each other (ΔPI {d_pi:.4f} < {REPRO_MARGIN_PI}). After 25 trials the seeded campaigns stood at '
+        f'{C.fmt_pct(pr["at25_pct"])} and {C.fmt_pct(prr["at25_pct"])}; the '
+        f'unseeded ones at {_irr_words(pu["at25_pct"])} and '
+        f'{_irr_words(pur["at25_pct"])}. All three campaigns that passed '
+        f'27 % returned co-production designs: this work\'s TRY-informed '
         f'{g(best["relay"]["ibo"])} isobutanol + {g(best["relay"]["etoh"])} '
         f'ethanol; replicate TRY-informed {g(best["relay_rep"]["ibo"])} + '
         f'{g(best["relay_rep"]["etoh"])}; replicate uninformed '
         f'{g(best["unin_rep"]["ibo"])} + {g(best["unin_rep"]["etoh"])}.',
-        '',
-        '**What does not replicate.**',
-        '',
-        f'* The unseeded plateau: this work\'s uninformed campaign stayed at '
-        f'{U} (ethanol only) from trial {facts["U_sim"]} to trial '
-        f'{C.fmt_int(facts["campaigns"]["unin"]["max_sim"])}; every '
-        f'improvement of the replicate co-produced, from a start-up design '
-        f'on, and it passed 25 % at trial {w_25["sim"]}. With two runs this '
-        f'is an observation, not '
-        f'a test: 1 of 2 unseeded runs stayed on the ethanol-only plateau, '
-        f'while seeded search was fast in 2 of 2.',
-        '',
-        '*Methods notes (not part of the legend).*',
-        f'* Every improvement of this work\'s uninformed campaign was an '
+        f'* (b) The isobutanol scouts visited {ibo_n} designs above {U} '
+        f'(yield, titer, productivity; price-weighted yield '
+        f'{C.fmt_int(rep["rep_pw"]["n_gt_U"])}); the ethanol scouts never '
+        f'did (best {C.fmt_pct(F["rep_etoh_max_visit_pct"])}). Every '
+        f'replicate scout returned a design below this work\'s plateau '
+        f'(highest {C.fmt_pct(F["rep_max_returned_pct"])}); "loss" in the '
+        f'returned-IRR column: {loss_ret}.',
+        f'* This work\'s uninformed campaign stayed at {U} (ethanol only) '
+        f'from trial {facts["U_sim"]} to trial '
+        f'{C.fmt_int(facts["campaigns"]["unin"]["max_sim"])}. Every '
+        f'improvement of this work\'s uninformed campaign was an '
         f'ethanol-only design (all {F["n_steps"]["unin"]} best-so-far steps; '
         f'first positive-IRR design at trial '
         f'{F["unin_first_profitable_sim"]}, after its '
@@ -951,7 +919,11 @@ def build_caption(facts, F):
         'recorded value.',
         '',
     ]
-    return '\n'.join(lines)
+    txt = '\n'.join(lines)
+    n_leg = len(txt.split('*Methods notes')[0].split('-->')[-1].split())
+    assert n_leg <= LEGEND_MAX_WORDS, f'S1 legend {n_leg} words'
+    print(f'S1 legend: {n_leg} words')
+    return txt
 
 
 # %% Main ------------------------------------------------------------------------
