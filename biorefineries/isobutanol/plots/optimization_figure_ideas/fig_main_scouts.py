@@ -22,8 +22,7 @@ Panels (figwork/figure_spec.md section 3; take-aways T1-T5):
        alcohol titer; the uninformed isobutanol designs outlined (T2, T3,
        T4)
     c  visited vs returned: every trial of each campaign as a strip, the
-       best visit (open) and the returned design (filled), plus a two-column
-       table (trials above the plateau, trials losing) (T3)
+       best visit (open) and the returned design (filled) (T3)
     d  titers of each returned design (T1, T4)
     e  metabolic proteome of each returned design (T1)
     f  exploration (trials making isobutanol) vs IRR of the best visit and
@@ -135,11 +134,12 @@ L = {
     'a_strip': (0.72, 4.55, 0.40, 2.85),
     'a': (1.17, 4.55, 4.20, 2.85),
     'b': (6.02, 4.55, 3.86, 2.85),
-    # c ends 0.08 in short of the table's first column (round 3: the relay's
-    # grey 'of 998' started 0.01 in from c's right spine)
     # fresh round 1: 0.11 in shorter (2.58 -> 2.47) so the header band
     # holds the three-row d/e key
-    'c': (1.52, 0.72, 1.90, 2.47),
+    # 2026-10-01: the two-column table between c and d (trials above the
+    # plateau, trials losing) removed at the user's request; c widened into
+    # its space, ending 0.30 in short of d's left spine
+    'c': (1.52, 0.72, 2.62, 2.47),
     'd': (4.44, 0.72, 0.72, 2.47),
     'e': (5.26, 0.72, 1.64, 2.47),
     'f': (7.52, 0.72, 2.36, 2.47),
@@ -152,21 +152,19 @@ L = {
 INSET_DATA = ((125.0, 1400.0), (0.9, 7.6))
 INSET_GAP_PT = 2.0                # min gap: inset (labels incl.) <-> the 0
                                   # line, a's labels, a's right-spine ticks
-TABLE_X = (3.68, 4.15)            # centres of the two table columns
 GROUP_X = 0.12                    # group headers, left-aligned
 ROW_LABEL_X = 1.30                # row labels, right-aligned
 ROW_MARK_X = 1.40                 # role marker after the row label
-# row separators: labels + c, then d + e (broken across the table so the
-# relay's two-line count never crosses one)
-# (the first stops at c's right spine, short of the 'of 998' text)
-SEP_SEGMENTS = ((0.12, 3.42), (4.40, 6.90))
+# row separators: one run across the labels, c, d and e (no table between
+# c and d to break around since 2026-10-01)
+SEP_SEGMENTS = ((0.12, 6.90),)
 TOP_LETTER_Y, BOT_LETTER_Y = 7.66, 3.86
 # bottom-row letters: >= 0.3 in between a title's end and the next letter
 # (round 3: 'Titers' ran into 'e'); f's title is longer, so its letter sits
 # further left with a smaller letter-title gap (TITLE_DX)
 # fresh round 2: 'd' sits over d's left spine (at 4.20 in, 'd Titers' read
-# as the title of the c table's 'trials losing' column); e moves right to
-# keep MIN_TITLE_GAP_IN, with tighter letter-title gaps (TITLE_DX)
+# as the title of the former c table's 'trials losing' column); e moves
+# right to keep MIN_TITLE_GAP_IN, with tighter letter-title gaps (TITLE_DX)
 LETTER_X = {'a': 0.06, 'b': 5.42, 'c': 0.06, 'd': 4.40, 'e': 5.36, 'f': 6.94}
 TITLE_DX = {'d': 0.20, 'e': 0.22, 'f': 0.22}   # default 0.28 in
 MIN_TITLE_GAP_IN = 0.30           # title end -> next letter (asserted)
@@ -176,7 +174,7 @@ BAND_Y = (3.645, 3.475)           # the two key lines of the header band
 BAND_Y_DE = BAND_Y + (3.305,)
 HEAD_Y = 7.45                     # top-row sub-header line (a strip, b key)
 KEY_DE_X = 4.52                   # d/e key start (0.08 in right of d's
-                                  # left edge: clear of c's table header)
+                                  # left edge)
 KEY_GAP_IN = 0.30                 # min gap between the d/e and f keys
 KEY_DE_MAX_X = 6.90               # the d/e key ends inside e (e's right)
 
@@ -1275,38 +1273,6 @@ def row_labels(fig, F, ax_c):
                               mew=mew))
 
 
-def table_c(fig, F, ax_c):
-    tr = _rows_transform(fig, ax_c)
-    camp = F['campaigns']
-    U = F['U_pct']
-    hy = BAND_Y[1] + 0.06
-    for x, h in zip(TABLE_X, (f'trials\n> {C.fmt_irr(U)}', 'trials\nlosing')):
-        S.fig_text(fig, x, hy, h, fontsize=S.FS['note'], ha='center',
-                   va='center', color=TEXT, linespacing=1.1)
-    fs = S.FS['table']
-    for k in C.MAIN_KEYS:
-        st = camp[k]
-        y = ROW_Y[k]
-        if k == 'unin':
-            n_txt = '–'
-        else:
-            n_txt = C.fmt_int(st['n_gt_U'])
-        bold = k == 'iy'
-        if C.campaign(k).is_relay:
-            fig.text(TABLE_X[0], y - 0.13, n_txt, transform=tr, ha='center',
-                     va='center', fontsize=fs, color=TEXT)
-            fig.text(TABLE_X[0], y + 0.47,
-                     f"of {C.fmt_int(st['n_complete'])}", transform=tr,
-                     ha='center', va='center', fontsize=S.FS['note'],
-                     color=NOTE, zorder=3)
-        else:
-            fig.text(TABLE_X[0], y, n_txt, transform=tr, ha='center',
-                     va='center', fontsize=fs, color=TEXT,
-                     fontweight='bold' if bold else 'normal')
-        fig.text(TABLE_X[1], y, _pct0(st['pct_losing']), transform=tr,
-                 ha='center', va='center', fontsize=fs, color=TEXT)
-
-
 # fresh round 2: each d bar ends in its row's returned-design marker (as in
 # c), so d and e need no tracking back to c's row labels; d's x limit makes
 # room for the longest bar's marker
@@ -1671,7 +1637,6 @@ def build(F):
     ax_b = panel_b(fig, F)
     ax_c = panel_c(fig, F)
     row_labels(fig, F, ax_c)
-    table_c(fig, F, ax_c)
     ax_d = panel_d(fig, F)
     ax_e = panel_e(fig, F)
     ax_f = panel_f(fig, F)
@@ -1681,11 +1646,8 @@ def build(F):
     assert x_de <= KEY_DE_MAX_X, f'd/e key runs to {x_de:.2f} in'
     x_f0 = max(L['f'][0], x_de + KEY_GAP_IN)
     x_fk = key_f(fig, x_f0)
-    # the d/e key clear of c's table header (fresh round 1: 2 mm apart)
-    hdr_end = TABLE_X[1] + 0.5 * _text_w_in(fig, 'losing', S.FS['note'])
-    assert KEY_DE_X - hdr_end >= 0.15, f'table header ends {hdr_end:.2f} in'
-    print(f'header band: table header ends {hdr_end:.2f} in, d/e key '
-          f'{KEY_DE_X:.2f}-{x_de:.2f} in, f key {x_f0:.2f}-{x_fk:.2f} in')
+    print(f'header band: d/e key {KEY_DE_X:.2f}-{x_de:.2f} in, '
+          f'f key {x_f0:.2f}-{x_fk:.2f} in')
     assert x_fk <= S.MAIN_SIZE[0] - 0.05, f'f key runs to {x_fk:.2f} in'
 
     rel = F['relay']
