@@ -16,6 +16,7 @@ package, never load()s -- safe alongside a running simulation on any numba
 cache state (also on a partially complete stage-1 CSV).
 
     python analyze_sobol_split12d.py --study-name <STUDY_NAME>
+    python analyze_sobol_split12d.py --study-name <STUDY_NAME> --replot   # figures only
     python analyze_sobol_split12d.py --self-test        # synthetic, no data needed
 
 --gp-metrics names the metrics whose surrogate may be a Gaussian process
@@ -247,12 +248,22 @@ def _ticks(ax):
     ax.xaxis.set_tick_params(which='minor', bottom=False)
     top.xaxis.set_tick_params(which='minor', top=False)
 
-def plot_bars(table, names, q2_text, path):
-    _style()
-    t = table[table.metric == HEADLINE]
-    order = (t[t['index'] == 'Shapley'].set_index('parameter')['mean']
-             .sort_values(ascending=False).index.tolist())
-    fig, ax = plt.subplots(figsize=(7.5, 4.6))
+#: Stacked bar figure: one panel per metric, top to bottom, sharing the PI
+#: panel's x order (descending PI Shapley effect).
+STACK_METRICS = ('PI', 'EtOH titer', 'EtOH yield', 'IBO titer', 'IBO yield')
+STACK_TITLES = {'PI': 'Profitability Index', 'EtOH titer': 'Ethanol titer',
+                'EtOH yield': 'Ethanol yield', 'IBO titer': 'Isobutanol titer',
+                'IBO yield': 'Isobutanol yield'}
+BAR_YLIM = (-0.04, 1.0)
+
+def _headline_order(table):
+    """Parameters by descending Shapley effect on the headline metric."""
+    t = table[(table.metric == HEADLINE) & (table['index'] == 'Shapley')]
+    return t.set_index('parameter')['mean'].sort_values(ascending=False).index.tolist()
+
+def _draw_index_bars(ax, t, order):
+    """First-order / Shapley / total bars (with replicate sd) of one metric's
+    rows `t` of the index table, in the parameter order `order`."""
     width, x = 0.27, np.arange(len(order))
     ax.axhline(0.0, color='k', linewidth=0.8, zorder=0.5)
     for k, (kind, colour, label) in enumerate((
@@ -264,7 +275,13 @@ def plot_bars(table, names, q2_text, path):
                color=colour, edgecolor='k', linewidth=0.5, label=label)
     ax.set_xticks(x)
     ax.set_xticklabels([LABELS.get(n, n) for n in order], rotation=40, ha='right')
-    ax.set_ylim(-0.04, 1.0)
+    ax.set_ylim(*BAR_YLIM)
+
+def plot_bars(table, names, q2_text, path):
+    _style()
+    order = _headline_order(table)
+    fig, ax = plt.subplots(figsize=(7.5, 4.6))
+    _draw_index_bars(ax, table[table.metric == HEADLINE], order)
     ax.set_ylabel('Share of Profitability Index variance')
     ax.set_title(f'Sensitivity of the Profitability Index ({q2_text})', fontweight='bold')
     _ticks(ax)
@@ -273,6 +290,50 @@ def plot_bars(table, names, q2_text, path):
     fig.savefig(path + '.png', dpi=600, bbox_inches='tight')
     fig.savefig(path + '.pdf', bbox_inches='tight')
     plt.close(fig)
+
+def plot_bars_stack(table, path, metrics=STACK_METRICS):
+    """The PI bar panel and the ethanol / isobutanol titer and yield panels
+    stacked in one column on ONE shared x axis in the PI panel's order (the
+    tick labels drawn once, under the bottom panel). Metrics absent from the
+    table are skipped; returns the metrics drawn."""
+    _style()
+    metrics = [m for m in metrics if m in set(table.metric)]
+    order = _headline_order(table)
+    fig, axes = plt.subplots(len(metrics), 1, sharex=True, squeeze=False,
+                             figsize=(7.5, 1.9*len(metrics) + 1.6))
+    axes = axes[:, 0]
+    for ax, m in zip(axes, metrics):
+        t = table[table.metric == m]
+        _draw_index_bars(ax, t, order)
+        s, q2, reliable = t.surrogate.iloc[0], t.Q2.iloc[0], bool(t.reliable.iloc[0])
+        ax.set_title(f'{STACK_TITLES.get(m, m)} ({s.upper()} surrogate, Q$^2$ = {q2:.2f}'
+                     + ('' if reliable else ', unreliable') + ')',
+                     fontweight='bold', fontsize=12)
+        _ticks(ax)
+        if ax is not axes[-1]:
+            ax.tick_params(labelbottom=False)
+    # inside the top (PI) panel: its bars descend left to right, so the upper right is empty
+    axes[0].legend(loc='upper right', frameon=False)
+    fig.supylabel('Share of variance', fontsize=12)
+    fig.tight_layout(h_pad=0.6)
+    fig.savefig(path + '.png', dpi=600, bbox_inches='tight')
+    fig.savefig(path + '.pdf', bbox_inches='tight')
+    plt.close(fig)
+    return metrics
+
+def replot(study_name, heatmap_include_unreliable=False):
+    """Redraw the figures from a finished run's <study>_sobol_indices.csv (no
+    surrogate refit, no summary rewrite)."""
+    out = os.path.join(RESULTS, study_name + '_sobol_')
+    table = pd.read_csv(out + 'indices.csv')
+    names = list(dict.fromkeys(table.parameter))     # index_table writes them in design order
+    t = table[table.metric == HEADLINE]
+    plot_bars(table, names, f'{t.surrogate.iloc[0].upper()} surrogate, '
+                            f'Q$^2$ = {t.Q2.iloc[0]:.2f}', out + 'PI_bars')
+    plot_bars_stack(table, out + 'bars_stack')
+    plot_heatmap(table, names, out + 'shapley_heatmap',
+                 include_unreliable=heatmap_include_unreliable)
+    print(f'Figures redrawn: {out}*')
 
 def plot_heatmap(table, names, path, include_unreliable=False):
     """Shapley heatmap, one row per metric. By default only metrics whose
@@ -502,6 +563,7 @@ def run(args):
     pd.DataFrame(conv).to_csv(out + 'PI_convergence.csv', index=False)
     s = surrogates[HEADLINE]
     plot_bars(table, names, f'{s.name.upper()} surrogate, Q$^2$ = {s.q2[s.name]:.2f}', out + 'PI_bars')
+    plot_bars_stack(table, out + 'bars_stack')
     plot_heatmap(table, names, out + 'shapley_heatmap',
                  include_unreliable=args.heatmap_include_unreliable)
     write_summary(out + 'summary.txt', study_name=args.study_name, counts=counts,
@@ -559,6 +621,8 @@ def self_test():
     import tempfile
     with tempfile.TemporaryDirectory() as tmp:
         plot_bars(table, Box.names, 'self-test', os.path.join(tmp, 'bars'))
+        stacked = plot_bars_stack(table, os.path.join(tmp, 'stack'))
+        assert stacked == [HEADLINE, 'IBO titer'], stacked     # absent metrics skipped
         drawn = plot_heatmap(table, Box.names, os.path.join(tmp, 'heat'))
         assert set(drawn) == set(table[table.reliable].metric), drawn
         every = plot_heatmap(table, Box.names, os.path.join(tmp, 'heat'),
@@ -569,7 +633,8 @@ def self_test():
                       names=Box.names, surrogates=surrogates, S=S, fallback=fallback,
                       y_headline=Y[HEADLINE], measure='screening', target=target)
         made = sorted(os.listdir(tmp))
-        assert made == ['bars.pdf', 'bars.png', 'heat.pdf', 'heat.png', 'summary.txt'], made
+        assert made == ['bars.pdf', 'bars.png', 'heat.pdf', 'heat.png', 'stack.pdf',
+                        'stack.png', 'summary.txt'], made
         with open(os.path.join(tmp, 'summary.txt'), encoding='utf-8') as fh:
             text = fh.read()
         for needle in ('GP-eligible metrics', 'Input measure: screening',
@@ -608,11 +673,16 @@ if __name__ == '__main__':
     parser.add_argument('--heatmap-include-unreliable', action='store_true',
                         help='also draw (starred) the metrics whose surrogate CV Q2 is '
                              'below 0.8 in the Shapley heatmap (default: omit them)')
+    parser.add_argument('--replot', action='store_true',
+                        help="only redraw the figures from the study's saved "
+                             '<study>_sobol_indices.csv (no surrogate fits)')
     parser.add_argument('--self-test', action='store_true')
     args = parser.parse_args()
     if args.self_test:
         self_test()
     elif not args.study_name:
         parser.error('--study-name is required (or --self-test)')
+    elif args.replot:
+        replot(args.study_name, args.heatmap_include_unreliable)
     else:
         run(args)
