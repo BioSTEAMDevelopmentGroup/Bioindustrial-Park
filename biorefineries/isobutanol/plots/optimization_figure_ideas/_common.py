@@ -29,17 +29,16 @@ Paths
     PKG, RESULTS, FIGDIR, OUT_DIR, MAX_PATH_CHARS (259)
 Registry
     Campaign (frozen dataclass: key, stem, label, long_label, family, role,
-        marker, is_relay, replicate, n_trials)
-    CAMPAIGNS            {key: Campaign} for the eight main campaigns, in the
-                         bottom-row order unin, relay, ey, et, ep, iy, it, ip
-    REPLICATES           {key: Campaign} for Fig. S1 (unin_rep, relay_rep,
-                         rep_iy, rep_it, rep_ip, rep_pw, rep_ey, rep_et, rep_ep)
-    ALL_CAMPAIGNS        CAMPAIGNS + REPLICATES
+        marker, is_relay, n_trials)
+    CAMPAIGNS            {key: Campaign} for the eight campaigns (all run
+                         2026-09-23/24; the ONLY campaigns any figure here
+                         reads), in the bottom-row order unin, relay, ey, et,
+                         ep, iy, it, ip
     MAIN_KEYS, PROFIT_KEYS, SCOUT_KEYS, ETOH_SCOUTS, IBO_SCOUTS,
-    REP_SCOUT_KEYS, ROW_KEYS ('base' + MAIN_KEYS)
+    ROW_KEYS ('base' + MAIN_KEYS)
     ROLE_MARKER {'yield': 'o', 'titer': 's', 'productivity': '^'};
     FAMILY_LABEL {'profit': 'Profitability', 'etoh': 'Ethanol TRY', ...}
-    campaign(key) -> Campaign;  family_of_stem(stem) -> 'etoh'|'ibo'|...
+    campaign(key) -> Campaign;  family_of_stem(stem) -> 'etoh'|'ibo'|'profit'
 Loading (cached; DO NOT mutate the returned frames -- .copy() first)
     load_trajectory(key)  every row, sorted by trial_number, + derived columns
     complete(key)         COMPLETE rows only (the rows used everywhere)
@@ -121,9 +120,8 @@ import pandas as pd
 
 __all__ = [
     'PKG', 'RESULTS', 'FIGDIR', 'OUT_DIR', 'MAX_PATH_CHARS',
-    'Campaign', 'CAMPAIGNS', 'REPLICATES', 'ALL_CAMPAIGNS', 'MAIN_KEYS',
-    'PROFIT_KEYS', 'SCOUT_KEYS', 'ETOH_SCOUTS', 'IBO_SCOUTS',
-    'REP_SCOUT_KEYS', 'ROW_KEYS', 'ROLE_MARKER', 'FAMILY_LABEL', 'campaign',
+    'Campaign', 'CAMPAIGNS', 'MAIN_KEYS',
+    'PROFIT_KEYS', 'SCOUT_KEYS', 'ETOH_SCOUTS', 'IBO_SCOUTS', 'ROW_KEYS', 'ROLE_MARKER', 'FAMILY_LABEL', 'campaign',
     'family_of_stem', 'load_trajectory', 'complete', 'load_manifest',
     'add_derived', 'IBO_THRESHOLD', 'ETOH_THRESHOLD', 'SHARE_MIN_ALCOHOL',
     'ABOVE_EPS', 'RELAY_KEEP_ABOVE', 'is_loss', 'no_irr', 'makes_ibo',
@@ -162,14 +160,14 @@ def _stem(slug, tag=''):
 ROLE_MARKER = {'profit_unin': 'D', 'profit_relay': '*', 'yield': 'o',
                'titer': 's', 'productivity': '^'}
 FAMILY_LABEL = {'profit': 'Profitability', 'etoh': 'Ethanol TRY',
-                'ibo': 'Isobutanol TRY', 'pw': 'Price-weighted yield'}
+                'ibo': 'Isobutanol TRY'}
 
 
 @dataclass(frozen=True)
 class Campaign:
     """One campaign. `label` is the short figure-text row label, `long_label`
     the stand-alone name; `role` in {'profit_unin', 'profit_relay', 'yield',
-    'titer', 'productivity'}; `family` in {'profit', 'etoh', 'ibo', 'pw'}."""
+    'titer', 'productivity'}; `family` in {'profit', 'etoh', 'ibo'}."""
     key: str
     stem: str
     label: str
@@ -177,7 +175,6 @@ class Campaign:
     family: str
     role: str
     is_relay: bool = False
-    replicate: bool = False
     n_trials: int = 2000          # simulated trials (rows of the CSV)
 
     @property
@@ -193,13 +190,16 @@ class Campaign:
         return os.path.join(RESULTS, self.stem + '_relay_manifest.csv')
 
 
-def _scout(key, fam, role, tag, replicate=False):
-    slug = {'etoh': 'etoh', 'ibo': 'ibo', 'pw': 'price-weighted'}[fam]
-    name = {'etoh': 'Ethanol', 'ibo': 'Isobutanol', 'pw': 'Price-weighted'}[fam]
-    return Campaign(key, _stem(f'{slug}_{role}', tag), role,
-                    f'{name} {role}', fam, role, replicate=replicate)
+def _scout(key, fam, role, tag):
+    name = {'etoh': 'Ethanol', 'ibo': 'Isobutanol'}[fam]
+    return Campaign(key, _stem(f'{fam}_{role}', tag), role,
+                    f'{name} {role}', fam, role)
 
 
+# The eight campaigns of this work (all run 2026-09-23/24): the seed-350
+# uninformed profitability campaign, the six seed-350 TRY scouts and the
+# TRY-informed relay preloaded with 1,000 scout trials. No other (older)
+# campaign is read by any figure here.
 CAMPAIGNS = {c.key: c for c in (
     Campaign('unin', _stem('pi_log-tail', '_rs350'), 'uninformed',
              'Profitability (uninformed)', 'profit', 'profit_unin'),
@@ -213,48 +213,26 @@ CAMPAIGNS = {c.key: c for c in (
     _scout('it', 'ibo', 'titer', '_rs350'),
     _scout('ip', 'ibo', 'productivity', '_rs350'),
 )}
-# Fig. S1 replicates: the untagged 2026-09-16/17 campaigns (no _rs350) and the
-# 2026-09-23 relay seeded from them
-REPLICATES = {c.key: c for c in (
-    Campaign('unin_rep', _stem('pi_log-tail'), 'uninformed (replicate)',
-             'Profitability (uninformed, replicate)', 'profit', 'profit_unin',
-             replicate=True),
-    Campaign('relay_rep', _stem('pi_log-tail', '_rlba1b2315'),
-             'TRY-informed (replicate)',
-             'Profitability (TRY-informed, replicate)', 'profit',
-             'profit_relay', is_relay=True, replicate=True, n_trials=1000),
-    _scout('rep_iy', 'ibo', 'yield', '', True),
-    _scout('rep_it', 'ibo', 'titer', '', True),
-    _scout('rep_ip', 'ibo', 'productivity', '', True),
-    _scout('rep_pw', 'pw', 'yield', '', True),
-    _scout('rep_ey', 'etoh', 'yield', '', True),
-    _scout('rep_et', 'etoh', 'titer', '', True),
-    _scout('rep_ep', 'etoh', 'productivity', '', True),
-)}
-ALL_CAMPAIGNS = {**CAMPAIGNS, **REPLICATES}
 MAIN_KEYS = tuple(CAMPAIGNS)                  # unin relay ey et ep iy it ip
 PROFIT_KEYS = ('unin', 'relay')
 ETOH_SCOUTS = ('ey', 'et', 'ep')
 IBO_SCOUTS = ('iy', 'it', 'ip')
 SCOUT_KEYS = ETOH_SCOUTS + IBO_SCOUTS
-REP_SCOUT_KEYS = ('rep_iy', 'rep_it', 'rep_ip', 'rep_pw', 'rep_ey',
-                  'rep_et', 'rep_ep')
 ROW_KEYS = ('base',) + MAIN_KEYS              # the bottom-row / Section 1.6 rows
-_STEM_TO_KEY = {c.stem: k for k, c in ALL_CAMPAIGNS.items()}
+_STEM_TO_KEY = {c.stem: k for k, c in CAMPAIGNS.items()}
 
 
 def campaign(key):
-    return ALL_CAMPAIGNS[key]
+    return CAMPAIGNS[key]
 
 
 def family_of_stem(stem):
-    """'etoh' / 'ibo' / 'pw' / 'profit' of a (donor) study stem or path."""
+    """'etoh' / 'ibo' / 'profit' of a (donor) study stem or path."""
     s = os.path.basename(str(stem)).replace('_trajectory.csv', '')
     if s in _STEM_TO_KEY:
-        return ALL_CAMPAIGNS[_STEM_TO_KEY[s]].family
+        return CAMPAIGNS[_STEM_TO_KEY[s]].family
     slug = s[len(_PFX):] if s.startswith(_PFX) else s
-    for pre, fam in (('etoh_', 'etoh'), ('ibo_', 'ibo'),
-                     ('price-weighted', 'pw'), ('pi_', 'profit')):
+    for pre, fam in (('etoh_', 'etoh'), ('ibo_', 'ibo'), ('pi_', 'profit')):
         if slug.startswith(pre):
             return fam
     raise KeyError(f'cannot classify donor stem {stem!r}')
@@ -384,14 +362,18 @@ def complete(key):
 def load_manifest(key='relay'):
     """The relay campaign's 1,000 preloaded seed rows (<relay>_relay_manifest
     .csv) with 'donor_key' (registry key of the donor campaign), 'family'
-    ('etoh' / 'ibo' / 'pw') and the derived columns ('sim' is NaN)."""
+    ('etoh' / 'ibo') and the derived columns ('sim' is NaN)."""
     c = campaign(key)
     if not c.is_relay:
         raise ValueError(f'{key} is not a relay campaign')
     m = pd.read_csv(c.manifest_csv, low_memory=False)
     stems = m['donor'].map(lambda d: os.path.basename(str(d)).replace(
         '_trajectory.csv', ''))
-    m['donor_key'] = stems.map(lambda s: _STEM_TO_KEY.get(s, s))
+    # every donor must be one of this work's campaigns (no older campaign)
+    unknown = sorted(set(stems) - set(_STEM_TO_KEY))
+    if unknown:
+        raise ValueError(f'{key}: donor(s) outside the registry: {unknown}')
+    m['donor_key'] = stems.map(_STEM_TO_KEY)
     m['family'] = stems.map(family_of_stem)
     m = add_derived(m)
     return m
@@ -685,7 +667,6 @@ RELAY_BSF_SIMS = (25, 53, 100, 871, 913, 1000)
 RELAY_WINDOWS = ((1, 10), (11, 50), (51, 100), (101, 250), (251, 500),
                  (501, 1000))
 UNIN_BSF_SIMS = (24, 25, 53, 100, 104, 2000)
-UNIN_REP_WALK = (63, 72, 99, 103)
 IY_PAIR = (841, 842)
 
 
@@ -918,55 +899,9 @@ def _compute_facts():
     # --- the isobutanol-yield pair (returned #841 vs best visit #842)
     facts['iy_pair'] = {t: row_record(row_at_trial('iy', t)) for t in IY_PAIR}
 
-    # --- replicates (Fig. S1)
-    rep_prog = {k: progress(k, U) for k in
-                ('unin', 'relay', 'unin_rep', 'relay_rep')}
-    walk = {}
-    for t in UNIN_REP_WALK:
-        rr = row_at_trial('unin_rep', t)
-        walk[t] = {'irr_pct': _pct(rr['IRR']), 'ibo': float(rr['ibo']),
-                   'etoh': float(rr['etoh']), 'sim': int(rr['sim'])}
-    rep_scouts = {}
-    for k in REP_SCOUT_KEYS:
-        st = campaign_stats(k, U)
-        rep_scouts[k] = {
-            'best_visit_irr_pct': st['best_visit']['irr_pct'],
-            'returned_irr_pct': st['returned']['irr_pct'],
-            'n_gt_U': st['n_gt_U'], 'pct_losing': st['pct_losing'],
-            'exploration_pct': st['exploration_pct'],
-            'n_complete': st['n_complete']}
-    dec = list(DECISION_VARS)
-    # the two SEEDED campaigns, like for like: each one's best preloaded
-    # seed and the first simulated trial above it (main caption, Fig. S1)
-    seeded = {}
-    for k in ('relay', 'relay_rep'):
-        m = man if k == 'relay' else load_manifest(k)
-        bs_k = float(m['IRR'].max())
-        seeded[k] = {'best_seed_pct': _pct(bs_k),
-                     'first_gt_best_seed': first_sim(
-                         complete(k), bs_k + ABOVE_EPS, strict=True),
-                     # price-weighted-yield seeds (a revenue-weighted, not a
-                     # TRY, objective; replicate only; main caption)
-                     'n_pw': int((m['family'] == 'pw').sum())}
-    facts['replicates'] = {
-        'progress': rep_prog,
-        'seeded': seeded,
-        'unin_rep_walk': walk,
-        'unin_rep_startup_identical': bool(np.allclose(
-            load_trajectory('unin_rep').head(51)[dec].to_numpy(float),
-            load_trajectory('unin').head(51)[dec].to_numpy(float))),
-        'scouts': rep_scouts,
-        # the two replicate profitability campaigns (panel f, Fig. S1)
-        'profit_stats': {
-            k: {'exploration_pct': st['exploration_pct'],
-                'n_gt_U': st['n_gt_U'],
-                'best_irr_pct': st['best_visit']['irr_pct'],
-                'best_etoh': st['best_visit']['etoh'],
-                'best_ibo': st['best_visit']['ibo'],
-                'best_class': st['best_visit']['class']}
-            for k, st in ((k, campaign_stats(k, U))
-                          for k in ('unin_rep', 'relay_rep'))},
-    }
+    # --- best-so-far milestones of the two profitability campaigns (main
+    # f and its caption)
+    facts['progress'] = {k: progress(k, U) for k in PROFIT_KEYS}
 
     # --- returned-design proteome and products (section 1.6)
     prot = {'base': {**base['sectors'], 'Phi_M': float(base['Phi_M']),
@@ -981,16 +916,14 @@ def _compute_facts():
     facts['proteome'] = prot
 
     # --- invariants (section 6.A)
-    allframes = [complete(k) for k in ALL_CAMPAIGNS] + [man,
-                                                       load_manifest('relay_rep')]
+    allframes = [complete(k) for k in CAMPAIGNS] + [man]
     sec_err = max(float(np.max(np.abs(
         f[['sec_' + s for s in SECTOR_KEYS]].sum(axis=1).to_numpy(float)
         - f['Phi_M'].to_numpy(float)))) for f in allframes)
     phiT = np.concatenate([f['phi_T'].to_numpy(float) for f in allframes])
     Fflex = np.concatenate([f['F_flex'].to_numpy(float) for f in allframes])
     out_of_band = {}
-    for f, name in zip(allframes, list(ALL_CAMPAIGNS) + ['seeds',
-                                                         'seeds_rep']):
+    for f, name in zip(allframes, list(CAMPAIGNS) + ['seeds']):
         for v in DECISION_VARS:
             lo, hi = BANDS[v]
             x = f[v].to_numpy(float)
@@ -1000,7 +933,7 @@ def _compute_facts():
                 out_of_band[f'{name}:{v}'] = n
     bsf_mm = {}
     ret_eq = {}
-    for k in ('unin', 'relay', 'unin_rep', 'relay_rep'):
+    for k in PROFIT_KEYS:
         c = complete(k)
         s1, b1 = best_so_far(c)
         s2, b2 = incumbent_irr(c)
@@ -1011,7 +944,7 @@ def _compute_facts():
         ret_eq[k] = bool(r1['trial_number'] == r2['trial_number']
                          == r3['trial_number'])
     shared = _leading_identical_rows(('unin',) + SCOUT_KEYS, dec)
-    nan_irr = sum(int(complete(k)['IRR'].isna().sum()) for k in ALL_CAMPAIGNS)
+    nan_irr = sum(int(complete(k)['IRR'].isna().sum()) for k in CAMPAIGNS)
     facts['checks'] = {
         'bsf_vs_incumbent_mismatches': bsf_mm,
         'returned_eq_best_visit_eq_PI_argmax': ret_eq,
@@ -1073,8 +1006,8 @@ def compute_facts():
     Top-level keys: U, U_pct, U_trial, U_sim, start_irr_pct, baseline_A,
     baseline_decision,
     phi_T, F_flex, budget, campaigns{key}, global, unin, seeds, relay,
-    iy_pair{841, 842}, replicates{progress, unin_rep_walk,
-    unin_rep_startup_identical, scouts}, proteome{row key}, checks."""
+    iy_pair{841, 842}, progress{unin, relay}, proteome{row key}, checks,
+    sobol."""
     return _compute_facts()
 
 
@@ -1249,65 +1182,11 @@ EXPECTED = {
         842: {'irr_pct': E('22.90'), 'ibo_yield': E('0.354'), 'ibo': E('37.3'),
               'tau': E('31.5'), 'TCI': E('183'), 'growth': E('0.65')},
     },
-    'replicates': {
-        'progress': {
-            'unin': {'first_ge25': E(None), 'at25_pct': E('-11.21'),
-                     'best_pct': E('15.83'), 'best_sim': E(104)},
-            'relay': {'first_ge25': E(18), 'at25_pct': E('26.22'),
-                      'best_pct': E('27.26'), 'best_sim': E(913)},
-            'unin_rep': {'first_gt_U': E(64), 'first_ge20': E(73),
-                         'first_ge25': E(104), 'best_pct': E('27.26'),
-                         'best_sim': E(1603), 'best_trial': E(1602),
-                         'at25_pct': E('9.63'), 'at100_pct': E('24.14')},
-            'relay_rep': {'first_gt_U': E(3), 'first_ge20': E(3),
-                          'first_ge25': E(19), 'best_pct': E('27.14'),
-                          'best_sim': E(824), 'at25_pct': E('25.59'),
-                          'at100_pct': E('26.66')},
-        },
-        'seeded': {
-            'relay': {'best_seed_pct': E('22.898'),
-                      'first_gt_best_seed': E(13), 'n_pw': E(0)},
-            'relay_rep': {'best_seed_pct': E('25.13'),
-                          'first_gt_best_seed': E(19), 'n_pw': E(201)},
-        },
-        'unin_rep_walk': {
-            63: {'irr_pct': E('17.25'), 'ibo': E('11.8'), 'etoh': E('110.2')},
-            72: {'irr_pct': E('20.45')},
-            99: {'irr_pct': E('24.14')},
-            103: {'irr_pct': E('25.09'), 'ibo': E('30.7'), 'etoh': E('46.7')},
-        },
-        'unin_rep_startup_identical': E(False),
-        'profit_stats': {
-            'unin_rep': {'exploration_pct': E('38.3'), 'n_gt_U': E(609),
-                         'best_irr_pct': E('27.26'), 'best_etoh': E('29.2'),
-                         'best_ibo': E('41.7'), 'best_class': E('coprod')},
-            'relay_rep': {'exploration_pct': E('77.6'), 'n_gt_U': E(639),
-                          'best_irr_pct': E('27.14'),
-                          'best_class': E('coprod')},
-        },
-        'scouts': {
-            'rep_iy': {'best_visit_irr_pct': E('25.13'),
-                       'returned_irr_pct': E('15.45'), 'n_gt_U': E(92),
-                       'pct_losing': E('76.2'), 'exploration_pct': E('59.1')},
-            'rep_it': {'best_visit_irr_pct': E('18.36'),
-                       'returned_irr_pct': E('-inf'), 'n_gt_U': E(2),
-                       'pct_losing': E('98.4'), 'exploration_pct': E('86.0')},
-            'rep_ip': {'best_visit_irr_pct': E('19.98'),
-                       'returned_irr_pct': E('-inf'), 'n_gt_U': E(5),
-                       'pct_losing': E('97.9'), 'exploration_pct': E('75.6')},
-            'rep_pw': {'best_visit_irr_pct': E('21.51'),
-                       'returned_irr_pct': E('-6.01'), 'n_gt_U': E(46),
-                       'pct_losing': E('54.3'), 'exploration_pct': E('30.1')},
-            'rep_ey': {'best_visit_irr_pct': E('15.31'),
-                       'returned_irr_pct': E('13.56'), 'n_gt_U': E(0),
-                       'pct_losing': E('26.0'), 'exploration_pct': E('0.8')},
-            'rep_et': {'best_visit_irr_pct': E('14.84'),
-                       'returned_irr_pct': E('1.56'), 'n_gt_U': E(0),
-                       'pct_losing': E('59.6'), 'exploration_pct': E('2.1')},
-            'rep_ep': {'best_visit_irr_pct': E('14.33'),
-                       'returned_irr_pct': E('12.21'), 'n_gt_U': E(0),
-                       'pct_losing': E('72.5'), 'exploration_pct': E('2.2')},
-        },
+    'progress': {
+        'unin': {'first_ge25': E(None), 'at25_pct': E('-11.21'),
+                 'best_pct': E('15.83'), 'best_sim': E(104)},
+        'relay': {'first_ge25': E(18), 'at25_pct': E('26.22'),
+                  'best_pct': E('27.26'), 'best_sim': E(913)},
     },
     'proteome': {
         'base': _prot('.0479', '.0078', '.0093', '.0044', '0', '.0007',
@@ -1452,8 +1331,7 @@ def check_facts(verbose=False, raise_on_fail=True):
 FORBIDDEN_LITERALS = ('15.8', '27.3', '22.9', '563', '296', '110', '97')
 _LIT_RE = re.compile(r'(?<![\d.])(' + '|'.join(
     re.escape(x) for x in FORBIDDEN_LITERALS) + r')(?![\d])')
-FIGURE_SCRIPTS = ('fig_main_scouts.py', 'fig_s1_replicates.py',
-                  'fig_s2_fingerprints.py')
+FIGURE_SCRIPTS = ('fig_main_scouts.py', 'fig_s2_fingerprints.py')
 
 
 def _docstring_ids(tree):

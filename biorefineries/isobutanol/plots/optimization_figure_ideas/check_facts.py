@@ -9,9 +9,11 @@
 """Offline test of the optimization-figure folder (sim-safe; no load(), no
 simulation): recompute every fact the figures quote from the campaign CSVs
 (`_common.compute_facts()`), print each computed-vs-expected value, assert
-them against `_common.EXPECTED`, scan the figure scripts for hard-coded
-annotation numbers (spec 6.A.7), check the palette (`_style.cvd_check()`)
-and confirm no simulation package was imported. Exit 0 = all checks passed,
+them against `_common.EXPECTED`, confirm the data scope (only the eight
+campaigns of 2026-09-23/24 are registered), scan the figure scripts
+(main, S2) for hard-coded annotation numbers (spec 6.A.7), check the
+palette (`_style.cvd_check()`) and confirm no simulation package was
+imported. Exit 0 = all checks passed,
 1 = any mismatch.
 
 Usage::
@@ -63,6 +65,18 @@ def main(argv=None):
     failures = []
     if n_bad:
         failures.append(f'{n_bad} fact mismatch(es)')
+
+    # data scope: only this work's eight campaigns (run 2026-09-23/24; the
+    # seed-350 uninformed + six scouts and the _rl15c111dc relay)
+    allowed = ('_rs350_burden', '_rl15c111dc_burden')
+    stray = [k for k, c in C.CAMPAIGNS.items()
+             if not c.stem.endswith(allowed)]
+    print(f'\ndata scope: {len(C.CAMPAIGNS)} campaigns '
+          f'({", ".join(C.CAMPAIGNS)}) + the relay manifest; '
+          f'{len(stray)} outside it')
+    if len(C.CAMPAIGNS) != 8 or stray:
+        failures.append(f'data scope: {len(C.CAMPAIGNS)} campaigns, '
+                        f'stray {stray}')
 
     if not args.no_literal_scan:
         hits = C.literal_scan()

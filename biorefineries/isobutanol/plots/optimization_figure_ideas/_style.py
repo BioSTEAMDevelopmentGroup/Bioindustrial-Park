@@ -29,7 +29,7 @@ Constants
     PALETTE {key: hex} (spec section 2), TEXT / NOTE colours, FS (font
     sizes, pt on the 10-in canvas), MIN_FONT_PT = 9, CANVAS_WIDTH_IN = 10,
     PRINT_WIDTH_MM = 180, PRINT_SCALE (0.709), MAIN_SIZE (10 x 7.9),
-    S1_SIZE (10 x 3.9), S2_SIZE (10 x 5.6), DPI = 300
+    S2_SIZE (10 x 5.6), DPI = 300
     IRR_LIM (-6, 31), LOSS_BAND (-6, 0), LOSS_CENTER -3, LOSS_JITTER 2.4
     PLATEAU_LINE / START_LINE / ZERO_LINE (line kwargs)
     UNIT_TITER 'g·L$^{-1}$', UNIT_PROD, UNIT_PROTEOME 'g·(g DCW)$^{-1}$'
@@ -141,7 +141,7 @@ from _common import MAX_PATH_CHARS, OUT_DIR                 # noqa: E402
 
 __all__ = [
     'PALETTE', 'TEXT', 'NOTE', 'FS', 'MIN_FONT_PT', 'CANVAS_WIDTH_IN',
-    'PRINT_WIDTH_MM', 'PRINT_SCALE', 'MAIN_SIZE', 'S1_SIZE', 'S2_SIZE', 'DPI',
+    'PRINT_WIDTH_MM', 'PRINT_SCALE', 'MAIN_SIZE', 'S2_SIZE', 'DPI',
     'IRR_LIM', 'LOSS_BAND', 'LOSS_CENTER', 'LOSS_JITTER', 'PLATEAU_LINE',
     'START_LINE', 'ZERO_LINE', 'UNIT_TITER', 'UNIT_PROD', 'UNIT_PROTEOME',
     'apply_style', 'new_figure', 'inch_axes', 'fig_text', 'panel_letter',
@@ -190,9 +190,7 @@ PALETTE = {
     'gly': '#8C8C8C',           # glycolysis (e)
     'tca': '#CFCFCF',           # TCA + acetate (e)
     'base': '#90918e',          # starting strain line / open diamond
-    'seed': '#8F8F8F',          # seeds diamond (f)
-    'pw': '#7A7A7A',            # price-weighted-yield replicate scout (S1)
-    'pw_light': '#C4C4C4',      # its dots
+    'seed': '#8F8F8F',          # seeds hexagon (f)
     'loss_band': '#EDEDED',     # loss band fill
     'startup_band': '#F4F4F4',  # uninformed space-filling start-up (1-51)
     'tint': '#18C4DC',          # "above the plateau" region, alpha TINT_ALPHA
@@ -212,7 +210,6 @@ CANVAS_WIDTH_IN = 10.0
 PRINT_WIDTH_MM = 180.0
 PRINT_SCALE = PRINT_WIDTH_MM / 25.4 / CANVAS_WIDTH_IN       # 0.709
 MAIN_SIZE = (10.0, 7.9)
-S1_SIZE = (10.0, 3.9)
 S2_SIZE = (10.0, 5.6)
 DPI = 300
 # canvas point sizes (print = x 0.709): tick 12 (8.5), axis title 12,
@@ -532,7 +529,7 @@ def loss_label_x(width_in, fontsize=None, gap_in=None):
 
 
 def log_trial_axis(ax, which='x', lim=(1, 2200), title='Simulated trials'):
-    """Log trial axis (panel a / S1a): limits 1..2,200, majors 1, 10, 100,
+    """Log trial axis (panel a): limits 1..2,200, majors 1, 10, 100,
     1,000 labelled '1', '10', '100', '1,000', log minors (2..9). Call
     style_ticks(ax) afterwards (it keeps the log minors)."""
     from matplotlib.ticker import LogLocator
@@ -623,8 +620,8 @@ def campaign_style(c):
         txt = PALETTE['relay_text'] if c.is_relay else PALETTE['unin_text']
         return {'color': col, 'dark': col, 'light': col, 'text': txt,
                 'marker': c.marker}
-    fam = {'etoh': 'etoh', 'ibo': 'ibo', 'pw': 'pw'}[c.family]
-    dark = PALETTE[fam + '_dark'] if fam != 'pw' else PALETTE['pw']
+    fam = {'etoh': 'etoh', 'ibo': 'ibo'}[c.family]
+    dark = PALETTE[fam + '_dark']
     return {'color': PALETTE[fam], 'dark': dark,
             'light': PALETTE[fam + '_light'], 'text': dark,
             'marker': c.marker}

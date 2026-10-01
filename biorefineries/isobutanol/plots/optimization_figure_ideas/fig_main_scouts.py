@@ -26,9 +26,8 @@ Panels (figwork/figure_spec.md section 3; take-aways T1-T5):
     d  titers of each returned design (T1, T4)
     e  metabolic proteome of each returned design (T1)
     f  exploration (trials making isobutanol) vs IRR of the best visit and
-       the returned design, plus the replicate uninformed campaign with its
-       first trial >= 25 % (T5: speed, not only the endpoint; the
-       TRY-informed campaign's is in a and caption (f))
+       the returned design, with the TRY-informed campaign's first trial
+       >= 25 % (T5: speed, not only the endpoint; also marked in a)
 
 Round 3: b's two free labels are placed by search (`_place_label`: no key
 mark / reference line / label under them, fewest outlined uninformed
@@ -472,31 +471,20 @@ def assert_claims(F):
     # e tags: every design beyond the budget is tagged (and only those)
     for k in C.ROW_KEYS:
         assert (pr[k]['Phi_M'] > F['budget']) == (pr[k]['growth'] < 1.0), k
-    # f: the replicate unseeded campaign escaped the plateau with a
-    # co-production design (the 'this run' qualifier)
-    rp = F['replicates']['profit_stats']
     # round 3 caption claims: the scouts' visits above the plateau split
     # into pure-isobutanol + co-production; the title's 'visit designs more
     # profitable than any the uninformed campaign reached' is about
-    # isobutanol TRY campaigns only; the seeded runs' like-for-like speed;
-    # the replicate's slower 25 %
+    # isobutanol TRY campaigns only
     g = F['global']
     assert (g['n_try_gt_U_ibo_only'] + g['n_try_gt_U_coprod']
             == g['n_try_gt_U'] == sum(camp[k]['n_gt_U']
                                       for k in C.IBO_SCOUTS))
     assert camp['unin']['n_gt_U'] == 0
-    sd = F['replicates']['seeded']
-    assert sd['relay']['first_gt_best_seed'] == rel['first_gt_best_seed']
-    assert abs(sd['relay']['best_seed_pct']
-               - F['seeds']['best_irr_pct']) < 1e-9
-    assert all(sd[k]['first_gt_best_seed'] < 100 for k in sd)  # 'tens'
-    prg = F['replicates']['progress']
+    # f / caption: the uninformed campaign never reached 25 %; the
+    # TRY-informed campaign did (its trial is f's speed label)
+    prg = F['progress']
     assert prg['unin']['first_ge25'] is None
-    assert prg['unin_rep']['first_ge25'] > rel['first_ge25']
-    assert rp['unin_rep']['best_class'] == 'coprod'
-    assert rp['unin_rep']['best_irr_pct'] > U
-    assert (rp['unin_rep']['exploration_pct']
-            > camp['unin']['exploration_pct'])
+    assert prg['relay']['first_ge25'] == rel['first_ge25'] is not None
 
 
 # %% Panel a: when ------------------------------------------------------------------
@@ -617,8 +605,8 @@ def panel_a(fig, F):
     fs = S.FS['note']
     _ann(ax, f"{C.fmt_irr(v2)} · {C.fmt_trial(sim2)}", (sim2, v2), (5, -3),
          ha='left', va='top', fontsize=fs, color=P['relay_text'])
-    # fresh round 1: the first trial >= 25 % (f and its caption compare it
-    # with the replicate's). Fresh round 2: the trial-13 point keeps its dot
+    # fresh round 1: the first trial >= 25 % (also quoted in f). Fresh
+    # round 2: the trial-13 point keeps its dot
     # but loses its label (the title states it; one of the labels the
     # density review asked to drop), and this label, above-left of its dot,
     # gets a leader to it (it sat over the trial-13 dot, unattached)
@@ -1163,7 +1151,7 @@ def key_b(fig):
     """One-line colour key of b's dot clouds under b's title (dots as
     markers, same colours as the clouds)."""
     # round 3: the TRY families carry ONE name set everywhere ('ethanol TRY'
-    # / 'isobutanol TRY', as C.FAMILY_LABEL in c, S1b and S2); 'scouts' is
+    # / 'isobutanol TRY', as C.FAMILY_LABEL in c and S2); 'scouts' is
     # only the collective noun for the six TRY campaigns
     # starts under the title text (round 3: the longer family names ran
     # past b's right spine from b's left edge)
@@ -1189,8 +1177,8 @@ def panel_c(fig, F):
     U, start = F['U_pct'], F['start_irr_pct']
     camp = F['campaigns']
     ax = _row_axes(fig, 'c')
-    # fresh round 1: '0' labelled like a, b and f; 'loss' (full size, as in
-    # Fig. S1b) moves left inside the band, clear of it
+    # fresh round 1: '0' labelled like a, b and f; 'loss' (full size) moves
+    # left inside the band, clear of it
     S.irr_axis(ax, 'x', step=10,
                loss_at=S.loss_label_x(L['c'][2]))
     S.tint_above(ax, U, which='x')
@@ -1383,22 +1371,16 @@ def panel_e(fig, F):
 L_F_XLIM = (0.008, 0.93)          # f's logit x limits (fractions)
 F_TICKS_PCT = (1, 2, 5, 10, 20, 50, 80)    # 90 dropped: '80 90' crowded
 F_ETOH_LABEL_Y = 10.0             # 'ethanol TRY' label centre (IRR, %)
-F_RIGHT_PT = 5.0                  # right-aligned labels: pt left of the spine
-# round 4: f's IRR axis stops at the shared S.IRR_LIM like a, b and c (it
-# had 4.5 points of label headroom), so the TRY-informed label moved under
-# its star, between the star and the isobutanol-yield ring. Fresh round 1:
-# the seeds -> star arrow ENDS ON the star (it stopped in empty space
-# between the replicate diamond and the star, readable as seeds ->
-# replicate, an unseeded run); it bows up-left (F_ARROW_RAD) past the
-# TRY-informed label's top-left corner
-# Fresh round 2: a flatter arc (-0.20 -> -0.08), well below the replicate
-# diamond (it passed right under it and read as seeds -> replicate)
+F_LABELS = []                     # f labels whose fit inside f is asserted
+# Fresh round 1: the seeds -> star arrow ENDS ON the star; fresh round 2:
+# a flatter arc (-0.20 -> -0.08), bowing up-left (F_ARROW_RAD)
 F_ARROW_RAD = -0.08
 F_ARROW_SHRINK_PT = 7.5           # the star's radius + 1.5 pt
 F_MINOR_PCT = (3, 4, 6, 7, 8, 9, 30, 40, 60, 70)   # logit minors (round 2)
-# fresh round 2: f alone gets headroom above 30 % (F_YLIM) for the two
-# speed labels -- the TRY-informed one above its star (below it, the
-# seeds arrow crossed it) -- so the speed half of T5 is read in f itself
+# fresh round 2: f alone gets headroom above 30 % (F_YLIM) for the
+# TRY-informed speed label above its star (below or left of the star the
+# seeds arrow crosses it; right of it the spine is too close), so the
+# speed half of T5 is read in f itself
 F_YLIM = (S.IRR_LIM[0], 35.5)
 
 
@@ -1435,12 +1417,6 @@ def panel_f(fig, F):
         pos[k] = (x, yb, yr)
     xu = camp['unin']['exploration_pct'] / 100
     _mark(ax, xu, U, 'D', S_DIAMOND_C, P['unin'], 'white', 0.7, z=6)
-    # the replicate unseeded campaign (Fig. S1): same objective, another
-    # seed; it made isobutanol more often and escaped the plateau. Light
-    # fill + dark-cyan edge = 'the other uninformed run', not a best visit
-    rp = F['replicates']['profit_stats']['unin_rep']
-    xq, yq = rp['exploration_pct'] / 100, rp['best_irr_pct']
-    _mark(ax, xq, yq, 'D', S_DIAMOND_C, '#B9ECF3', P['unin_text'], 1.1, z=6)
     # the seeds: a grey hexagon (the open grey diamond is the starting
     # strain in c)
     xs = F['seeds']['exploration_pct'] / 100
@@ -1462,24 +1438,10 @@ def panel_f(fig, F):
     fs, nfs = S.FS['annot'], S.FS['note']
     note = dict(fontsize=nfs, fontstyle='italic', color=NOTE,
                 linespacing=1.1)
-    rep = F['replicates']['progress']
     # the seeds: label under the hexagon, right-aligned short of the
-    # isobutanol-yield stem (round 4: left of it, it sat where the
-    # replicate's three-line label now goes)
+    # isobutanol-yield stem
     _ann(ax, f"{C.fmt_int(F['seeds']['n'])} seeds", (xs, ys), (13, -7),
          ha='right', va='top', fontsize=nfs, color=GREY_LABEL)
-    # round 4: the replicate is named as the OTHER uninformed run, with its
-    # speed (first trial >= 25 %; the TRY-informed campaign's is in a and
-    # caption (f)), left of its diamond at its height
-    # fresh round 1: 'reached 25 % at trial 104' (the old '≥ 25 % only' /
-    # 'at trial 104' break read as 'only >= 25 %'); the TRY-informed
-    # campaign's trial 18 is marked in a and quoted in caption (f)
-    # fresh round 2: its speed moves to the 'first >= 25 %' key line above
-    # f, next to the TRY-informed campaign's (the star had none)
-    _ann(ax, f"uninformed replicate\n(Fig. S1): 25 % at\n"
-             f"{C.fmt_trial(rep['unin_rep']['first_ge25'])}",
-         (xq, yq), (-7, 6), ha='right', va='center', fontsize=nfs,
-         color=P['unin_text'], linespacing=1.1)
     # group labels (data-anchored; offsets in points). The ethanol label
     # sits right of the ethanol markers
     _ann(ax, FAM_TEXT['etoh'], (pos['ep'][0], F_ETOH_LABEL_Y), (6, 0),
@@ -1500,13 +1462,17 @@ def panel_f(fig, F):
          ha='right', va='bottom', fontsize=fs, color=P['ibo_dark'])
     _ann(ax, 'alone: visits, returns low IRR', (pos['ip'][0], S.LOSS_CENTER),
          (-7, -0.5), ha='right', va='top', **note)
-    # the TRY-informed label under its star, right-aligned at the spine
-    # fresh round 2: above its star, with its speed (parallel to the
-    # replicate's): the reader of f sees both runs' first trial >= 25 %
+    # the TRY-informed label centred above its star (F_YLIM headroom; it
+    # was right-aligned at the spine beside a second, replicate label, now
+    # dropped), with its speed: the first trial >= 25 % (also marked in a);
+    # the uninformed campaign never reached 25 % (its 'alone: plateau'
+    # note). Its fit inside f is asserted in build()
     r_star = np.sqrt(150) / 2
-    _ann(ax, f"TRY-informed:\n25 % at {C.fmt_trial(F['relay']['first_ge25'])}",
-         (L_F_XLIM[1], yr), (-F_RIGHT_PT - 3.0, r_star + 1.5), ha='right',
-         va='bottom', fontsize=nfs, color=P['relay_text'], linespacing=1.1)
+    F_LABELS.clear()
+    F_LABELS.append(_ann(
+        ax, f"TRY-informed:\n25 % at {C.fmt_trial(F['relay']['first_ge25'])}",
+        (xr, yr), (0, r_star + 1.5), ha='center', va='bottom', fontsize=nfs,
+        color=P['relay_text'], linespacing=1.1))
     S.style_ticks(ax)
     return ax
 
@@ -1689,6 +1655,12 @@ def build(F):
     r = fig.canvas.get_renderer()
     for t in E_TAGS:
         assert t.get_window_extent(r).x1 < ax_e.bbox.x1 - 2.0, t.get_text()
+    # f's star label stays inside f (clear of the right spine's ticks and
+    # below the top spine)
+    for t in F_LABELS:
+        bb = t.get_window_extent(r)
+        assert bb.x1 < ax_f.bbox.x1 - 6.0, t.get_text()
+        assert bb.y1 < ax_f.bbox.y1 - 6.0, t.get_text()
     return fig, dict(a=ax_a, strip=strip, inset=ins, b=ax_b, c=ax_c, d=ax_d,
                      e=ax_e, f=ax_f)
 
@@ -1782,8 +1754,7 @@ def caption(F):
     etoh_bv = max(camp[k]['best_visit']['irr_pct'] for k in C.ETOH_SCOUTS)
     tagged = [k for k in C.ROW_KEYS if pr[k]['growth'] < 1.0]
     growth = ', '.join(_growth_tag(pr[k]['growth']) for k in tagged)
-    rep = F['replicates']['progress']
-    rps = F['replicates']['profit_stats']['unin_rep']
+    prg = F['progress']
     s1, s2 = rel['sims'][1], rel['sims'][2]
     s_seed = rel['sims'][rel['first_gt_best_seed']]
     first_word = ('lost money' if C.is_loss(s1['irr_pct']) else
@@ -1796,25 +1767,11 @@ def caption(F):
                + (f' and {WORDS[n_noirr]} with no IRR' if n_noirr else ''))
     pdc_ratio = pr['relay']['pdc'] / pr['base']['pdc']
     ib5 = ui['ibo_ge5']
-    n_unseeded_plateau = sum(1 for k in ('unin', 'unin_rep')
-                             if rep[k]['best_pct'] <= F['U_pct'] + 1e-9)
-    sd = F['replicates']['seeded']
-    sd_keys = ('relay', 'relay_rep')
-    beat = ' and '.join(str(sd[k]['first_gt_best_seed']) for k in sd_keys)
-    beat_seeds = ' and '.join(C.fmt_irr(sd[k]['best_seed_pct'])
-                              for k in sd_keys)
-    # the unseeded runs' first trial >= 25 % ('or never' for a run that
-    # did not get there)
-    un25 = sorted((rep[k]['first_ge25'] for k in ('unin', 'unin_rep')),
-                  key=lambda v: (v is None, v or 0))
-    un25_txt = ' and '.join(C.fmt_trial(v) for v in un25 if v is not None)
-    un25_txt = f'only at {un25_txt}' + (', or never' if None in un25 else '')
     fam = FAM_TEXT
     # round 4: the seeds already held co-producers above the plateau (the
     # headline and (a) say so; skeptic-referee, round 3)
     n_cop_word = WORDS.get(seeds['n_coprod_gt_U'], str(seeds['n_coprod_gt_U']))
     best_cop = C.fmt_irr(seeds['best_coprod_irr_pct'])
-    n_pw = sd['relay_rep']['n_pw']
     # fresh round 1: the headline in two short sentences, one per finding
     # (the one-sentence, 50-word headline nested 'four of them ... above its
     # plateau'); the seeded co-producers and their best move to (a)
@@ -1826,16 +1783,17 @@ def caption(F):
     col = COLUMN_COUNT
     pi_gain = pi_best - pi25
     # fresh round 2: the legend cut to <= LEGEND_MAX_WORDS (it was 653):
-    # definitions, the seed selection, the compute and the 1-of-2 caveat
-    # stay; the per-panel numeric recaps the panels already show move to
-    # the methods notes
+    # definitions, the seed selection and the compute stay; the per-panel
+    # numeric recaps the panels already show move to the methods notes.
+    # The synthesis speaks of these single runs only (no replicate runs
+    # are used)
     n_cop = _first_coprod_run(C.complete('relay').sort_values('sim'))
     s3 = rel['sims'][3]
     bh = BLOCK_HIDDEN
     legend = [
         f"**Figure N | Isobutanol TRY scouts visit designs above the {U} "
-        f"ethanol-only plateau of this work's uninformed profitability "
-        f"campaign but return low-IRR designs; seeded with their trials, "
+        f"ethanol-only plateau of the uninformed profitability campaign but "
+        f"return low-IRR designs; seeded with their trials, "
         f"profitability search co-produces above that plateau on "
         f"{C.fmt_trial(rel['first_gt_U'])}, beats every seed by "
         f"{C.fmt_trial(rel['first_gt_best_seed'])} and reaches "
@@ -1876,15 +1834,16 @@ def caption(F):
         f"it. Hatched: Adh1, Adh6.",
         '',
         f"**(f)** Share of trials making isobutanol vs best-visit (open) and "
-        f"returned (filled) IRR. Hexagon: the seeds; light diamond: a "
-        f"replicate uninformed campaign (Fig. S1).",
+        f"returned (filled) IRR. Hexagon: the seeds.",
         '',
-        f"Neither objective alone reliably returned a profitable "
-        f"co-producer here: unseeded profitability search plateaued on "
-        f"ethanol in {WORDS[n_unseeded_plateau]} of two runs, and seeded "
-        f"search beat its best seed within {beat} trials in both seeded runs "
-        f"(Fig. S1). The seeded route used {C.fmt_int(n_seeded_sims)} "
-        f"simulations ({C.fmt_int(g['n_try'])} scout + "
+        f"In these single runs, neither objective alone returned a "
+        f"profitable co-producer: the unseeded profitability campaign "
+        f"plateaued at {U} on ethanol, and the scouts returned ethanol-only "
+        f"or isobutanol-only designs. Seeded with the scouts' trials, the "
+        f"profitability campaign beat every seed by "
+        f"{C.fmt_trial(rel['first_gt_best_seed'])} and reached "
+        f"{C.fmt_irr(rb['irr_pct'])}. The seeded route used "
+        f"{C.fmt_int(n_seeded_sims)} simulations ({C.fmt_int(g['n_try'])} scout + "
         f"{C.fmt_int(camp['relay']['max_sim'])}), the uninformed campaign "
         f"{C.fmt_int(camp['unin']['max_sim'])}.",
     ]
@@ -1970,15 +1929,13 @@ def caption(F):
         f"The translation (φ_T = {F['phi_T']:.3f}) and housekeeping sectors "
         f"are omitted; the {WORDS[len(tagged)]} designs beyond the budget "
         f"grow at {growth} of their penalty-free rate.",
-        f"* (f) The replicate uninformed campaign made isobutanol in "
-        f"{rps['exploration_pct']:.0f} % of its trials and returned a "
-        f"{C.fmt_irr(rps['best_irr_pct'])} co-producer, found at "
-        f"{C.fmt_trial(rep['unin_rep']['best_sim'])}; the unseeded runs "
-        f"reached 25 % {un25_txt}, the TRY-informed campaign at "
-        f"{C.fmt_trial(rel['first_ge25'])}. The seeded runs' best seeds were "
-        f"{beat_seeds}; the replicate's seeds also held {n_pw} "
-        f"price-weighted-yield trials. Hexagon: x, share of seeds making "
-        f"isobutanol ({seeds['exploration_pct']:.1f} %); y, best seed.",
+        f"* (f) The uninformed campaign made isobutanol in "
+        f"{camp['unin']['exploration_pct']:.1f} % of its trials and never "
+        f"reached 25 %; the TRY-informed campaign made isobutanol in "
+        f"{camp['relay']['exploration_pct']:.1f} % and reached 25 % on "
+        f"{C.fmt_trial(prg['relay']['first_ge25'])}. Hexagon: x, share of "
+        f"seeds making isobutanol ({seeds['exploration_pct']:.1f} %); y, "
+        f"best seed.",
         f"* No compute-matched control (e.g. "
         f"{C.fmt_int(n_seeded_sims)} random or space-filling seeds) was run. "
         f"Two {C.fmt_int(sobol['campaign']['n'])}-design Sobol' random "
@@ -1988,8 +1945,8 @@ def caption(F):
         f"linear engineering prior {sobol['screening']['n_gt_hurdle']} did "
         f"({sobol['screening']['n_gt_U']} above the {U} plateau; best "
         f"{C.fmt_irr(sobol['screening']['max_irr_pct'])}, below the best "
-        f"seed). Seeding is shown to buy speed and reliability here, not "
-        f"unique access to designs above the plateau.",
+        f"seed). These single runs therefore show seeding buying speed "
+        f"here, not unique access to designs above the plateau.",
         f"* The best design lies at {WORDS.get(n_hits, n_hits)} search "
         f"bounds, so higher IRR may exist outside the searched ranges.",
         f"* IRRs are at default prices under the model version used for the "
@@ -2019,15 +1976,18 @@ def caption(F):
                for k in (rel['first_gt_best_seed'], rel['first_ge25']))
     # the caption's quoted claims must agree with the figure's facts
     assert ratio > 1, ratio
-    assert n_unseeded_plateau == 1
-    assert rps['best_class'] == 'coprod'
-    assert all(rep[k]['first_ge25'] is not None
-               for k in ('relay', 'relay_rep'))
+    # the synthesis: the unseeded campaign's best = its plateau, ethanol
+    # only; no scout returned a co-producer; (f): the uninformed campaign
+    # never reached 25 %, the TRY-informed one did
+    assert abs(prg['unin']['best_pct'] - F['U_pct']) < 1e-9
+    assert camp['unin']['returned']['class'] == 'etoh'
+    assert all(camp[k]['returned']['class'] in ('etoh', 'ibo')
+               for k in C.SCOUT_KEYS)
+    assert prg['unin']['first_ge25'] is None
+    assert prg['relay']['first_ge25'] == rel['first_ge25'] is not None
     # round 4: the headline's seeded claims
     assert seeds['n_coprod_gt_U'] == g['n_try_gt_U_coprod']
     assert rel['first_gt_best_seed'] < 100
-    assert sd['relay']['n_pw'] == 0 < n_pw
-    assert rel['first_ge25'] < rep['unin_rep']['first_ge25']
     return '\n'.join(legend) + '\n\n' + '\n'.join(methods) + '\n'
 
 

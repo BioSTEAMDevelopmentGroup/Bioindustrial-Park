@@ -3,8 +3,13 @@
 Publication figures for the eight `metabolic_split_12d` Gaussian-process kinetic
 (strain-design) optimization campaigns. These are the seed-350 uninformed profitability
 campaign, the six seed-350 TRY "scout" campaigns, and the TRY-informed relay campaign
-(`_rl15c111dc`), which was preloaded with 1,000 scout trials. The replicate campaigns used
-in Fig. S1 are the untagged 09-16/17 runs and the `_rlba1b2315` relay.
+(`_rl15c111dc`), which was preloaded with 1,000 scout trials.
+
+**Data scope.** These eight campaigns, all run 2026-09-23/24, are the only optimization
+campaigns any script here reads. The registry in `_common.py` (`CAMPAIGNS`) holds no
+other campaign, and `load_manifest()` raises if a relay seed's donor is outside it. Older
+campaigns are not used. Every statement in the figures and captions is about these single
+runs.
 
 Everything here is **sim-safe**. It reads the campaign CSVs with pandas. It never imports
 `biorefineries.*`, nskinetics, biosteam, thermosteam or optuna, and it never calls `load()`.
@@ -18,9 +23,8 @@ alongside a running simulation.
 |---|---|
 | `_common.py` | Data layer. It holds the paths and the campaign registry, the cached loaders, and the one set of definitions. It also holds the proteome sectors, the decision bands, `compute_facts()`, `EXPECTED` and `check_facts()`. The public API is documented at the top of the file. |
 | `_style.py` | Style layer. It holds the palette, rcParams, `style_ticks` and inch-based placement. It provides the IRR / log-trial / logit axes, the loss band, plateau and tint helpers, and `inline_key`. It also holds the render checks (`text_overlaps`, `tick_label_collisions`, `min_font_check`, `glyph_check`, `marker_text_hits`, `check_figure`), the palette check (`cvd_check`) and `save()`. The public API is documented at the top of the file. |
-| `check_facts.py` | The folder's offline test. It prints every computed-vs-expected fact, the hard-coded-literal scan of the figure scripts, the palette check and the sim-safety check. It exits 1 on any mismatch. |
+| `check_facts.py` | The folder's offline test. It prints every computed-vs-expected fact, the data-scope check (the eight registered campaigns only), the hard-coded-literal scan of the two figure scripts, the palette check and the sim-safety check. It exits 1 on any mismatch. |
 | `fig_main_scouts.py` | Main figure (panels a–f), stem `kinBO_main_scouts`. |
-| `fig_s1_replicates.py` | Fig. S1, the replicate / honesty check, stem `kinBO_S1_replicates`. |
 | `fig_s2_fingerprints.py` | Fig. S2, the design-fingerprint heatmap, stem `kinBO_S2_fingerprints`. |
 
 The full figure specification is in `figwork/figure_spec.md` in the session scratchpad. It
@@ -103,8 +107,6 @@ All files are in `analyses/results/`. Study stems have the form
 | `relay` | `pi_log-tail` / `_rl15c111dc` (+ `_relay_manifest.csv` = the 1,000 seeds) | TRY-informed (profitability) |
 | `ey` `et` `ep` | `etoh_{yield,titer,productivity}` / `_rs350` | Ethanol TRY scouts |
 | `iy` `it` `ip` | `ibo_{yield,titer,productivity}` / `_rs350` | Isobutanol TRY scouts |
-| `unin_rep`, `relay_rep` | `pi_log-tail` / none and `_rlba1b2315` | Fig. S1 replicates |
-| `rep_iy` … `rep_ep`, `rep_pw` | the untagged scouts + `price-weighted_yield` | Fig. S1 replicate scouts |
 
 * The two Sobol' random designs of the same 12-d space (`kin_sobol_..._split_12d_{rb0.001-4_ib0.75-1.5,screening_rb0.1-4_lin0_ib0.75-1.5}_aA_burden_seed20260920_trajectory.csv`, `SOBOL_STEMS`) are read by `sobol_reference()` (`facts['sobol']`) for the main methods notes' compute caveat: no compute-matched random-seed control was run.
 
@@ -206,7 +208,7 @@ All files are in `analyses/results/`. Study stems have the form
   collide at the band centre. Use `irr_axis(ax, 'x', loss_at=loss_label_x(width_in))`:
   both labels stay at the tick size, "loss" moves left inside the band
   (`LOSS_ZERO_GAP_IN` 0.08 in apart) and a break mark cuts the spine between them
-  (main c, S1b).
+  (main c).
 * No data marker may cross a letter. `marker_text_hits` (run by `check_figure`) flags
   every scatter or marker point whose centre falls inside an annotation's text extent
   (1-pt pad), per axes, insets included, plus figure-level text over any axes. A point
@@ -217,5 +219,6 @@ All files are in `analyses/results/`. Study stems have the form
   as specks inside the text at print size). The main figure's panel-b labels are placed
   this way by `_spot` / `_best_spot`; only the large-dots block (the uninformed
   campaign's isobutanol-making designs) uses the backing.
-* Main f has headroom above 30 % (`F_YLIM`) for the two runs' speed labels; it is the
+* Main f has headroom above 30 % (`F_YLIM`) for the TRY-informed campaign's speed label,
+  centred above its star (below or left of the star the seeds arrow crosses it); it is the
   only IRR axis that does not stop at `IRR_LIM`.
