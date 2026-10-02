@@ -1509,7 +1509,6 @@ class Biorefinery:
         
         @metric(name='Competitive biomass yield', element='Feedstock', units='dry MT/ha')
         def competitive_biomass_yield():
-            # assert self.ROI_target is None
             if self.ROI_target is None: return np.nan
             if composition_specification.oil == 0: return self.baseline_dry_biomass_yield
             x0 = self.dry_biomass_yield
