@@ -168,7 +168,10 @@ FIGSIZE = (11.5, 15.5)
 
 FONT_FAMILY = 'Arial'
 FONTS = {'tick': 12, 'axis': 12, 'title': 12, 'subtitle': 10,
-         'category': 10, 'total': 9, 'legend': 9}
+         'category': 10, 'total': 9, 'legend': 9, 'letter': 14}
+#: bold panel letters, LAYOUT order (row-major), left-aligned on each
+#: panel's frame at the title's baseline
+PANEL_LETTERS = 'ABCDEFGHI'
 TICK_LEN = {'major': 4.0, 'minor': 2.0}
 
 
@@ -413,7 +416,7 @@ def style_ticks(ax):
             tick.tick2line.set_markersize(L)
 
 
-def draw_panel(ax, record, groups, metrics, operating_hours):
+def draw_panel(ax, record, groups, metrics, operating_hours, letter=None):
     """Five stacked bars of one scenario, their unit-group totals above the
     stacks and the total revenue under the operating-cost bar."""
     for j, metric in enumerate(metrics):
@@ -445,6 +448,10 @@ def draw_panel(ax, record, groups, metrics, operating_hours):
     ax.annotate(panel_subtitle(record), xy=(0.5, 1.0), xycoords='axes fraction',
                 xytext=(0, 4), textcoords='offset points', ha='center',
                 va='bottom', fontsize=FONTS['subtitle'])
+    if letter:
+        ax.annotate(letter, xy=(0.0, 1.0), xycoords='axes fraction',
+                    xytext=(0, 18), textcoords='offset points', ha='left',
+                    va='baseline', fontsize=FONTS['letter'], fontweight='bold')
 
 
 def make_figure(doc):
@@ -455,9 +462,11 @@ def make_figure(doc):
     bottom = y_bottom(doc)
     fig = plt.figure(figsize=FIGSIZE, layout='constrained')
     axs = fig.subplots(len(LAYOUT), len(LAYOUT[0]), sharex=True, sharey=True)
+    letters = iter(PANEL_LETTERS)
     for row, keys in zip(axs, LAYOUT):
         for ax, key in zip(row, keys):
-            draw_panel(ax, doc['scenarios'][key], groups, metrics, hours)
+            draw_panel(ax, doc['scenarios'][key], groups, metrics, hours,
+                       letter=next(letters))
     ax0 = axs[0, 0]
     ax0.set_xlim(-0.6, len(metrics) - 0.4)
     ax0.set_ylim(bottom, Y_TOP)
