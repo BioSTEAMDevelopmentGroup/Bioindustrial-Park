@@ -260,14 +260,16 @@ def create_sucrose_fermentation_system(ins, outs,
     
     if scrubber:
         stripping_water = bst.Stream('stripping_water')
-        def update_stripping_water():
-            stripping_water, vent = D301.ins
-            stripping_water.mol[:] = D301.stripping_water_over_vent * vent.F_mass
-        
         D301 = bst.VentScrubber('D301', ins=(stripping_water, R301-0), 
                                 outs=(vent, ''), gas=('CO2', 'O2'))
         D301.register_alias('vent_scrubber')
         D301.stripping_water_over_vent = 0.07
+        
+        @D301.add_specification(run=True)
+        def update_stripping_water():
+            stripping_water, vent = D301.ins
+            stripping_water.imol['Water'] = D301.stripping_water_over_vent * vent.F_mass
+        
         bst.Mixer('M302', ins=(C301-1, D301-1), outs=beer)
     
     if add_urea or (add_urea is None and nutrient_kwargs):
