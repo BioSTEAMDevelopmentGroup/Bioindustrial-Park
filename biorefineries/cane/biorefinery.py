@@ -1692,6 +1692,8 @@ class Biorefinery:
         except:
             pass
         else:
+            if not isinstance(PolishingFilter, bst.Unit):
+                PolishingFilter, = set(PolishingFilter)
             def adjust_system_convergence(system):
                 system.converge_method = 'fixed-point'
                 system.maxiter = 500
