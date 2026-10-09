@@ -335,11 +335,24 @@ def create_model():
                           ))
 
     ethanol = s.ethanol
-    etoh_sep_group = unit_groups_dict['ethanol separation']
+    # Train-level: the beer column and rectifier are SHARED by both alcohols
+    # (system.py 'alcohol recovery'), so the cost is reported per kg of TOTAL
+    # alcohol product, not per kg ethanol. get_material_cost is the native
+    # stream-cost sum (NOT the renamed 'Operating cost' metric object).
+    separation_groups = [unit_groups_dict[i] for i in ('alcohol recovery',
+                                                        'ethanol purification',
+                                                        'isobutanol purification')]
+    def get_separation_operating_cost():
+        total_alcohol = ethanol.F_mass + f.isobutanol.F_mass
+        # flexsolve sets np.seterr(divide='raise') globally: never divide by 0
+        if not total_alcohol > 0.: return np.nan
+        return sum([sum([i.utility_cost for i in ug.units if i.utility_cost is not None])
+                    + ug.get_material_cost()
+                    for ug in separation_groups])/total_alcohol
 
-    metrics.append(Metric('Ethanol separation operating cost', 
-                          lambda: (sum([i.utility_cost for i in etoh_sep_group.units if i.utility_cost is not None]) + etoh_sep_group.get_material_cost())/ethanol.F_mass,
-                          '$/kg', 
+    metrics.append(Metric('Separation operating cost',
+                          get_separation_operating_cost,
+                          '$/kg',
                           'Separation',
                           ))
 

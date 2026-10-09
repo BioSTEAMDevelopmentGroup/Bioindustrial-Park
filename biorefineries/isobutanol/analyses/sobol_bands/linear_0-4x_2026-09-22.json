@@ -1,0 +1,15 @@
+{
+ "_comment": "Custom Sobol' measure for evaluate_sobol_split12d.py (IBO_SOBOL_MEASURE=custom, IBO_SOBOL_BANDS=<this file>), chosen 2026-09-22. Absolute decision-variable units. Native axes 0x-4x of scenario A (k_3 5.81, k_6 2.82, glycolysis multiplier 1), linear; from-zero pathway axes linear on [0, campaign ceiling]; inhibition multipliers 0.75x-1.5x linear; feeding = the campaign bands.",
+ "k_3":                {"low": 0.0,  "high": 23.24, "log": false},
+ "k_6":                {"low": 0.0,  "high": 11.28, "log": false},
+ "k_13":               {"low": 0.0,  "high": 4.0,   "log": false},
+ "k_17":               {"low": 0.0,  "high": 2.154, "log": false},
+ "glycolysis":         {"low": 0.0,  "high": 4.0,   "log": false},
+ "ehrlich_downstream": {"low": 0.0,  "high": 4.0,   "log": false},
+ "inhib_ethanol":      {"low": 0.75, "high": 1.5,   "log": false},
+ "inhib_isobutanol":   {"low": 0.75, "high": 1.5,   "log": false},
+ "inhib_acetate":      {"low": 0.75, "high": 1.5,   "log": false},
+ "threshold_conc":     {"low": 0.0,  "high": 295.0, "log": false},
+ "target_delta":       {"low": 5.0,  "high": 500.0, "log": false},
+ "max_n_spikes":       {"low": 0,    "high": 50,    "log": false}
+}

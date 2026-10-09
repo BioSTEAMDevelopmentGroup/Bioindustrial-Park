@@ -16,37 +16,41 @@ run-without-asking list; rerunning with the same study name resumes a
 crashed/interrupted study and runs only the remaining trials.
 
 Search set and bands come from a named STUDY PRESET (default
-study_target_products='ethanol_isobutanol', study_type='metabolic_protein':
-start at the scenario-A baseline, the B workbook's 56 kinetic rows; log
-bands by nskinetics ROLE since 2026-09-06 -- rate constants (capacity:
-k_1h, k_2, ..., k_13-k_16) on [1e-3x, 10x], inhibition coefficients
-(k_1ie, k_1ii, k_10ie, ...) and the regulation / affinity / self-
-inhibition terms K_* on [0.1x, 10x]; k_10 (active-biomass decay) is
-EXCLUDED by default -- a free lunch, not an engineering target -- so the
-sampled set is 55; see ko.resolve_study_preset and run()'s docstring; the
-derived study name carries the band tags `_rb0.001-10_ib0.1-10` and the
-exclusion tag `_xk10`). study_target_products=None is the legacy flag
-path (scenario / kinetic_bounds_scenario / single band, k_10 sampled)
-for resuming older studies.
+study_target_products='ethanol_isobutanol', study_type='metabolic_split_14d'
+since 2026-09-16: start at the scenario-A baseline; the individual rates
+k_3, k_6 (Adh1), k_13, k_14, k_15, k_16 and k_17 (Adh6) on the rate band
+[1e-3x, 4x], the glycolysis capacity group on [0.2x, 4x], one multiplier
+per inhibition effector (inhib_ethanol / inhib_isobutanol / inhib_acetate,
+on the LIVE k_17ie / k_17ia cross-product coefficients) on [0.75x, 1.5x],
+and the three feeding variables -- stage_1_max_x is PINNED, so the sampled
+set is 14 (8 for ethanol_only); see ko.resolve_study_preset and run()'s
+docstring; the derived study name carries the band tags
+`_rb0.001-4_ib0.75-1.5` (no `_xk10`, no `_s1x`)). study_type='metabolic_protein'
+is the full-workbook space (the B workbook's 59 rows minus k_10; log bands by
+nskinetics ROLE -- rate constants [1e-3x, 4x], inhibition + K_* terms
+[0.1x, 10x]; sampled set 58; tags `_rb0.001-4_ib0.1-10_xk10`).
+study_target_products=None is the legacy flag path (scenario /
+kinetic_bounds_scenario / single band, k_10 sampled) for resuming older
+studies.
 
 study_type='metabolic_minimal' (2026-09-07) is the compact preset: the
 capacities minus k_10, k_7 and k_8 (17 for ethanol_isobutanol, 13 for
-ethanol_only) on the rate band, ONE 0.2x-2x log multiplier per
+ethanol_only) on the rate band, ONE 0.75x-1.5x log multiplier per
 inhibition-effector family (inhib_ethanol / inhib_isobutanol /
 inhib_acetate, scaling every coefficient of that effector together;
 recorded as applied_<member> CSV columns), no K_* terms, and the four
 feeding/operating variables with the spike feed pinned at the baseline
-600 g/L (no spike_delta column) -- 24 / 19 decision variables. The
-per-effector-family band floors ONLY inhib_ethanol at 0.3x (others
-0.2x), so the inhibition tag is _ibe0.3-2; name
-kin_opt_ethanol_isobutanol_metabolic_minimal_irr_rb0.001-10_ibe0.3-2_xk10+k7+k8_s1x1-50_burden.
+600 g/L (no spike_delta column) -- 24 / 19 decision variables. Every
+effector family takes the default band, so the inhibition tag is
+_ib0.75-1.5; name
+kin_opt_ethanol_isobutanol_metabolic_minimal_irr_rb0.001-4_ib0.75-1.5_xk10+k7+k8_s1x1-50_burden.
 
 study_type='metabolic_minimal_subset' (2026-09-07) is a STANDALONE
 explicit set, not derived from metabolic_minimal: 9 listed rate
 constants (k_1l, k_1h, k_1e, k_3, k_6, k_13, k_14, k_15, k_16;
 ko.METABOLIC_MINIMAL_SUBSET_RATES) on the rate band, the three
 inhibition-effector multipliers (ko.METABOLIC_MINIMAL_SUBSET_GROUPS,
-inhib_ethanol floored at 0.3x, the others 0.2x-2x) and the three
+every family on the default 0.75x-1.5x band) and the three
 feeding variables threshold_conc / target_delta / max_n_spikes, with
 BOTH the spike feed and stage_1_max_x pinned at the baseline (no
 spike_delta / stage_1_max_x column) -- 15 decision variables for
@@ -54,8 +58,38 @@ ethanol_isobutanol, 10 for ethanol_only (the listed set intersected
 with the A workbook: no k_13-k_16, no isobutanol coefficients); nothing
 excluded (the other rates and every K_* stay at the baseline with no
 probe); name
-kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-10_ibe0.3-2_burden
+kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-4_ib0.75-1.5_burden
 (no _x / _s1x tag).
+
+study_type='metabolic_split_14d' (2026-09-15) is metabolic_14d (the
+6 metabolic_minimal_subset rates minus the grouped glycolysis family, ONE
+0.2x-4x glycolysis capacity multiplier, the three inhibition multipliers,
+the three feeding variables) with the two alcohol dehydrogenases as
+INDEPENDENT knobs -- k_6 (Adh1, r6) and the new k_17 (Adh6, r17, the
+nskinetics 2026-09-15 split of the lumped Ehrlich step), the inhibition
+groups on the live k_17ie / k_17ia, and stage_1_max_x PINNED -- 14
+decision variables for ethanol_isobutanol, 8 for ethanol_only; name
+kin_opt_ethanol_isobutanol_metabolic_split_14d_irr_rb0.001-4_ib0.75-1.5_burden.
+
+study_type='metabolic_split_12d' (2026-09-15) is metabolic_split_14d with
+the three DOWNSTREAM Ehrlich rates k_14 (Ilv5) / k_15 (Ilv3) / k_16 (Aro10)
+collapsed into ONE log-scale capacity multiplier, ehrlich_downstream, with
+fixed STOICHIOMETRIC intra-ratios (ko.EHRLICH_DOWNSTREAM_WEIGHTS: k_14 the
+anchor at 1.0, k_15 1.015, k_16 1.015 x 0.866 from the antimony r14 / r15
+product coefficients) on the ABSOLUTE scenario-A anchor band
+ko.IBO_PATHWAY_ZERO_A_RATE_BOUNDS (1e-3-4.0 g/L/h on k_14, the band 14d
+gives it individually; its REFERENCES = the weights themselves, the
+preset's group_references, which the engine samples as weight x
+multiplier because the live A-start k_14-k_16 are 0 -- until 2026-09-16
+the weights were scaled by the B workbook's k_14 = 4.8) -- the three were noise
+dimensions carrying real burden in the 09-14 / 09-15 14d GP studies;
+k_13 stays a free individual rate (r13 runs far from saturation, so tying
+the trio to it would prune the profitable region). 12 decision variables
+for ethanol_isobutanol (k_3, k_6, k_13, k_17 + glycolysis +
+ehrlich_downstream + 3 inhibition multipliers + 3 feeding), 8 for
+ethanol_only (no Ehrlich group); the Ehrlich band is untagged (the
+distinct column blocks any cross-study resume); name
+kin_opt_ethanol_isobutanol_metabolic_split_12d_irr_rb0.001-4_ib0.75-1.5_burden.
 
 The enzyme-burden (proteome-allocation) constraint of enzyme_burden.py
 is ON by default (burden=True): sampled capacities are charged to the
@@ -70,11 +104,13 @@ before the study starts. burden=False is the legacy burden-free study
 Runner pattern (fresh kernel, one process):
     import runpy
     ns = runpy.run_path(r'<this file>')
-    # default preset: kin_opt_ethanol_isobutanol_metabolic_protein_irr
-    #   _rb0.001-10_ib0.1-10_xk10_burden
+    # default preset: kin_opt_ethanol_isobutanol_metabolic_split_14d_irr
+    #   _rb0.001-4_ib0.75-1.5_burden  (14 variables; Adh1 + Adh6 independent)
     result, csv_path = ns['run'](objective='IRR')
-    # re-include k_10 (its 0.1x-10x band; no _xk10 tag)
-    result, csv_path = ns['run'](objective='IRR', exclude_params=())
+    # full metabolic_protein space (58 params, k_10 excluded by default) --
+    # re-include k_10 on its 0.1x-10x band with exclude_params=() (no _xk10 tag)
+    result, csv_path = ns['run'](objective='IRR', study_type='metabolic_protein',
+                                 exclude_params=())
     # ethanol-only strain, expression/tolerance engineering only (29 params)
     result, csv_path = ns['run'](study_target_products='ethanol_only',
                                  study_type='metabolic')
@@ -84,6 +120,10 @@ Runner pattern (fresh kernel, one process):
     # standalone 15-variable set (9 listed rates + 3 effector multipliers
     # + 3 feeding; spike AND stage_1_max_x pinned; no _x / _s1x tag)
     result, csv_path = ns['run'](objective='IRR', study_type='metabolic_minimal_subset')
+    # Adh1 + Adh6 independent (k_6, k_17), stage_1_max_x pinned; 14 variables
+    result, csv_path = ns['run'](objective='IRR', study_type='metabolic_split_14d', method='gp')
+    # k_14/k_15/k_16 as ONE stoichiometric capacity multiplier (ehrlich_downstream); 12 variables
+    result, csv_path = ns['run'](objective='IRR', study_type='metabolic_split_12d', method='gp')
     # legacy: resume a pre-2026-09-04 study under its old name/space
     result, csv_path = ns['run'](scenario='A', kinetic_bounds_scenario='B',
                                  study_target_products=None)
@@ -93,15 +133,30 @@ Runner pattern (fresh kernel, one process):
     result, csv_path = ns['run'](objective='IRR', study_type='metabolic',
                                  seed_from=[('<donor study name>', [1553, 1914]),
                                             ('<other donor>', [1162])])
-    # dual annealing instead of TPE (name ..._irr_da_rb0.001-10_ibe0.3-2_burden)
+    # dual annealing instead of TPE (name ..._irr_da_rb0.001-4_ib0.75-1.5_burden)
     result, csv_path = ns['run'](objective='IRR', study_type='metabolic_minimal_subset', method='dual_annealing')
     # Gaussian-process sampler (feasibility-aware optuna GPSampler; <= 15
-    # variables; name ..._irr_gp_rb0.001-10_ibe0.3-2_burden); learned
+    # variables; name ..._irr_gp_rb0.001-4_ib0.75-1.5_burden); learned
     # constraint GP on by default, off via gp_kwargs
     result, csv_path = ns['run'](objective='IRR', study_type='metabolic_minimal_subset', method='gp')
     result, csv_path = ns['run'](objective='IRR', study_type='metabolic_minimal_subset', method='gp',
                                  gp_kwargs={'learned_constraints': False})
+    # relay campaign (GP only, since 2026-09-23): a FRESH store first receives
+    # up to 1000 COMPLETE rows of the donor campaigns (same search space) as
+    # preloaded trials carrying their RECORDED 'PI (log-tail)' -- no
+    # re-simulation -- then simulates n_trials NEW trials; the name gains
+    # _rl<sha1-8> (ko.relay_study_tag) before _burden
+    result, csv_path = ns['run'](objective='PI (log-tail)', study_type='metabolic_split_12d',
+                                 method='gp', gp_kwargs={'deterministic_objective': True},
+                                 relay_from=['<donor study name>', '<other donor>'],
+                                 relay_kwargs={'max_rows': 1000, 'keep_above': -0.12953})
+
+Relay campaigns (relay_from / relay_kwargs, since 2026-09-23; spec
+docs/superpowers/specs/2026-09-23-relay-preload-pi-campaign-design.md) are
+GP-only preset studies on a registry, maximized, tracked-metric objective;
+see run()'s RELAY paragraph.
 """
+import os
 from datetime import datetime
 
 from biorefineries import isobutanol
@@ -236,9 +291,21 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
         # (initial_temp, restart_temp_ratio, visit, accept, no_local_search,
         # energy_scale, max_calls_factor); ignored under 'tpe' / 'gp'.
         gp_kwargs=None,  # dict of the GP sampler's knobs under method='gp'
-        # (ko.GP_KWARGS_DEFAULTS: learned_constraints True,
-        # deterministic_objective False, n_fallback_candidates 2048,
+        # (ko.GP_KWARGS_DEFAULTS: learned_constraints False,
+        # deterministic_objective True, n_fallback_candidates 2048,
         # max_fallback_batches 20); ValueError under any other method.
+        relay_from=None,  # RELAY campaign (since 2026-09-23; GP only): donor
+        # study names (resolved to analyses/results/<name>_trajectory.csv) or
+        # trajectory-CSV paths of the SAME search space; a FRESH store preloads
+        # their selected COMPLETE rows, with the recorded objective value, as
+        # trials 0..N-1 (no re-simulation), then simulates n_trials NEW ones.
+        # None / empty = off; one string = one donor. The derived name gains
+        # ko.relay_study_tag (`_rl<sha1-8>`) before `_burden`.
+        relay_kwargs=None,  # dict of the relay selection knobs
+        # (ko.RELAY_KWARGS_DEFAULTS: max_rows 1000, keep_above None,
+        # dedupe_tol 1e-3, drop_quarantined True; ko.resolve_relay_kwargs,
+        # the same resolution the supervisor applies); ValueError without
+        # relay_from.
         **engine_kwargs,  # bounds/overrides/etc. -> run_kinetic_optimization
         ):
     """Set up the scenario baseline (same recipe as the smoke tests), run
@@ -268,9 +335,16 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     stage_1_max_x pinned (the preset's stage_1_max_x_bounds=None; an
     explicit run(stage_1_max_x_bounds=(lo, hi)) re-samples it and tags
     `_s1x`).
+    'metabolic_split_12d' the 12-variable set with k_14/k_15/k_16 as ONE
+    REFERENCED capacity multiplier, ehrlich_downstream (the preset's
+    `group_references` = ko.EHRLICH_DOWNSTREAM_WEIGHTS themselves on the
+    absolute scenario-A band ko.IBO_PATHWAY_ZERO_A_RATE_BOUNDS, since
+    2026-09-16; setdefault-ed like the other preset keys, so
+    run(group_references=...) overrides it; a referenced group is
+    sampled as reference x multiplier, never live baseline x multiplier).
     Bands (log-scale, x baseline)
     by nskinetics ROLE since 2026-09-06: rate constants (role capacity;
-    the preset's `rate_params`, ko.rate_constant_names) [1e-3x, 10x]
+    the preset's `rate_params`, ko.rate_constant_names) [1e-3x, 4x]
     (1e-5x until later that day) EXCEPT k_10, the active-biomass decay
     capacity, on [0.1x, 10x] (the preset's `parameter_multiplier_bounds`,
     a copy of ko.DEFAULT_PARAMETER_MULTIPLIER_BOUNDS -- a near-zero
@@ -293,10 +367,13 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     the rate band) wins over the preset. A preset is itself a
     workbook restriction, so restrict_to_workbook=False raises. Every
     preset-derived study name carries the EFFECTIVE rate band tag
-    `_rb{lo}-{hi}` (`_rb0.001-10` at the default), the inhibition band
+    `_rb{lo}-{hi}` (`_rb0.001-4` at the default), the inhibition band
     tag `_ib{lo}-{hi}` (`_ib0.1-10`) and the exclusion tag of the
     effective `exclude_params` (`_xk10` at the default, nothing for an
-    empty set; ko.default_study_name / ko.excluded_parameters_tag), so a
+    empty set; ko.default_study_name / ko.excluded_parameters_tag) and,
+    since 2026-09-16, the anchoring tag `_aA` (the IBO-pathway rate bands
+    for k_13-k_17 are anchored on scenario A / antimony via the preset's
+    param_bounds_override, a numeric-range change over the SAME columns), so a
     study under the current preset never resumes one started under the
     1e-5x rate band (e.g. kin_opt_ethanol_isobutanol_metabolic_irr_ib0.1-
     10_burden, untagged because only a differing band was tagged then),
@@ -443,7 +520,7 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     store) with the same preset / scenario / burden / volume set-up; the
     derived study name gains `_da` right after the objective slug on both
     naming paths (kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_
-    da_rb0.001-10_ibe0.3-2_burden). `annealing_kwargs` (dict) forwards the
+    da_rb0.001-4_ib0.75-1.5_burden). `annealing_kwargs` (dict) forwards the
     annealing knobs (initial_temp 5230, restart_temp_ratio 2e-5, visit 2.62,
     accept -5.0, no_local_search True, energy_scale None = the registry's,
     max_calls_factor 20). Under DA, enqueue_knockouts=True or a non-empty
@@ -456,14 +533,47 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     plus optuna's learned constraint GP (ConstrainedLogEI) on the violations
     by default -- fit on COMPLETE (hence feasible, under the pre-sim
     INFEASIBLE prune) trials only; the derived name gains `_gp` right after the objective slug
-    (kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_gp_rb0.001-10_
-    ibe0.3-2_burden); more than 15 decision variables raise before any study
+    (kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_gp_rb0.001-4_
+    ib0.75-1.5_burden); more than 15 decision variables raise before any study
     is touched, so use it with metabolic_minimal_subset / metabolic_14d.
     n_startup_trials=None means max(10, 2*d) under 'gp'; every enqueue /
     seed / sampler setting is honoured as under TPE. `gp_kwargs` (dict;
-    ValueError under any other method) forwards learned_constraints (True),
-    deterministic_objective (False), n_fallback_candidates (2048),
-    max_fallback_batches (20)."""
+    ValueError under any other method) forwards learned_constraints (False),
+    deterministic_objective (True), n_fallback_candidates (2048),
+    max_fallback_batches (20).
+
+    RELAY (`relay_from` / `relay_kwargs`, default None; since 2026-09-23,
+    spec docs/superpowers/specs/2026-09-23-relay-preload-pi-campaign-design.md
+    §3.2 + amendments A1 / A6 / A8 / A12). `relay_from` names donor
+    campaigns of the SAME search space (study names or trajectory-CSV
+    paths); the engine (ko.run_kinetic_optimization) selects their COMPLETE
+    rows sim-free (ko.select_relay_rows: filters, identity checks, unit-cube
+    dedupe, keep set above `keep_above` + maximin fill up to `max_rows`) and
+    a FRESH store receives them as COMPLETE trials 0..N-1 carrying the
+    donors' RECORDED objective value, then `n_trials` NEW trials are
+    simulated (n_trials counts SIMULATED trials only; the trajectory CSV
+    holds only those, from trial_number N; <study>_relay_manifest.csv lists
+    the preloaded rows). Refused here with ValueError BEFORE the preset
+    resolution and the scenario load: any method but 'gp'
+    (ko.check_method_kwargs -- TPE would score a constraint-less preloaded
+    trial infeasible, DA has no store), the legacy path
+    (study_target_products=None), an objective that is not a registry,
+    maximized, tracked-metric name (the donors' value column), learned
+    constraints (the donor rows carry no constraint values), relay_kwargs
+    without relay_from. The knobs are resolved by ko.resolve_relay_kwargs
+    (the supervisor resolves them identically) and the derived study name
+    gains ko.relay_study_tag(relay_from, relay_kwargs) -- `_rl<sha1-8>` of
+    the sorted donor stems + resolved knobs, argument-only -- after the seed
+    tag and before `_burden`; an explicit study_name is used as given. The
+    longest path the relay study can write (ko.longest_output_paths) is
+    printed; a run-data path at or over Windows' MAX_PATH (260 incl. the
+    NUL) is refused with ValueError before the scenario load, an over-long
+    plot path only warned about (spec §3.1). A
+    resume re-passes the same relay args (the stored spec must match; the
+    preload is never repeated). The end-of-run PCA marks the enqueued
+    baseline at the trajectory's FIRST trial_number (N for a relay
+    campaign, 0 otherwise), and the plots / final print use only SIMULATED
+    trials (the CSV; ko.best_simulated_trial)."""
     if 'burden_model' in engine_kwargs:
         raise ValueError("pass burden=True/False to run(), not the engine's "
                          'burden_model (run() builds it so the reports can '
@@ -474,15 +584,55 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
                  for donor, trials in (seed_from or ())]
     n_seeds = sum(len(trials) for _, trials in seed_from)
     method_tag = ko.method_study_tag(method)        # ValueError on a bad method
+    # Relay donors (2026-09-23): None / empty = off; one string (or path) =
+    # one donor; normalized BEFORE check_method_kwargs, which refuses a
+    # non-empty relay_from under any method but 'gp' (spec A1).
+    if isinstance(relay_from, (str, os.PathLike)):
+        relay_from = (relay_from,)
+    relay_from = tuple(os.fspath(donor) for donor in (relay_from or ())) or None
     method_note = ko.check_method_kwargs(
         method, enqueue_knockouts=enqueue_knockouts, seed_from=seed_from,
         n_startup_trials=n_startup_trials, feasible_sampling=feasible_sampling,
-        startup_sampling=startup_sampling)
+        startup_sampling=startup_sampling, relay_from=relay_from)
     if method_note:
         print(method_note)
     if gp_kwargs and method != 'gp':
         raise ValueError(f'gp_kwargs={gp_kwargs!r} requires method=\'gp\'; '
                          f'got method={method!r}')
+    # Relay refusals (2026-09-23; spec §3.2 + A1-A3 / A12), all BEFORE the
+    # preset resolution and the ~20 s scenario load, so a misconfigured
+    # relay fails in seconds -- the engine repeats every one of them (it is
+    # authoritative for direct callers), this only fails earlier. The knobs
+    # go through the SAME ko.resolve_relay_kwargs the supervisor applies, so
+    # the driver and the supervisor hash one canonical spec into one tag.
+    relay_tag = ''
+    if relay_from:
+        if study_target_products is None:
+            raise ValueError(
+                'relay_from requires a study preset (study_target_products): '
+                'the legacy flag path (study_target_products=None) has no '
+                'relay tag in its study name; got relay_from='
+                f'{list(relay_from)!r}')
+        if (not isinstance(objective, str)
+                or objective not in ko.OBJECTIVE_REGISTRY
+                or objective not in ko.TRACKED_METRICS
+                or ko.OBJECTIVE_REGISTRY[objective]['direction'] != 'maximize'
+                or engine_kwargs.get('direction') not in (None, 'maximize')):
+            raise ValueError(
+                'relay_from needs a REGISTRY objective that is MAXIMIZED and a '
+                'tracked trajectory column (the donors\' recorded values are '
+                f'read from it); got objective={objective!r}')
+        if ko.resolve_gp_kwargs(gp_kwargs)['learned_constraints']:
+            raise ValueError(
+                "relay_from with gp_kwargs['learned_constraints']=True: the "
+                'preloaded donor trials carry no constraint values; keep '
+                'learned_constraints=False for a relay campaign.')
+        relay_kwargs = ko.resolve_relay_kwargs(relay_kwargs)
+        relay_tag = ko.relay_study_tag(relay_from, relay_kwargs)
+    elif relay_kwargs:
+        raise ValueError(f'relay_kwargs={relay_kwargs!r} given without '
+                         'relay_from (no donors): pass relay_from or drop the '
+                         'relay knobs.')
     if study_target_products is not None:
         if not restrict_to_workbook:
             raise ValueError(
@@ -498,7 +648,8 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
                     'rate_multiplier_bounds', 'rate_params',
                     'parameter_multiplier_bounds', 'stage_1_max_x_bounds',
                     'parameter_groups', 'group_multiplier_bounds',
-                    'spike_delta_bounds'):
+                    'spike_delta_bounds', 'group_references',
+                    'param_bounds_override'):
             engine_kwargs.setdefault(key, preset[key])
         if study_name is None:
             study_name = ko.default_study_name(
@@ -535,7 +686,17 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
                 # The seed count: same columns as the unseeded study, so
                 # the tag is what keeps a seeded run off its store.
                 n_seeds=n_seeds,
-                method=method)
+                method=method,
+                # Every preset name gains _aA: the IBO-pathway bands are now
+                # anchored on scenario A (antimony), a numeric-range change over
+                # the SAME columns, so only the name keeps a new study off an
+                # old B-anchored store.
+                ibo_pathway_anchoring='scenario_A',
+                # A relay campaign (2026-09-23) has the columns of the plain
+                # study of its objective (the preload lives in the store and
+                # a manifest, never in the CSV), so only this tag -- '' when
+                # relay_from is off -- keeps it off that study's store.
+                relay_tag=relay_tag)
         excluded = tuple(engine_kwargs['exclude_params'] or ())
         groups = dict(engine_kwargs['parameter_groups'] or {})
         grouped = {m for members in groups.values() for m in members}
@@ -571,12 +732,17 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
             # tuple or a {group: (lo, hi)} dict of per-group bands);
             # ko.group_bounds_for resolves each group's own band, so this
             # line reports the true per-group band and never chokes on a
-            # dict.
+            # dict. A REFERENCED group (group_references, since 2026-09-15:
+            # reference x multiplier instead of live baseline x multiplier)
+            # is marked; the engine's set-up print lists its references.
             gmb = engine_kwargs['group_multiplier_bounds']
+            refs = engine_kwargs.get('group_references') or {}
             print('Parameter groups (one log-scale multiplier each on its '
-                  'own band x baseline, preserving intra-group ratios): '
-                  + '; '.join(f'{g}[{len(m)}] on {ko.group_bounds_for(g, gmb)}: '
-                              f'{", ".join(m)}'
+                  'own band x baseline -- x REFERENCE for a referenced '
+                  'group -- preserving intra-group ratios): '
+                  + '; '.join(f'{g}[{len(m)}] on {ko.group_bounds_for(g, gmb)}'
+                              + (' x REFERENCE' if g in refs else '')
+                              + f': {", ".join(m)}'
                               for g, m in groups.items())
                   + '.')
     elif scenario is None:
@@ -614,6 +780,37 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     if seed_from:
         print(f'Seed points: {n_seeds} donor trials enqueued after the '
               f'probes of a fresh study: {seed_from}')
+    if relay_from:
+        # One line: the canonical spec (sorted donor stems + resolved knobs)
+        # is exactly what the engine stores as the 'relay_spec' system attr
+        # and what the tag hashes; the engine prints the selection itself.
+        print(f'Relay campaign (tag {relay_tag}): a FRESH store preloads the '
+              f'selected COMPLETE donor rows with their recorded '
+              f'{objective!r} (no re-simulation) before {n_trials} SIMULATED '
+              'trials (a resume never re-preloads); spec '
+              + ko.relay_spec_json(relay_from, relay_kwargs))
+        # Output-path budget (spec §3.1, 2026-09-23): the longest file this
+        # study can write under the engine's results directory, reported on
+        # its own line (never folded into the one-line summary above). A
+        # run-data path (CSV / store / manifest) that cannot exist on
+        # Windows (MAX_PATH 260 incl. the NUL) is refused HERE, before the
+        # scenario load; the end-of-run plots are written last and inside
+        # a try, so an over-long plot path is only warned about.
+        data_path, plot_path = ko.longest_output_paths(
+            engine_kwargs.get('results_dir'), study_name)
+        if len(data_path) >= ko.WINDOWS_MAX_PATH:
+            raise ValueError(
+                f'relay study {study_name!r}: its longest run-data path is '
+                f'{len(data_path)} characters, over Windows MAX_PATH '
+                f'{ko.WINDOWS_MAX_PATH} (incl. the NUL): {data_path} -- use '
+                'a shorter study_name / results_dir.')
+        print(f'Longest output path: {len(plot_path)} characters (run data '
+              f'{len(data_path)}; Windows MAX_PATH {ko.WINDOWS_MAX_PATH} '
+              f'incl. the NUL): {plot_path}')
+        if len(plot_path) >= ko.WINDOWS_MAX_PATH:
+            print(f'WARNING: the end-of-run plots ({len(plot_path)} '
+                  'characters) exceed Windows MAX_PATH and will fail to '
+                  'save; the run itself is unaffected.')
     # Consolidated scenario baseline: workbook kinetics + distributions +
     # feeding strategy + one baseline model_specification (single source of
     # truth in scenarios.SCENARIOS). The BO samples on top of this baseline.
@@ -651,7 +848,28 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
             volume_feasibility=volume_feasibility,
             startup_sampling=startup_sampling,
             seed_from=seed_from,
+            # None / None for every non-relay study (the engine's no-op path)
+            relay_from=relay_from,
+            relay_kwargs=relay_kwargs,
             **engine_kwargs)
+        if method == 'gp':
+            # A relay store's best trial may be a PRELOADED donor row: report
+            # the best SIMULATED one (spec A8). n_relay_trials is 0 -- and
+            # nothing is printed -- for every other GP study. Report-only: a
+            # failed store read here must never fail a finished run (a
+            # non-zero exit would make the supervisor relaunch it).
+            try:
+                n_preloaded = ko.n_relay_trials(result)
+                if n_preloaded:
+                    best_sim = ko.best_simulated_trial(result)
+                    print(f'Relay campaign: {n_preloaded} preloaded trials; '
+                          'best SIMULATED trial '
+                          + (f'#{best_sim.number} = {best_sim.value!r}'
+                             if best_sim is not None else
+                             'none yet (no COMPLETE simulated trial)'))
+            except Exception as e:
+                print('Relay summary failed (the study is intact on disk): '
+                      f'{repr(e)[:300]}')
     else:
         result, csv_path, kinetic_baselines = ko.run_kinetic_dual_annealing(
             objective=objective,
@@ -679,7 +897,13 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
             objective_units = (ko.OBJECTIVE_REGISTRY[objective]['units']
                                if isinstance(objective, str)
                                else engine_kwargs.get('objective_units', ''))
+            # The trajectory CSV holds only SIMULATED trials (a relay
+            # campaign's preloaded donor rows live in the store and the
+            # manifest), so every plot below -- best-vs-baseline included --
+            # reads simulated trials only.
             df = ko.load_trajectory(csv_path)
+            first_trial_number = (int(df['trial_number'].min()) if len(df)
+                                  else None)
             stamp = datetime.now().strftime('%Y.%m.%d-%H.%M')
             base = csv_path[:-len('_trajectory.csv')]
             ko.plot_optimization_trajectories(
@@ -710,9 +934,14 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
                 objective_name=objective_name,
                 objective_units=objective_units,
                 filename=base + f'_pca_{stamp}.png',
-                # Trial 0 is the baseline ONLY when it was enqueued;
-                # otherwise it is a sampled draw and gets no marker.
-                baseline_trial=(0 if enqueue_baseline else None))
+                # The FIRST trial of the trajectory is the baseline ONLY
+                # when it was enqueued; otherwise it is a sampled draw and
+                # gets no marker. Its number is the CSV's first
+                # trial_number, not a literal 0 (spec A8, 2026-09-23): a
+                # relay campaign numbers its simulated trials from the
+                # preload size N (optuna numbering); 0 for every other study.
+                baseline_trial=(first_trial_number if enqueue_baseline
+                                else None))
             print(f'Plots saved next to {csv_path}')
         except Exception as e:
             print('Plotting failed (the trajectory CSV and study are '

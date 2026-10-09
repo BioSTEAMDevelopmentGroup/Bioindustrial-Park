@@ -26,7 +26,7 @@ rows; 'ethanol_isobutanol' = scenario-B rows, i.e. plus the Ehrlich block
 and the isobutanol-inhibition coefficients; both start at the A baseline)
 and study_type ('metabolic' = capacity, product-inhibition, lethality and
 substrate-regulation roles; 'metabolic_protein' = plus affinity and
-product self-inhibition), with the rate constants on [1e-3x, 10x] and the
+product self-inhibition), with the rate constants on [1e-3x, 4x] and the
 inhibition coefficients / K_* terms on [0.1x, 10x] log bands; k_10 (the
 active-biomass decay capacity) is excluded from every preset by default
 (DEFAULT_EXCLUDED_PARAMETERS -- a lower decay rate is a free lunch, not an
@@ -53,6 +53,7 @@ import json
 import math
 import os
 import re
+import warnings
 
 import numpy as np
 
@@ -70,11 +71,18 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'group_bounds_for', 'expand_grouped_values',
            'RATE_CONSTANT_ROLES', 'INHIBITION_COEFFICIENT_ROLES',
            'kinetic_parameter_roles_path', 'kinetic_parameter_roles',
+           'antimony_file_path', 'antimony_rate_baselines',
+           'scenario_A_ibo_pathway_rate_bounds',
+           'SCENARIO_A_ANCHORED_RATE_MULTIPLIER_BOUNDS',
+           'IBO_PATHWAY_ZERO_A_RATE_BOUNDS',
            'rate_constant_names',
            'STUDY_TARGET_PRODUCTS', 'STUDY_TYPE_ROLES',
            'STUDY_TYPE_OPTIONS', 'EFFECTOR_ORDER',
            'METABOLIC_MINIMAL_SUBSET_RATES', 'METABOLIC_MINIMAL_SUBSET_GROUPS',
            'METABOLIC_14D_RATES', 'METABOLIC_14D_RATE_GROUPS',
+           'METABOLIC_SPLIT_14D_RATES', 'METABOLIC_SPLIT_14D_GROUPS',
+           'EHRLICH_DOWNSTREAM_WEIGHTS', 'METABOLIC_SPLIT_12D_RATES',
+           'METABOLIC_SPLIT_12D_RATE_GROUPS',
            'kinetic_parameter_effectors', 'study_type_name_defaults',
            'DEFAULT_STUDY_TARGET_PRODUCTS', 'DEFAULT_STUDY_TYPE',
            'resolve_study_preset', 'default_study_name',
@@ -103,7 +111,21 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'unit_to_internal', 'unit_to_external', 'external_to_unit',
            'PENALTY_ENERGY', 'resolve_energy_scale', 'annealing_energy',
            'SIMULATED_STATES', 'trajectory_resume_state', 'AnnealingResult',
-           'run_kinetic_dual_annealing',)
+           'run_kinetic_dual_annealing',
+           'SPLIT12D_STUDY_TARGET_PRODUCTS', 'SPLIT12D_STUDY_TYPE',
+           'split12d_trajectory_path', 'read_trajectory_row',
+           'REPRODUCTION_MODES', 'reconstruct_trial_kinetics',
+           'REPRODUCTION_DIAGNOSTIC_METRICS', 'compare_tracked_metrics',
+           'reproduce_split12d_trial',
+           'RELAY_KWARGS_DEFAULTS', 'RELAY_TRIAL_SYSTEM_ATTR',
+           'RELAY_TRIAL_USER_ATTR', 'RELAY_DROP_REASONS',
+           'resolve_relay_kwargs', 'relay_donor_path', 'relay_spec_json',
+           'relay_study_tag', 'relay_rows_sha1', 'select_relay_rows',
+           'relay_frozen_trials', 'n_relay_trials', 'best_simulated_trial',
+           'relay_manifest_path', 'default_results_dir',
+           'STUDY_OUTPUT_SUFFIXES', 'STUDY_PLOT_SUFFIXES',
+           'PLOT_STAMP_PLACEHOLDER', 'WINDOWS_MAX_PATH',
+           'longest_output_paths',)
 
 FEEDING_VARIABLES = ('threshold_conc', 'target_delta', 'spike_delta',
                      'max_n_spikes')
@@ -147,9 +169,9 @@ DEFAULT_SPIKE_DELTA_BOUNDS = (0.5, 595.0)
 #: Default log-scale band of a PARAMETER GROUP multiplier (x every
 #: member's baseline; build_search_space `group_multiplier_bounds`): the
 #: metabolic_minimal preset samples one multiplier per inhibition-effector
-#: family on it (0.2x-2x, baseline 1.0), so a family's intra-family
+#: family on it (0.75x-1.5x, baseline 1.0), so a family's intra-family
 #: ratios are preserved while its overall strength varies.
-DEFAULT_GROUP_MULTIPLIER_BOUNDS = (0.2, 2.0)
+DEFAULT_GROUP_MULTIPLIER_BOUNDS = (0.75, 1.5)
 
 def group_bounds_for(group, group_multiplier_bounds):
     """(lo, hi) log-scale multiplier band for ONE parameter group.
@@ -184,25 +206,42 @@ def _as_group_multiplier_bounds(value):
         return {group: tuple(band) for group, band in value.items()}
     return tuple(value)
 
-def expand_grouped_values(values, parameter_groups, kinetic_baselines):
+def expand_grouped_values(values, parameter_groups, kinetic_baselines,
+                          group_references=None):
     """Copy of the decision dict `values` with every PARAMETER-GROUP
-    multiplier replaced by its members' applied values (member baseline x
-    multiplier, from `kinetic_baselines`), the group key dropped and every
-    other entry (individual kinetics, feeding and operating variables)
-    passed through unchanged. `parameter_groups` is the
-    {group_name: [member names]} mapping given to build_search_space;
-    None / {} gives a plain copy. Pure: used by the engine's objective
-    (what reaches the model and the burden), by the `applied_<member>`
-    trajectory columns and by the offline test. The inverse for the
-    baseline point is trivial (every group multiplier = 1.0)."""
+    multiplier replaced by its members' applied values, the group key
+    dropped and every other entry (individual kinetics, feeding and
+    operating variables) passed through unchanged. `parameter_groups` is
+    the {group_name: [member names]} mapping given to build_search_space;
+    None / {} gives a plain copy.
+
+    The BASIS a member's multiplier is applied to: its LIVE baseline from
+    `kinetic_baselines` (member baseline x multiplier -- the glycolysis and
+    inhibition groups), OR, for a group listed in `group_references`
+    ({group_name: {member: reference_capacity}}; None / {} = none, since
+    2026-09-15), that member's REFERENCE (reference x multiplier), so a
+    group whose members are ZERO on the live model (the Ehrlich rates at
+    the scenario-A start) can still be sampled on an absolute band -- the
+    metabolic_split_12d preset's ehrlich_downstream group (resolve_study_
+    preset uses EHRLICH_DOWNSTREAM_WEIGHTS themselves as the references, so
+    the band is an absolute one on the anchor). Pure: used by the engine's
+    evaluation site (what reaches the model and the burden), by the
+    feasibility predicate, by the `applied_<member>` trajectory columns
+    and by the offline test. The inverse for the baseline point is
+    baseline_decision_point's (1.0 for an un-referenced group, live anchor
+    / reference for a referenced one)."""
     if not parameter_groups:
         return dict(values)
     groups = dict(parameter_groups)
+    references = dict(group_references or {})
     out = {}
     for name, value in values.items():
         if name in groups:
+            refs = references.get(name)
             for member in groups[name]:
-                out[member] = kinetic_baselines[member]*value
+                basis = (kinetic_baselines[member] if refs is None
+                         else refs[member])
+                out[member] = basis*value
         else:
             out[name] = value
     return out
@@ -211,8 +250,8 @@ def expand_grouped_values(values, parameter_groups, kinetic_baselines):
 #: named study presets (resolve_study_preset), assigned by nskinetics
 #: ROLE (kinetic_parameter_roles) since 2026-09-06:
 #:   1. RATE CONSTANTS (role capacity: k_1h, k_2, ..., k_13-k_16) --
-#:      DEFAULT_RATE_MULTIPLIER_BOUNDS, [1e-3×, 10×] (1e-5× until later
-#:      on 2026-09-06): an effective
+#:      DEFAULT_RATE_MULTIPLIER_BOUNDS, [1e-3×, 4×] (1e-5× until later
+#:      on 2026-09-06, high 10× until 2026-09-15): an effective
 #:      knock-out is reachable (still log-uniform below and above the
 #:      baseline).
 #:   2. INHIBITION COEFFICIENTS (roles product_inhibition and lethality:
@@ -231,8 +270,21 @@ def expand_grouped_values(values, parameter_groups, kinetic_baselines):
 #: and older-study resumes). The legacy single band of
 #: build_search_space's multiplier_bounds default, (0.1, 10.0), is
 #: unchanged.
-DEFAULT_RATE_MULTIPLIER_BOUNDS = (1e-3, 10.0)
+DEFAULT_RATE_MULTIPLIER_BOUNDS = (1e-3, 4.0)
 DEFAULT_SATURATION_MULTIPLIER_BOUNDS = (0.1, 10.0)
+
+#: Per-parameter multiplier bands for the nonzero-scenario-A isobutanol-pathway
+#: capacity rates, applied to their scenario-A (antimony) anchor value. Scenario A
+#: uses the antimony values as-is, so this honours the anchoring rule (only the
+#: fitted antimony -- never arbitrary scenario B -- anchors a kinetic value).
+SCENARIO_A_ANCHORED_RATE_MULTIPLIER_BOUNDS = {'k_16': (1e-3, 1e2), 'k_17': (1e-3, 20.0)}
+
+#: Absolute (low, high) g/L/h band for the isobutanol-pathway capacity rates whose
+#: scenario-A anchor is zero (k_13, k_14, k_15): no nonzero anchor to scale, so an
+#: absolute log-scale band. The low bound is 1e-3 (not 0) so the band stays
+#: log-scale and the trial-0 baseline (live A = 0) clips up to it, exactly as the
+#: old B-anchored floor (1e-3 x B_baseline) did.
+IBO_PATHWAY_ZERO_A_RATE_BOUNDS = (1e-3, 4.0)
 
 #: Per-parameter multiplier bands of the study presets, {name: (m_lo,
 #: m_hi)} x baseline, taking precedence over the ROLE band of that name
@@ -434,6 +486,21 @@ OBJECTIVE_REGISTRY = {
         getter=lambda h: _nsk(h)['y_EtOH_IBO_glu_added'],
         direction='maximize', level='kinetic', units='g-EtOH-and-IBO/g-sugars',
         energy_scale=0.01),
+    # Price-weighted combined yield (a revenue-per-sugar proxy): each
+    # glucose-added product yield (as in 'IBO yield' / 'EtOH yield') times
+    # the model's STATIC, PRICE_YEAR-indexed reference price -- V514.
+    # isobutanol_price / V513.ethanol_price (the scalar per-kg reference
+    # prices set once at load() and indexed in place, NOT the fluctuating
+    # stream .price a TEA solve leaves behind). Kinetic level: it needs
+    # only the fermentation yields and the fixed prices, not the TEA
+    # solution (solve_TEA still runs every trial for the tracked TEA
+    # metrics). Unlike 'Combined yield' (unweighted sum), this weights the
+    # two products by revenue, so the optimizer trades IBO vs EtOH by value.
+    'Price-weighted yield': dict(
+        getter=lambda h: (_nsk(h)['y_IBO_glu_added']*h['f'].V514.isobutanol_price
+                          + _nsk(h)['y_EtOH_glu_added']*h['f'].V513.ethanol_price),
+        direction='maximize', level='kinetic',
+        units='($/kg-product)(g-product/g-sugars)', energy_scale=0.01),
     'Cell density': dict(
         getter=lambda h: _nsk(h)['[x]'],
         direction='maximize', level='kinetic', units='g-cell/L-water',
@@ -454,6 +521,17 @@ OBJECTIVE_REGISTRY = {
     'TCI': dict(
         getter=lambda h: h['tea'].TCI/1e6,
         direction='minimize', level='system', units='MM$', energy_scale=2.0),
+    # Net present value at the fixed 15 % hurdle IRR with every product at
+    # its default price -- the same TEA exit state PI reads -- in MM$. This
+    # is the RAW NPV, not PI's per-TCI ratio: unlike PI it is NOT
+    # scale-invariant (it rewards a larger plant at equal return), and its
+    # MM$ magnitude with deep-loss tails is exactly what can distort a GP
+    # surrogate's target standardization (PI / PI (log-tail) were introduced
+    # to avoid that). Registered on explicit request. energy_scale mirrors
+    # TCI's (MM$; used only by dual annealing, not GP).
+    'NPV': dict(
+        getter=lambda h: h['tea'].NPV/1e6,
+        direction='maximize', level='system', units='MM$', energy_scale=2.0),
     # Profitability index (2026-09-12; docs/reports/profitability-index-
     # objective.md): NPV at the fixed 15 % hurdle with every product at its
     # default price, per $ of TCI. Defined for EVERY simulated point (no
@@ -603,6 +681,7 @@ def build_search_space(kinetic_baselines,
                        stage_1_max_x_bounds=None,
                        parameter_groups=None,
                        group_multiplier_bounds=DEFAULT_GROUP_MULTIPLIER_BOUNDS,
+                       group_references=None,
                        ):
     """Build the decision-variable space: {name: {'low', 'high', 'log'}}
     (integer variables additionally carry 'int': True).
@@ -709,6 +788,22 @@ def build_search_space(kinetic_baselines,
     The metabolic_minimal preset groups the inhibition coefficients by
     effector (resolve_study_preset).
 
+    `group_references` ({group_name: {member: reference_capacity}}; None /
+    {} = none; since 2026-09-15) makes a group a REFERENCED capacity group:
+    its multiplier applies to each member's REFERENCE instead of its live
+    baseline (expand_grouped_values), so the members may have a ZERO live
+    baseline (the Ehrlich rates at the scenario-A start -- the
+    metabolic_split_12d preset's ehrlich_downstream group, references =
+    EHRLICH_DOWNSTREAM_WEIGHTS themselves on an absolute anchor band).
+    A referenced member is EXEMPT from the positive-live-baseline check
+    above (an un-referenced group's members still need one). ValueError:
+    a referenced group that is not in `parameter_groups`; a reference for
+    a name that is not a member of that group (a non-kinetic name
+    included); a reference dict that does not cover EVERY member of its
+    group (all-or-none per group); a nonpositive (or NaN) reference.
+    The band and the column are exactly those of an un-referenced group
+    (group_multiplier_bounds; one log-scale multiplier).
+
     Returns (space, excluded_parameter_names)."""
     param_bounds_override = dict(param_bounds_override or {})
     parameter_multiplier_bounds = dict(parameter_multiplier_bounds or {})
@@ -718,6 +813,32 @@ def build_search_space(kinetic_baselines,
     is_rate = _rate_predicate(rate_params)
     parameter_groups = {str(group): list(members)
                         for group, members in dict(parameter_groups or {}).items()}
+    group_references = {str(group): dict(refs)
+                        for group, refs in dict(group_references or {}).items()}
+    for group, refs in group_references.items():
+        # References are validated against the GROUP definition (membership,
+        # all-or-none, positivity) before the members themselves are checked
+        # below, where a referenced member is exempt from the positive-live-
+        # baseline requirement.
+        if group not in parameter_groups:
+            raise ValueError(f'group_references names group {group!r}, which '
+                             'is not in parameter_groups')
+        members = parameter_groups[group]
+        extra = [name for name in refs if name not in members]
+        if extra:
+            raise ValueError(f'group_references for group {group!r}: {extra} '
+                             'are not members of that group')
+        missing = [name for name in members if name not in refs]
+        if missing:
+            raise ValueError(f'group_references for group {group!r} must '
+                             'cover every member of the group (all-or-none); '
+                             f'missing {missing}')
+        for member, reference in refs.items():
+            if not (reference > 0.0):   # also catches NaN
+                raise ValueError(f'group_references for group {group!r}: '
+                                 f'member {member!r} has a nonpositive '
+                                 f'reference ({reference}); a reference '
+                                 'capacity must be positive')
     grouped = {}  # member name -> group name
     if parameter_groups:
         reserved = (set(kinetic_baselines) | set(FEEDING_VARIABLES)
@@ -733,6 +854,7 @@ def build_search_space(kinetic_baselines,
                                  'operating variable name')
             if not members:
                 raise ValueError(f'parameter group {group!r} is empty')
+            referenced = group in group_references
             for member in members:
                 if member not in kinetic_baselines:
                     raise ValueError(f'parameter group {group!r}: member '
@@ -746,11 +868,12 @@ def build_search_space(kinetic_baselines,
                     raise ValueError(f'kinetic parameter {member!r} is both in '
                                      f'parameter group {group!r} and in '
                                      'exclude_params')
-                if kinetic_baselines[member] <= 0.0:
+                if not referenced and kinetic_baselines[member] <= 0.0:
                     raise ValueError(f'parameter group {group!r}: member '
                                      f'{member!r} has a nonpositive baseline '
                                      f'({kinetic_baselines[member]}); a group '
-                                     'multiplier needs a positive one')
+                                     'multiplier needs a positive one (or a '
+                                     'group_references entry for the group)')
                 grouped[member] = group
     space, excluded = {}, []
     for name, baseline in kinetic_baselines.items():
@@ -832,7 +955,8 @@ def baseline_decision_point(search_space, kinetic_baselines,
                             baseline_model_kwargs,
                             baseline_max_n_spikes=None,
                             baseline_stage_1_max_x=None,
-                            parameter_groups=None):
+                            parameter_groups=None,
+                            group_references=None):
     """The scenario baseline expressed in decision-variable coordinates
     for `search_space` (either feeding parameterization) -- suitable for
     study.enqueue_trial, so a fresh study evaluates the baseline itself
@@ -849,13 +973,28 @@ def baseline_decision_point(search_space, kinetic_baselines,
     into its band like every other entry).
 
     `parameter_groups` (the build_search_space mapping; None = none)
-    gives every group in the space its baseline multiplier 1.0. A space
-    without spike_delta (spike_delta_bounds=None) gets no such entry."""
+    gives every group in the space its baseline multiplier: 1.0 for an
+    un-referenced group (member baseline x 1.0 = the baseline), and, for
+    a group in `group_references` ({group: {member: reference}}; None =
+    none; since 2026-09-15), the live ANCHOR baseline over its reference
+    -- kinetic_baselines[anchor] / references[anchor], anchor = the
+    group's FIRST member -- then clipped into the band like every other
+    entry (0 at the scenario-A start -> the band floor, exactly how an
+    individual zero-baseline Ehrlich rate is clipped up to its floor). A
+    space without spike_delta (spike_delta_bounds=None) gets no such
+    entry."""
     point = {name: kinetic_baselines[name]
              for name in search_space if name in kinetic_baselines}
-    for group in dict(parameter_groups or {}):
-        if group in search_space:
+    references = dict(group_references or {})
+    for group, members in dict(parameter_groups or {}).items():
+        if group not in search_space:
+            continue
+        refs = references.get(group)
+        if refs is None:
             point[group] = 1.0
+        else:
+            anchor = list(members)[0]
+            point[group] = kinetic_baselines[anchor]/refs[anchor]
     thr = baseline_model_kwargs['threshold_conc']
     tgt = baseline_model_kwargs['target_conc']
     spk = baseline_model_kwargs['spike_conc']
@@ -1204,6 +1343,88 @@ def kinetic_parameter_roles_path():
                           'kinetic-parameter role table).')
     return os.path.join(os.path.dirname(spec.origin), *_ROLE_TABLE_RELPATH)
 
+#: Antimony model file (the fitted kinetics; scenario A uses it as-is), beside
+#: the role table.
+_ANTIMONY_MODEL_FILENAME = 's_cerevisiae_ferm_fb_inhib_mod_ibo_antimony.txt'
+
+def antimony_file_path():
+    """Absolute path of the nskinetics antimony file for the shipped
+    S. cerevisiae ethanol/isobutanol model, beside the role table
+    (kinetic_parameter_roles_path). The antimony is the only kinetic source
+    fitted on experimental data, so it is the only valid anchor for a new
+    kinetic constant (CLAUDE.md anchoring rule)."""
+    return os.path.join(os.path.dirname(kinetic_parameter_roles_path()),
+                        _ANTIMONY_MODEL_FILENAME)
+
+_antimony_rate_baselines_cache = None
+#: Every `k_<name> = <number>;` assignment line of the antimony file.
+_ANTIMONY_RATE_ASSIGNMENT_RE = re.compile(
+    r'^\s*(k_[A-Za-z0-9]+)\s*=\s*([-+0-9.eE]+)\s*;', re.M)
+
+def antimony_rate_baselines(path=None):
+    """{k_<name>: float} for every rate-constant assignment in the antimony
+    file (regex on the text; no nskinetics import, so safe for the offline
+    test and sim-free preset resolution). Cached for the default path; an
+    explicit `path` (tests) is read afresh and never cached -- the same
+    discipline as _kinetic_parameter_table."""
+    global _antimony_rate_baselines_cache
+    if path is None and _antimony_rate_baselines_cache is not None:
+        return _antimony_rate_baselines_cache
+    file_path = antimony_file_path() if path is None else path
+    with open(file_path, encoding='utf-8') as fh:
+        text = fh.read()
+    baselines = {name: float(value)
+                 for name, value in _ANTIMONY_RATE_ASSIGNMENT_RE.findall(text)}
+    if path is None:
+        _antimony_rate_baselines_cache = baselines
+    return baselines
+
+def scenario_A_ibo_pathway_rate_bounds(include_params, rate_params, *,
+                                       scenario_A_workbook_rows=None,
+                                       antimony=None):
+    """param_bounds_override entries for the isobutanol-pathway capacity rates
+    a preset samples INDIVIDUALLY. A rate qualifies iff it is a capacity rate
+    (in `rate_params`), individually sampled (in `include_params`), and ABSENT
+    from the scenario-A workbook (the natives are present in A -- and identical
+    in A, B and the antimony -- so their B-anchored bands already equal the A
+    ones and are left untouched). For each such rate the band is anchored on
+    the fitted scenario-A antimony value (CLAUDE.md anchoring rule):
+
+    * antimony value a > 0 -> (m_lo*a, m_hi*a), where (m_lo, m_hi) is the
+      per-parameter band from SCENARIO_A_ANCHORED_RATE_MULTIPLIER_BOUNDS
+      (k_16, k_17). A nonzero-A rate with no table entry is a KeyError (forces
+      an explicit decision; cannot happen with today's model).
+    * antimony value a == 0 (k_13, k_14, k_15) -> IBO_PATHWAY_ZERO_A_RATE_BOUNDS.
+
+    Grouped rates (not in `include_params`, e.g. k_14/k_15/k_16 under
+    metabolic_split_12d) are correctly skipped. Returns {} when the preset
+    samples no isobutanol-pathway rate individually (e.g. ethanol_only)."""
+    if scenario_A_workbook_rows is None:
+        scenario_A_workbook_rows = set(workbook_kinetic_baselines('A'))
+    else:
+        scenario_A_workbook_rows = set(scenario_A_workbook_rows)
+    if antimony is None:
+        antimony = antimony_rate_baselines()
+    rate_set = set(rate_params or ())
+    override = {}
+    for name in include_params:
+        if name not in rate_set or name in scenario_A_workbook_rows:
+            continue
+        a = antimony.get(name, 0.0)
+        if a > 0.0:
+            try:
+                m_lo, m_hi = SCENARIO_A_ANCHORED_RATE_MULTIPLIER_BOUNDS[name]
+            except KeyError:
+                raise KeyError(
+                    f'{name!r} is a nonzero scenario-A (antimony={a!r}) '
+                    'isobutanol-pathway rate with no entry in '
+                    'SCENARIO_A_ANCHORED_RATE_MULTIPLIER_BOUNDS; add a '
+                    'per-parameter multiplier band explicitly before sampling it.')
+            override[name] = (m_lo*a, m_hi*a)
+        else:
+            override[name] = IBO_PATHWAY_ZERO_A_RATE_BOUNDS
+    return override
+
 _kinetic_parameter_table_cache = None
 
 def _kinetic_parameter_table(path=None):
@@ -1329,6 +1550,20 @@ STUDY_TYPE_ROLES = {
     # (METABOLIC_14D_RATES + METABOLIC_14D_RATE_GROUPS + the shared inhibition
     # groups). The name encodes the ethanol_isobutanol decision-var count, 14.
     'metabolic_14d': (),
+    # 'metabolic_split_14d' (2026-09-15): NO role filter -- metabolic_14d
+    # with the two alcohol dehydrogenases as INDEPENDENT knobs (Adh1 k_6 and
+    # Adh6 k_17, new with the nskinetics r16/r17 split), the inhibition
+    # groups on the LIVE cross-product coefficients k_17ie / k_17ia, and
+    # stage_1_max_x PINNED so the ethanol_isobutanol count stays at 14
+    # (METABOLIC_SPLIT_14D_RATES / _GROUPS via STUDY_TYPE_OPTIONS).
+    'metabolic_split_14d': (),
+    # 'metabolic_split_12d' (2026-09-15): NO role filter -- metabolic_split_14d
+    # with the three DOWNSTREAM Ehrlich rates k_14 / k_15 / k_16 collapsed into
+    # ONE stoichiometrically weighted REFERENCED capacity multiplier,
+    # ehrlich_downstream (METABOLIC_SPLIT_12D_RATES / _RATE_GROUPS +
+    # EHRLICH_DOWNSTREAM_WEIGHTS via STUDY_TYPE_OPTIONS); the name encodes the
+    # ethanol_isobutanol decision-variable count, 12.
+    'metabolic_split_12d': (),
 }
 
 #: The STANDALONE metabolic_minimal_subset preset (2026-09-07): its
@@ -1365,12 +1600,81 @@ METABOLIC_MINIMAL_SUBSET_GROUPS = {
 METABOLIC_14D_RATES = ('k_3', 'k_6', 'k_13', 'k_14', 'k_15', 'k_16')
 #: Its CAPACITY group (declared under the STUDY_TYPE_OPTIONS rate_parameter_
 #: groups key so resolve_study_preset validates the members as capacity rows,
-#: not inhibition coefficients): ONE log multiplier on (0.2, 5.0) x every
+#: not inhibition coefficients): ONE log multiplier on (0.2, 4.0) x every
 #: member's LIVE baseline (expand_grouped_values), preserving the glycolysis
 #: family's intra-ratio. Merged glycolysis-FIRST into parameter_groups, so the
 #: search-space / CSV column order after the individual rates is glycolysis,
 #: then the three inhibition groups.
 METABOLIC_14D_RATE_GROUPS = {'glycolysis': ('k_1l', 'k_1h', 'k_1e')}
+
+#: metabolic_split_14d (2026-09-15): metabolic_14d with the two alcohol
+#: dehydrogenases as INDEPENDENT knobs -- Adh1 (r6, k_6, already present)
+#: and Adh6 (r17, k_17, new with the nskinetics r16/r17 split of the lumped
+#: KDC + ADH step; constitutive, antimony default 44 g/L/h, admitted by the
+#: workbook intersection through the B workbook's ._k_17 row) -- and
+#: stage_1_max_x PINNED, so the count stays at 14. Each rate on the rate
+#: band (DEFAULT_RATE_MULTIPLIER_BOUNDS), intersected with the target's
+#: workbook (ethanol_only lacks k_13-k_17).
+METABOLIC_SPLIT_14D_RATES = ('k_3', 'k_6', 'k_13', 'k_14', 'k_15', 'k_16', 'k_17')
+#: Its inhibition groups on the LIVE cross-product coefficients: k_17ie /
+#: k_17ia (r17, the alcohol-forming step) replace the k_16ie / k_16ia of the
+#: shared METABOLIC_MINIMAL_SUBSET_GROUPS, which the split left declared but
+#: inert (the repointed workbooks no longer carry those rows, so the older
+#: presets' workbook intersection drops them silently).
+METABOLIC_SPLIT_14D_GROUPS = {
+    'inhib_ethanol':    ('k_1ie', 'k_4ie', 'k_7ie', 'k_10ie', 'k_17ie'),
+    'inhib_isobutanol': ('k_1ii', 'k_4ii', 'k_6ii', 'k_7ii', 'k_10ii'),
+    'inhib_acetate':    ('k_1ia', 'k_4ia', 'k_6ia', 'k_7ia', 'k_10ia', 'k_17ia'),
+}
+
+#: metabolic_split_12d (2026-09-15; spec docs/superpowers/specs/2026-09-15-
+#: metabolic-split-12d-ehrlich-downstream-group-design.md): metabolic_split_14d
+#: with the three Ehrlich rates DOWNSTREAM of the pyruvate split -- k_14
+#: (Ilv5), k_15 (Ilv3), k_16 (Aro10) -- collapsed into ONE log-scale capacity
+#: multiplier, `ehrlich_downstream`, with fixed STOICHIOMETRIC intra-ratios.
+#: r14 / r15 / r16 are irreversible Michaelis-Menten steps in their own
+#: substrate with no feedback and no effluent mapping of their intermediates,
+#: so the trio is one degree of freedom ("enough downstream capacity"): the
+#: 09-14 / 09-15 14d GP studies show the three values at ~0.3-0.5 x k_13 in
+#: every high-isobutanol cluster, Spearman ~0 with titer / PI, and their
+#: pools still ~45 % of Phi_M. The INDIVIDUAL rates: k_3 (Pdc), k_6 (Adh1),
+#: k_13 (Ilv2, the branch entry, kept free -- r13 runs far from saturation
+#: and tying the trio to it by stoichiometry would prune the profitable
+#: region) and k_17 (Adh6), each on the rate band, intersected with the
+#: target's workbook (ethanol_only lacks k_13-k_17).
+METABOLIC_SPLIT_12D_RATES = ('k_3', 'k_6', 'k_13', 'k_17')
+#: The STOICHIOMETRIC weights of the ehrlich_downstream group, from the
+#: nskinetics antimony rate laws (s_cerevisiae_ferm_fb_inhib_mod_ibo_antimony
+#: .txt: `r14: s_AL + 0.121 $Red => 1.015 s_DHI`, `r15: s_DHI => 0.866
+#: s_KIV`, `r16: s_KIV => 0.621 s_isobutald + 0.379 $CO2`): every k is a
+#: capacity in g of ITS OWN substrate per gDCW per h, so a saturation-
+#: balanced chain needs, per unit of r14 capacity, 1.015 units of r15
+#: capacity (g DHIV per g acetolactate) and 1.015 x 0.866 = 0.878990 units of
+#: r16 capacity (g KIV per g acetolactate). k_14 is the ANCHOR (the first
+#: key, weight exactly 1.0): since 2026-09-16 resolve_study_preset uses the
+#: weights DIRECTLY as the group's references, so the group's multiplier
+#: band is an ABSOLUTE g/L/h band on k_14 -- IBO_PATHWAY_ZERO_A_RATE_BOUNDS,
+#: the band metabolic_split_14d gives k_14 individually, because k_14 is 0
+#: in the fitted scenario-A antimony (CLAUDE.md anchoring rule). Until then
+#: the weights were scaled by the anchor's bounds-workbook baseline (B:
+#: k_14 = 4.8 -> references 4.800 / 4.872 / 4.219), which anchored the
+#: group to the arbitrary scenario B. The B workbook's own 4.8 / 4.8 /
+#: 2.82 ratio (r16 33 % below balance) is deliberately NOT used. The
+#: offline test re-derives these numbers from the antimony file by path
+#: (check 84).
+EHRLICH_DOWNSTREAM_WEIGHTS = {'k_14': 1.0, 'k_15': 1.015, 'k_16': 1.015*0.866}
+#: Its two CAPACITY groups, in search-space / CSV column order (glycolysis,
+#: then ehrlich_downstream, both ahead of the inhibition groups): glycolysis
+#: on 0.2x-4x of every member's LIVE baseline (unchanged from metabolic_14d),
+#: ehrlich_downstream on the ABSOLUTE band IBO_PATHWAY_ZERO_A_RATE_BOUNDS
+#: (1e-3-4.0 g/L/h) applied to the group's REFERENCES = EHRLICH_DOWNSTREAM_
+#: WEIGHTS themselves (group_references; the anchor k_14 weighs 1.0, so the
+#: multiplier IS k_14 in g/L/h -- the live k_14-k_16 are 0 at the scenario-A
+#: start, so a live-baseline multiplier would be degenerate).
+METABOLIC_SPLIT_12D_RATE_GROUPS = {
+    'glycolysis': ('k_1l', 'k_1h', 'k_1e'),
+    'ehrlich_downstream': ('k_14', 'k_15', 'k_16'),
+}
 
 #: Per-study_type options beyond the role filter (a type absent here
 #: takes the defaults: DEFAULT_EXCLUDED_PARAMETERS, no groups,
@@ -1384,41 +1688,52 @@ METABOLIC_14D_RATE_GROUPS = {'glycolysis': ('k_1l', 'k_1h', 'k_1e')}
 #: group_roles absent), plus the optional rate_parameter_groups
 #: (metabolic_14d): CAPACITY groups whose members resolve_study_preset
 #: validates as capacity rows and merges FIRST into parameter_groups.
+#: Optional rate_group_weights ({capacity group: {member: weight}}; since
+#: 2026-09-15, metabolic_split_12d): the keys of each weights dict must be
+#: EXACTLY that rate_parameter_groups group's members in order, the first
+#: member the ANCHOR with weight 1.0, every weight > 0; resolve_study_preset
+#: turns it into group_references = {group: {member: weight}} after the
+#: workbook intersection (an emptied group gets no entry; since 2026-09-16
+#: the weights are the references themselves -- until then they were scaled
+#: by the anchor's bounds-workbook baseline, which anchored the group to
+#: scenario B), so the group is sampled as weight x multiplier on an
+#: ABSOLUTE band in the anchor's units even where its members are 0 on the
+#: live model.
 #: 'metabolic_minimal' = the compact, interpretable space (24 variables
 #: for ethanol_isobutanol, 19 for ethanol_only): exclude_params = k_10
 #: (decay, as everywhere) + k_7 and k_8 (the growth capacities, so the
 #: burden's phi_T stays at wild type); group_roles = the inhibition
 #: coefficients, grouped by the role table's effector into
 #: inhib_ethanol / inhib_isobutanol / inhib_acetate (EFFECTOR_ORDER),
-#: each ONE log multiplier on group_multiplier_bounds -- a per-group dict
-#: that floors ONLY inhib_ethanol at 0.3x (inhib_isobutanol / inhib_
-#: acetate keep the 0.2x default); and spike_delta_bounds = None, the
-#: spike feed pinned at the scenario baseline (600 g/L). The driver tags
-#: the per-group band as the inhibition band (`_ibe0.3-2`, the effector
-#: code of every group whose band differs from the default) and the
-#: exclusion set as `_xk10+k7+k8` (study_type_name_defaults); the group
-#: columns and the missing spike_delta column keep the header guard from
-#: any cross-resume, and the distinct `_ibe0.3-2` tag keeps a 0.3-floored
-#: study off an old 0.2 study's CSV.
+#: each ONE log multiplier on group_multiplier_bounds -- an empty dict
+#: {}, so every effector family takes the default band
+#: (DEFAULT_GROUP_MULTIPLIER_BOUNDS, 0.75x-1.5x); and spike_delta_bounds =
+#: None, the spike feed pinned at the scenario baseline (600 g/L). The
+#: driver tags the shared inhibition band as `_ib0.75-1.5` (the all-default
+#: dict collapses to `_ib{default}`) and the exclusion set as
+#: `_xk10+k7+k8` (study_type_name_defaults); the group columns and the
+#: missing spike_delta column keep the header guard from any cross-resume,
+#: and the distinct `_ib0.75-1.5` tag keeps this study off an old 0.2x /
+#: 0.3-floored / 0.5x-2x study's CSV.
 STUDY_TYPE_OPTIONS = {
     'metabolic_minimal': dict(
         exclude_params=('k_10', 'k_7', 'k_8'),
         group_roles=('product_inhibition', 'lethality'),
-        group_multiplier_bounds={'inhib_ethanol': (0.3, 2.0)},
+        group_multiplier_bounds={},
         spike_delta_bounds=None,
     ),
     # The standalone explicit set (METABOLIC_MINIMAL_SUBSET_*): 9 rates +
     # 3 groups + 3 feeding variables = 15 for ethanol_isobutanol (10 for
     # ethanol_only after the workbook intersection); no exclusions, spike
-    # and stage_1_max_x pinned; the per-group band floors ONLY inhib_
-    # ethanol at 0.3x (others 0.2x), default name
-    # kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-10_ibe0.3-2_burden
+    # and stage_1_max_x pinned; every effector family takes the default
+    # band (empty group_multiplier_bounds dict -> 0.75x-1.5x), default name
+    # kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-4_ib0.75-1.5_burden
     # (no _x / _s1x tag). Its column set differs from every other study's,
     # so the CSV header guard refuses any cross-resume regardless.
     'metabolic_minimal_subset': dict(
         rate_params=METABOLIC_MINIMAL_SUBSET_RATES,
         parameter_groups=METABOLIC_MINIMAL_SUBSET_GROUPS,
-        group_multiplier_bounds={'inhib_ethanol': (0.3, 2.0)},
+        group_multiplier_bounds={},
         exclude_params=(),
         spike_delta_bounds=None,
         stage_1_max_x_bounds=None,
@@ -1426,22 +1741,72 @@ STUDY_TYPE_OPTIONS = {
     # metabolic_14d = metabolic_minimal_subset with (a) the glycolysis rates
     # k_1l/k_1h/k_1e grouped as ONE capacity multiplier (rate_parameter_groups
     # -- validated as capacity rows and merged glycolysis-first into
-    # parameter_groups) on 0.2x-5x, and (b) stage_1_max_x SAMPLED
+    # parameter_groups) on 0.2x-4x, and (b) stage_1_max_x SAMPLED
     # (stage_1_max_x_bounds omitted -> the default (1.0, 50.0) g/L). 14
     # decision variables for ethanol_isobutanol (6 individual rates + 1
     # glycolysis + 3 inhibition groups + 3 feeding + stage_1_max_x), 9 for
     # ethanol_only. The glycolysis band rides in group_multiplier_bounds and is
     # ignored by the _ib name tag (only inhib_* keys are tagged), so the name
     # gains no glycolysis tag: the distinct glycolysis column already blocks any
-    # cross-study CSV resume. Default name
-    # kin_opt_ethanol_isobutanol_metabolic_14d_irr_rb0.001-10_ibe0.3-2_s1x1-50_burden.
+    # cross-study CSV resume. The inhibition families take the default band
+    # (0.75x-1.5x), so the inhibition tag collapses to _ib0.75-1.5. Default name
+    # kin_opt_ethanol_isobutanol_metabolic_14d_irr_rb0.001-4_ib0.75-1.5_s1x1-50_burden.
     'metabolic_14d': dict(
         rate_params=METABOLIC_14D_RATES,
         parameter_groups=METABOLIC_MINIMAL_SUBSET_GROUPS,
         rate_parameter_groups=METABOLIC_14D_RATE_GROUPS,
-        group_multiplier_bounds={'glycolysis': (0.2, 5.0), 'inhib_ethanol': (0.3, 2.0)},
+        group_multiplier_bounds={'glycolysis': (0.2, 4.0)},
         exclude_params=(),
         spike_delta_bounds=None,
+    ),
+    # metabolic_split_14d (2026-09-15) = metabolic_14d with k_17 (Adh6, r17)
+    # as a seventh individual rate next to k_6 (Adh1, r6), the inhibition
+    # groups on k_17ie / k_17ia, and stage_1_max_x PINNED (None) instead of
+    # sampled -- 7 rates + 1 glycolysis + 3 inhibition groups + 3 feeding =
+    # 14 decision variables for ethanol_isobutanol, 2 + 1 + 2 + 3 = 8 for
+    # ethanol_only; within GP_MAX_DIMENSIONS, so every method applies. The
+    # glycolysis band rides untagged as for metabolic_14d; no _x / _s1x tag.
+    # Default name (78 characters)
+    # kin_opt_ethanol_isobutanol_metabolic_split_14d_irr_rb0.001-4_ib0.75-1.5_burden.
+    'metabolic_split_14d': dict(
+        rate_params=METABOLIC_SPLIT_14D_RATES,
+        parameter_groups=METABOLIC_SPLIT_14D_GROUPS,
+        rate_parameter_groups=METABOLIC_14D_RATE_GROUPS,     # glycolysis, shared
+        group_multiplier_bounds={'glycolysis': (0.2, 4.0)},
+        exclude_params=(),
+        spike_delta_bounds=None,        # spike feed pinned at 600 g/L
+        stage_1_max_x_bounds=None,      # PINNED (the difference from metabolic_14d)
+    ),
+    # metabolic_split_12d (2026-09-15) = metabolic_split_14d with k_14 / k_15 /
+    # k_16 collapsed into ONE REFERENCED capacity multiplier, ehrlich_downstream,
+    # with fixed STOICHIOMETRIC intra-ratios: the references ARE
+    # EHRLICH_DOWNSTREAM_WEIGHTS (1.000 / 1.015 / 0.878990; since 2026-09-16 --
+    # until then they were scaled by the B workbook's k_14 = 4.8, anchoring
+    # the group to arbitrary scenario B), so the group multiplier band is an
+    # ABSOLUTE g/L/h band on the anchor k_14, IBO_PATHWAY_ZERO_A_RATE_BOUNDS
+    # (1e-3-4.0) -- the band metabolic_split_14d gives k_14 individually
+    # (a zero rate in the fitted scenario-A antimony); the multiplier applies
+    # to the references, not the zero live A-start baselines. 4
+    # rates + glycolysis + ehrlich_downstream + 3 inhibition groups + 3 feeding
+    # = 12 decision variables for ethanol_isobutanol, 2 + 1 + 2 + 3 = 8 for
+    # ethanol_only (the Ehrlich group emptied by the A-workbook intersection,
+    # its references dropped with it). Both capacity bands ride untagged in
+    # group_multiplier_bounds (only inhib_* keys are tagged); the distinct
+    # ehrlich_downstream column blocks any cross-study resume. No _x / _s1x
+    # tag. Default name (78 characters)
+    # kin_opt_ethanol_isobutanol_metabolic_split_12d_irr_rb0.001-4_ib0.75-1.5_burden.
+    'metabolic_split_12d': dict(
+        rate_params=METABOLIC_SPLIT_12D_RATES,
+        parameter_groups=METABOLIC_SPLIT_14D_GROUPS,          # inhibition groups, shared
+        rate_parameter_groups=METABOLIC_SPLIT_12D_RATE_GROUPS,
+        rate_group_weights={'ehrlich_downstream': EHRLICH_DOWNSTREAM_WEIGHTS},
+        group_multiplier_bounds={'glycolysis': (0.2, 4.0),
+                                 # ABSOLUTE g/L/h band on the anchor k_14
+                                 # (zero-A rate): the band 14d gives k_14.
+                                 'ehrlich_downstream': IBO_PATHWAY_ZERO_A_RATE_BOUNDS},
+        exclude_params=(),
+        spike_delta_bounds=None,        # spike feed pinned at 600 g/L
+        stage_1_max_x_bounds=None,      # PINNED, as in metabolic_split_14d
     ),
 }
 #: Order of the effector groups of a grouped preset (group name
@@ -1457,9 +1822,13 @@ def study_type_name_defaults(study_type):
     verbatim through _as_group_multiplier_bounds, so a per-group dict is
     preserved -- default_study_name's `_ib` tag understands both forms),
     exclude_params and stage_1_max_x_bounds when the type has them
-    (metabolic_minimal: {'inhib_ethanol': (0.3, 2.0)} and
+    (metabolic_minimal: {} -- every family at the default band -- and
     ('k_10', 'k_7', 'k_8'); metabolic_minimal_subset:
-    {'inhib_ethanol': (0.3, 2.0)}, () and None = pinned), else
+    {}, () and None = pinned; metabolic_split_14d:
+    {'glycolysis': (0.2, 4.0)}, () and None = pinned; metabolic_split_12d:
+    {'glycolysis': (0.2, 4.0), 'ehrlich_downstream': (1e-3, 4.0)}, () and
+    None = pinned -- neither capacity band is tagged, only inhib_* keys
+    are), else
     DEFAULT_SATURATION_MULTIPLIER_BOUNDS, DEFAULT_EXCLUDED_PARAMETERS and
     DEFAULT_STAGE_1_MAX_X_BOUNDS. resolve_study_preset builds its
     multiplier_bounds / exclude_params / stage_1_max_x_bounds from here
@@ -1482,7 +1851,7 @@ def study_type_name_defaults(study_type):
                               else tuple(stage_1_max_x_bounds)))
 
 DEFAULT_STUDY_TARGET_PRODUCTS = 'ethanol_isobutanol'
-DEFAULT_STUDY_TYPE = 'metabolic_protein'
+DEFAULT_STUDY_TYPE = 'metabolic_split_14d'
 
 def resolve_study_preset(study_target_products, study_type, roles=None,
                          effectors=None):
@@ -1493,7 +1862,7 @@ def resolve_study_preset(study_target_products, study_type, roles=None,
     multiplier_bounds=DEFAULT_SATURATION_MULTIPLIER_BOUNDS,
     rate_multiplier_bounds=DEFAULT_RATE_MULTIPLIER_BOUNDS,
     rate_params=[the workbook's RATE CONSTANTS -- rate_constant_names,
-    role capacity; 16 in A's workbook, 20 in B's -- the only names the
+    role capacity; 16 in A's workbook, 21 in B's -- the only names the
     rate band applies to, so the inhibition coefficients k_*i* sample
     the saturation band like the K_* terms],
     parameter_multiplier_bounds=a COPY of
@@ -1512,7 +1881,9 @@ def resolve_study_preset(study_target_products, study_type, roles=None,
     (OPERATING_VARIABLES) applied via V406.stage_1_max_x; the driver
     tags a band `_s1x1-50` into the study name, nothing when pinned].
     Set sizes (include_params, the workbook rows): ethanol_only 29
-    (metabolic) / 40 (metabolic_protein); ethanol_isobutanol 40 / 56 --
+    (metabolic) / 40 (metabolic_protein); ethanol_isobutanol 41 / 59
+    (40 / 55 before the 2026-09-15 r16/r17 split added k_17, K_17, k_17r,
+    K_17e; 56 before the 2026-09-13 K_16i drop) --
     one fewer each in the sampled space after the exclusion. `roles` (default
     kinetic_parameter_roles()) is the {name: role} table; a workbook row
     absent from it raises KeyError(name) so a future workbook/model change
@@ -1525,15 +1896,17 @@ def resolve_study_preset(study_target_products, study_type, roles=None,
     = spike pinned at the baseline), and its `multiplier_bounds` /
     `exclude_params` come from study_type_name_defaults(study_type).
     'metabolic_minimal' (STUDY_TYPE_OPTIONS): include_params = the
-    capacity + product_inhibition + lethality rows (36 for the B
-    workbook, 25 for A's); exclude_params ('k_10', 'k_7', 'k_8'); the
+    capacity + product_inhibition + lethality rows (37 for the B
+    workbook since the 2026-09-15 split, 36 before; 25 for A's);
+    exclude_params ('k_10', 'k_7', 'k_8'); the
     inhibition rows grouped by the role table's effector (`effectors`,
     default kinetic_parameter_effectors(); a grouped row whose effector
     is None or not in EFFECTOR_ORDER raises KeyError) into
     inhib_ethanol / inhib_isobutanol / inhib_acetate in EFFECTOR_ORDER,
     members in workbook order, effectors without rows omitted; so the
-    sampled space is 17 rates + 3 multipliers (+ 4 feeding/operating)
-    for ethanol_isobutanol and 13 + 2 (+ 4) for ethanol_only.
+    sampled space is 18 rates + 3 multipliers (+ 4 feeding/operating)
+    for ethanol_isobutanol (17 before the 2026-09-15 split) and 13 + 2
+    (+ 4) for ethanol_only.
     Every group member is scaled from its LIVE baseline -- the model value
     at study start (for a row absent from the scenario-A workbook, the
     nskinetics model default), NOT the workbook value; the engine prints
@@ -1568,6 +1941,37 @@ def resolve_study_preset(study_target_products, study_type, roles=None,
     group's. So ethanol_isobutanol samples 6 rates + 1 glycolysis + 3
     inhibition multipliers + 3 feeding + stage_1_max_x = 14, and ethanol_only
     (no k_13-k_16, no isobutanol coefficients) 2 + 1 + 2 + 3 + 1 = 9.
+
+    'metabolic_split_14d' (2026-09-15) is metabolic_14d with the two
+    alcohol dehydrogenases as independent knobs -- k_6 (Adh1, r6) and the
+    new k_17 (Adh6, r17; nskinetics r16/r17 split) -- the inhibition groups
+    on the live cross-product coefficients k_17ie / k_17ia (the repointed
+    workbook rows; the older presets' k_16ie / k_16ia members are inert
+    names the intersection now drops) and stage_1_max_x PINNED: 7 rates +
+    1 glycolysis + 3 inhibition multipliers + 3 feeding = 14 for
+    ethanol_isobutanol, 2 + 1 + 2 + 3 = 8 for ethanol_only.
+
+    'metabolic_split_12d' (2026-09-15) is metabolic_split_14d with k_14 /
+    k_15 / k_16 collapsed into ONE REFERENCED capacity group,
+    ehrlich_downstream (METABOLIC_SPLIT_12D_RATE_GROUPS), sampled on the
+    ABSOLUTE anchor band IBO_PATHWAY_ZERO_A_RATE_BOUNDS (1e-3-4.0 g/L/h,
+    the band metabolic_split_14d gives k_14 individually -- a zero rate in
+    the fitted scenario-A antimony) applied to its REFERENCES: the
+    STUDY_TYPE_OPTIONS key rate_group_weights ({group: {member: weight}},
+    the anchor -- the first member -- at weight 1.0) is returned, AFTER
+    the workbook intersection, as `group_references` = {group: {member:
+    weight}} (1.000 / 1.015 / 0.878990; since 2026-09-16 -- until then the
+    weights were scaled by the anchor's scenario-B workbook baseline 4.8,
+    anchoring the group to arbitrary B), so the engine samples weight x
+    multiplier, i.e. the multiplier IS k_14 in g/L/h, even though the live
+    A-start k_14-k_16 are 0. A group emptied by the intersection gets no
+    entry. The weights dict itself is validated (keys = the group's members in
+    order, anchor weight 1.0, every weight > 0, the group a
+    rate_parameter_groups group; ValueError naming the preset). So
+    ethanol_isobutanol samples 4 rates + glycolysis + ehrlich_downstream
+    + 3 inhibition multipliers + 3 feeding = 12, ethanol_only 2 + 1 + 2 +
+    3 = 8 with `group_references` None. EVERY preset returns the
+    `group_references` key (None for every other preset).
     """
     if study_target_products not in STUDY_TARGET_PRODUCTS:
         raise ValueError(
@@ -1582,7 +1986,8 @@ def resolve_study_preset(study_target_products, study_type, roles=None,
         roles = kinetic_parameter_roles()
     set_scenario = target['parameter_set_scenario']
     include_params = []
-    workbook_rows = list(workbook_kinetic_baselines(set_scenario))
+    workbook_baselines = workbook_kinetic_baselines(set_scenario)
+    workbook_rows = list(workbook_baselines)
     for name in workbook_rows:
         if name not in roles:
             raise KeyError(
@@ -1595,6 +2000,7 @@ def resolve_study_preset(study_target_products, study_type, roles=None,
     name_defaults = study_type_name_defaults(study_type)
     group_roles = set(options.get('group_roles', ()))
     parameter_groups = None
+    group_references = None
     if options.get('rate_params') is not None:
         # EXPLICIT preset (metabolic_minimal_subset, metabolic_14d): the set
         # is listed outright. (1) Typo guard against the role table FIRST --
@@ -1648,6 +2054,49 @@ def resolve_study_preset(study_target_products, study_type, roles=None,
             kept = [name for name in members if name in workbook_set]
             if kept:
                 parameter_groups[group] = kept
+        # (4) rate_group_weights -> group_references (metabolic_split_12d):
+        # validate the weights dict against the capacity-group definition,
+        # then use the weights DIRECTLY as the references (since 2026-09-16;
+        # the anchor's weight is 1.0, so the group's multiplier band is an
+        # ABSOLUTE band on the anchor, IBO_PATHWAY_ZERO_A_RATE_BOUNDS -- the
+        # anchor k_14 is 0 in the fitted scenario-A antimony, exactly as
+        # metabolic_split_14d bands it individually). Until then the weights
+        # were scaled by the anchor's bounds-workbook (scenario-B) baseline,
+        # which anchored the group to arbitrary scenario B. A group emptied
+        # by the intersection gets no entry.
+        rate_group_weights = dict(options.get('rate_group_weights', {}))
+        for group, weights in rate_group_weights.items():
+            weights = dict(weights)
+            if group not in explicit_rate_groups:
+                raise ValueError(
+                    f'rate_group_weights of the {study_type!r} preset names '
+                    f'{group!r}, which is not a rate_parameter_groups '
+                    'capacity group of the preset')
+            members = tuple(explicit_rate_groups[group])
+            if tuple(weights) != members:
+                raise ValueError(
+                    f'rate_group_weights of the {study_type!r} preset for '
+                    f'group {group!r} must list exactly the group members in '
+                    f'order {members}; got {tuple(weights)}')
+            anchor = members[0]
+            if weights[anchor] != 1.0:
+                raise ValueError(
+                    f'rate_group_weights of the {study_type!r} preset for '
+                    f'group {group!r}: the anchor {anchor!r} (first member) '
+                    f'must have weight 1.0; got {weights[anchor]!r}')
+            for member, weight in weights.items():
+                if not (weight > 0.0):
+                    raise ValueError(
+                        f'rate_group_weights of the {study_type!r} preset '
+                        f'for group {group!r}: member {member!r} has a '
+                        f'nonpositive weight ({weight!r})')
+            kept = parameter_groups.get(group)
+            if not kept:
+                continue   # emptied by the workbook intersection (ethanol_only)
+            if group_references is None:
+                group_references = {}
+            group_references[group] = {member: float(weights[member])
+                                       for member in kept}
         parameter_groups = parameter_groups or None
     elif group_roles:
         if effectors is None:
@@ -1684,12 +2133,15 @@ def resolve_study_preset(study_target_products, study_type, roles=None,
     multiplier_bounds = (DEFAULT_GROUP_MULTIPLIER_BOUNDS
                          if isinstance(inhib_name_default, dict)
                          else inhib_name_default)
+    rate_params_list = rate_constant_names(workbook_rows, roles=roles)
+    param_bounds_override = scenario_A_ibo_pathway_rate_bounds(
+        include_params, rate_params_list) or None
     return dict(scenario=target['scenario'],
                 kinetic_bounds_scenario=set_scenario,
                 include_params=include_params,
                 multiplier_bounds=multiplier_bounds,
                 rate_multiplier_bounds=DEFAULT_RATE_MULTIPLIER_BOUNDS,
-                rate_params=rate_constant_names(workbook_rows, roles=roles),
+                rate_params=rate_params_list,
                 parameter_multiplier_bounds=dict(
                     DEFAULT_PARAMETER_MULTIPLIER_BOUNDS),
                 exclude_params=name_defaults['exclude_params'],
@@ -1699,7 +2151,9 @@ def resolve_study_preset(study_target_products, study_type, roles=None,
                     options.get('group_multiplier_bounds',
                                 DEFAULT_GROUP_MULTIPLIER_BOUNDS)),
                 spike_delta_bounds=options.get('spike_delta_bounds',
-                                               DEFAULT_SPIKE_DELTA_BOUNDS))
+                                               DEFAULT_SPIKE_DELTA_BOUNDS),
+                group_references=group_references,
+                param_bounds_override=param_bounds_override)
 
 #: Study-name suffix of a burden-enabled study (enzyme_burden.py): it
 #: records extra columns and a different physiology, so it must never
@@ -1734,7 +2188,7 @@ def method_study_tag(method):
 
 def check_method_kwargs(method, *, enqueue_knockouts=False, seed_from=None,
                         n_startup_trials=None, feasible_sampling=True,
-                        startup_sampling='lhs'):
+                        startup_sampling='lhs', relay_from=None):
     """Validate the driver's optuna-only kwargs against `method`. Under
     'tpe' AND 'gp' (both optuna studies) everything is allowed ('' returned:
     enqueue_baseline / enqueue_knockouts / seed_from / n_startup_trials /
@@ -1744,8 +2198,23 @@ def check_method_kwargs(method, *, enqueue_knockouts=False, seed_from=None,
     SAMPLER settings (n_startup_trials, feasible_sampling, startup_sampling)
     are merely ignored: one printable line naming them is returned, so the
     driver and the supervisor (which forwards them explicitly) can say so
-    once. An unknown method raises (method_study_tag)."""
+    once. An unknown method raises (method_study_tag).
+
+    `relay_from` (a relay campaign's donors, since 2026-09-23; None / empty
+    = off) is GP-ONLY (spec A1): a non-empty value raises ValueError under
+    'tpe' -- optuna's TPE classes a trial without a 'constraints' system
+    attr as INFEASIBLE (score +inf) whenever a constraints_func is set,
+    which is every production TPE path, so the preload would become TPE's
+    "bad" density -- and under 'dual_annealing' (no optuna store)."""
     method_study_tag(method)            # ValueError on an unknown method
+    if _normalize_relay_from(relay_from) and method != 'gp':
+        raise ValueError(
+            f"relay_from (a relay campaign's preloaded donor trials) is "
+            f"GP-only; got method={method!r}. Under 'tpe' a preloaded trial "
+            "carries no 'constraints' system attr, so optuna's TPE would "
+            "score it infeasible whenever a constraints_func is set; "
+            "'dual_annealing' has no optuna store. Pass method='gp' or "
+            'relay_from=None.')
     if method != 'dual_annealing':
         return ''
     if enqueue_knockouts:
@@ -1773,12 +2242,12 @@ GP_MAX_DIMENSIONS = 15
 #: Defaults of run_kinetic_optimization's `gp_kwargs` (resolve_gp_kwargs).
 #: learned_constraints: fit optuna's constraint GP on the burden / volume
 #: violations (ConstrainedLogEI) -- inert with no active cap; toggleable,
-#: default on. deterministic_objective: optuna's noise switch (default
-#: off). n_fallback_candidates / max_fallback_batches: the feasibility
+#: default off. deterministic_objective: optuna's noise switch (default
+#: on). n_fallback_candidates / max_fallback_batches: the feasibility
 #: fallback search of FeasibleGPSampler._optimize_acqf (QMC batch size and
 #: the number of batches tried before the raw proposal is returned).
-GP_KWARGS_DEFAULTS = {'learned_constraints': True,
-                      'deterministic_objective': False,
+GP_KWARGS_DEFAULTS = {'learned_constraints': False,
+                      'deterministic_objective': True,
                       'n_fallback_candidates': 2048,
                       'max_fallback_batches': 20}
 
@@ -1847,7 +2316,8 @@ def default_study_name(objective, study_target_products, study_type,
                        burden=False, rate_multiplier_bounds=None,
                        inhibition_multiplier_bounds=None,
                        exclude_params=None, stage_1_max_x_bounds=None,
-                       n_seeds=None, method='tpe'):
+                       n_seeds=None, method='tpe', ibo_pathway_anchoring=None,
+                       relay_tag=''):
     """Stable study name of a preset study:
     kin_opt_{study_target_products}_{study_type}_{objective slug}
     (slug = lower-cased, spaces -> '_'), e.g.
@@ -1871,7 +2341,7 @@ def default_study_name(objective, study_target_products, study_type,
     columns, so the CSV header guard could not catch the mix).
 
     `rate_multiplier_bounds` (the k_* band, (m_lo, m_hi) x baseline) tags
-    the name `_rb{m_lo:g}-{m_hi:g}` (e.g. `_rb0.001-10` at the presets'
+    the name `_rb{m_lo:g}-{m_hi:g}` (e.g. `_rb0.001-4` at the presets'
     own DEFAULT_RATE_MULTIPLIER_BOUNDS, `_rb0.1-10`) WHENEVER it is
     given: a different band samples a different space over the SAME
     columns, so without the tag a run would silently resume the study
@@ -1939,9 +2409,29 @@ def default_study_name(objective, study_target_products, study_type,
 
     `method` ('tpe', the default and every pre-2026-09-11 study; or
     'dual_annealing') inserts method_study_tag right after the objective
-    slug (`..._irr_da_rb0.001-10_...`): a dual-annealing study has the
+    slug (`..._irr_da_rb0.001-4_...`): a dual-annealing study has the
     same columns as the TPE study of the same objective, so the tag is
     the only thing keeping it off that study's CSV.
+
+    `ibo_pathway_anchoring` ('scenario_A' on every preset name since
+    2026-09-16; None/'legacy' = nothing) tags the name `_aA` after the
+    exclusion tag and before `_s1x`. The IBO-pathway rate bands moved from
+    the arbitrary scenario-B workbook to the fitted scenario-A antimony
+    anchor without changing the trajectory-CSV columns, so the tag is the
+    only thing keeping a new-scheme study off an old B-anchored study's store
+    (the header guard cannot tell them apart -- same columns).
+
+    `relay_tag` (since 2026-09-23; '' = none) is a relay campaign's
+    relay_study_tag(relay_from, relay_kwargs) -- `_rl<sha1-8>` of the sorted
+    donor stems + the resolved selection kwargs -- appended after the seed
+    tag and before `_burden`. A relay campaign has the same columns as the
+    plain study of its objective (the preloaded donor rows live in the
+    optuna store and a manifest, never in the trajectory CSV), so the tag is
+    what keeps it off that study's store; derived from the arguments only,
+    so the driver and the supervisor compute the same name.
+
+    Tag order: objective slug, method tag, `_sc`, `_kb`, `_rb`, `_ib`,
+    `_x`, `_aA`, `_s1x`, `_seed{n}`, `_rl<sha1-8>`, `_burden`.
 
     `burden=True` appends BURDEN_STUDY_SUFFIX ('_burden') after every
     other tag: a burden study (enzyme_burden.py; the driver's default)
@@ -1963,10 +2453,17 @@ def default_study_name(objective, study_target_products, study_type,
     if inhibition_multiplier_bounds is not None:
         name += _inhibition_bounds_tag(inhibition_multiplier_bounds)
     name += excluded_parameters_tag(exclude_params)
+    if ibo_pathway_anchoring == 'scenario_A':
+        name += '_aA'
     if stage_1_max_x_bounds is not None:
         lo, hi = stage_1_max_x_bounds
         name += f'_s1x{lo:g}-{hi:g}'
     name += seed_points_tag(n_seeds)
+    if relay_tag:
+        if not isinstance(relay_tag, str):
+            raise TypeError('relay_tag must be a str (relay_study_tag); got '
+                            f'{relay_tag!r}')
+        name += relay_tag
     if burden:
         name += BURDEN_STUDY_SUFFIX
     return name
@@ -3200,13 +3697,24 @@ def _n_startup_finished(study):
     start-up-vs-TPE quantity (TPESampler: len(trials) < n_startup_trials)."""
     return len(_finished_trials(study))
 
+def _sampler_drew(trial):
+    """True for a trial the SAMPLER drew: not enqueued (no
+    system_attrs['fixed_params']) and not a preloaded relay trial (no
+    system_attrs['relay'], since 2026-09-23 -- add_trials-inserted donor
+    rows were never drawn from the LHS design). The one predicate of both
+    LHS row-index counters; identical to the old fixed_params test for
+    every non-relay study."""
+    return ('fixed_params' not in trial.system_attrs
+            and not trial.system_attrs.get('relay'))
+
 def _n_sampler_drawn_finished(study):
     """The LHS row index k: COMPLETE|PRUNED trials the SAMPLER drew, i.e. minus
     enqueued trials. Enqueued baseline/probe/seed points carry
     system_attrs['fixed_params'], bypass the sampler (optuna 4.9 Trial._suggest:
-    fixed -> relative -> independent), and consume no design row."""
-    return sum(1 for t in _finished_trials(study)
-               if 'fixed_params' not in t.system_attrs)
+    fixed -> relative -> independent), and consume no design row. Preloaded
+    relay trials (system_attrs['relay'], 2026-09-23) consume none either,
+    while the start-up GATE (_n_startup_finished) still counts them."""
+    return sum(1 for t in _finished_trials(study) if _sampler_drew(t))
 
 def _n_sampler_drawn_consumed(study, current_trial=None):
     """The LHS row index k: design rows already handed out to sampler-drawn
@@ -3223,15 +3731,17 @@ def _n_sampler_drawn_consumed(study, current_trial=None):
     equals _n_sampler_drawn_finished, so the start-up gate (_n_startup_finished)
     and every existing study are unaffected; it only advances k past a row whose
     trial was orphaned. `current_trial=None` counts every non-enqueued
-    sampler-drawn trial (used for diagnostics/tests)."""
+    sampler-drawn trial (used for diagnostics/tests). Preloaded relay trials
+    (system_attrs['relay'], 2026-09-23) are skipped like enqueued ones, so a
+    relay campaign with fewer preloaded trials than n_startup takes LHS rows
+    0, 1, ... for its remaining start-up draws (spec A9)."""
     from optuna.trial import TrialState
     states = (TrialState.COMPLETE, TrialState.PRUNED,
               TrialState.FAIL, TrialState.RUNNING)
     trials = study._get_trials(deepcopy=False, states=states, use_cache=False)
     current = None if current_trial is None else current_trial.number
     return sum(1 for t in trials
-               if 'fixed_params' not in t.system_attrs
-               and t.number != current)
+               if _sampler_drew(t) and t.number != current)
 
 def default_seed_from_datetime(when=None):
     """Default sampler seed derived from a study's start date and time
@@ -3292,6 +3802,878 @@ def record_seed_used(csv_path, *, method, seed, n_done):
     except OSError:
         return None
     return path
+
+#%% Relay campaigns (2026-09-23)
+# Spec docs/superpowers/specs/2026-09-23-relay-preload-pi-campaign-design.md
+# (section 6, amendments A1-A14, BINDING over section 3). A RELAY campaign
+# is a fresh optuna GP study (method='gp' ONLY -- check_method_kwargs) that
+# starts from a MAP of its space built by earlier campaigns of the SAME
+# search space: every trajectory row records every TRACKED_METRICS column,
+# so a process-level campaign's COMPLETE rows already carry the relay's
+# objective (e.g. 'PI (log-tail)') -- they are inserted into the fresh store
+# as COMPLETE trials carrying the donor's RECORDED value, with no
+# re-simulation, before the campaign simulates its own `n_trials`.
+#
+# Selection (select_relay_rows, sim-free, stdlib csv + numpy): COMPLETE rows
+# with a finite value column, quarantined cap hits dropped, out-of-band rows
+# DROPPED (never clipped: the recorded value belongs to the unclipped
+# point), deduplicated in the unit cube (all donors shared lhs_seed 33960,
+# so their start-up rows are bitwise identical and ~0.01 apart in PI --
+# same-x / different-y rows make a deterministic_objective GP
+# ill-conditioned), then a KEEP set (value >= keep_above) plus a
+# deterministic maximin FILL up to max_rows. Identity checks: every donor's
+# full header equals the relay's trajectory columns, its applied_<member>
+# columns reproduce this study's group anchor (a B-anchored donor shares
+# the columns but not the anchor), and every selected row is feasible under
+# this study's burden / volume predicate.
+#
+# Store protocol (run_kinetic_optimization, A7): the study system attrs
+# 'relay_rows_sha1' (selection digest) then 'relay_spec' (relay_spec_json;
+# the detection key last, so a kill between the two leaves no 'relay_spec'
+# and the next launch is simply fresh) are set BEFORE the one
+# study.add_trials call, the manifest
+# <study>_relay_manifest.csv is written, and only then 'relay_n_preloaded'
+# + 'relay_preload_complete' -- so a kill mid-preload is detected and
+# completed idempotently on the next launch. Preloaded trials carry the
+# system attr {'relay': True} and the user attr 'relay_donor' = the
+# '<donor stem>#<trial>' label; n_relay_trials counts them, and the engine's
+# n_done / budget / seed offset count only this campaign's SIMULATED trials.
+# The trajectory CSV holds only simulated rows (its first trial_number is
+# the preload size N, optuna numbering); TRACKED_METRICS and
+# trajectory_columns are unchanged. Nothing here runs for a non-relay study
+# (strict no-op: one extra storage READ of the study system attrs).
+
+#: Defaults of the relay selection knobs (resolve_relay_kwargs; since
+#: 2026-09-23): max_rows = the preload size cap (the GP refits on every
+#: COMPLETE trial each proposal, ~O(n^3.2): 4.2 s / proposal at n = 2000,
+#: 17 s at 3000); keep_above = the value threshold of the KEEP set (None =
+#: no keep set, a pure maximin panel); dedupe_tol = the max-norm unit-cube
+#: distance under which two rows are one point (first occurrence wins);
+#: drop_quarantined = drop COMPLETE rows that hit the sweep cap with a
+#: large final drift (n_sims_run == 5 and final_drift > 1e-4, the
+#: "nearly-converged cap hit" quarantine rule).
+RELAY_KWARGS_DEFAULTS = {'max_rows': 1000, 'keep_above': None,
+                         'dedupe_tol': 1e-3, 'drop_quarantined': True}
+#: Trial markers of a preloaded relay trial: the optuna SYSTEM attr
+#: {RELAY_TRIAL_SYSTEM_ATTR: True} (n_relay_trials; the LHS row index skips
+#: it) and the USER attr RELAY_TRIAL_USER_ATTR = '<donor stem>#<trial>'.
+RELAY_TRIAL_SYSTEM_ATTR = 'relay'
+RELAY_TRIAL_USER_ATTR = 'relay_donor'
+#: The quarantine rule of drop_quarantined (a COMPLETE row whose simulation
+#: hit the load_simulate sweep cap with a final drift above sim_rtol).
+RELAY_QUARANTINE_N_SIMS = 5
+RELAY_QUARANTINE_DRIFT = 1e-4
+#: Relative tolerance of the anchor-identity check (a donor's recorded
+#: applied_<member> vs this study's expand_grouped_values of its multiplier).
+RELAY_ANCHOR_RTOL = 1e-6
+#: Drop reasons counted per donor by select_relay_rows, in filter order.
+RELAY_DROP_REASONS = ('state', 'non_finite', 'quarantine', 'bad_decision',
+                      'out_of_band', 'duplicate')
+
+def _relay_is_number(value):
+    """A real number that is not a bool (numpy scalars included)."""
+    return (isinstance(value, (int, float, np.integer, np.floating))
+            and not isinstance(value, (bool, np.bool_)))
+
+def resolve_relay_kwargs(relay_kwargs):
+    """A fresh copy of RELAY_KWARGS_DEFAULTS updated with `relay_kwargs` (a
+    dict or None; a None VALUE means "use the default"), coerced to the
+    canonical types the relay spec / study tag hash (so 1000 and 1000.0
+    give the same tag): max_rows an int >= 1 (integral numbers accepted,
+    bool refused), keep_above None or a finite float, dedupe_tol a finite
+    float >= 0, drop_quarantined a bool (bool, or the integers 0 / 1). An
+    unknown key or a bad value raises ValueError naming it (the pattern of
+    resolve_gp_kwargs; since 2026-09-23)."""
+    options = dict(RELAY_KWARGS_DEFAULTS)
+    given = dict(relay_kwargs or {})
+    unknown = sorted(set(given) - set(options))
+    if unknown:
+        raise ValueError(f'unknown relay_kwargs key(s) {unknown}; allowed '
+                         f'keys: {sorted(options)}')
+    for key, value in given.items():
+        if value is not None:
+            options[key] = value
+    value = options['max_rows']
+    if (not _relay_is_number(value) or not math.isfinite(float(value))
+            or float(value) != int(value) or int(value) < 1):
+        raise ValueError("relay_kwargs['max_rows'] must be an integer >= 1; "
+                         f'got {value!r}')
+    options['max_rows'] = int(value)
+    value = options['keep_above']
+    if value is not None:
+        if not _relay_is_number(value) or not math.isfinite(float(value)):
+            raise ValueError("relay_kwargs['keep_above'] must be None or a "
+                             f'finite number; got {value!r}')
+        options['keep_above'] = float(value)
+    value = options['dedupe_tol']
+    if (not _relay_is_number(value) or not math.isfinite(float(value))
+            or float(value) < 0.0):
+        raise ValueError("relay_kwargs['dedupe_tol'] must be a finite number "
+                         f'>= 0; got {value!r}')
+    options['dedupe_tol'] = float(value)
+    value = options['drop_quarantined']
+    if isinstance(value, (bool, np.bool_)):
+        options['drop_quarantined'] = bool(value)
+    elif _relay_is_number(value) and value in (0, 1):
+        options['drop_quarantined'] = bool(value)
+    else:
+        raise ValueError("relay_kwargs['drop_quarantined'] must be a bool; "
+                         f'got {value!r}')
+    return options
+
+def _normalize_relay_from(relay_from):
+    """relay_from -> a tuple of donor strings (study names or CSV paths);
+    None / empty -> () (relay off). A single string is one donor."""
+    if relay_from is None:
+        return ()
+    if isinstance(relay_from, (str, os.PathLike)):
+        relay_from = (relay_from,)
+    donors = []
+    for donor in relay_from:
+        if isinstance(donor, os.PathLike):
+            donor = os.fspath(donor)
+        if not isinstance(donor, str) or not donor.strip():
+            raise ValueError('relay_from: every donor must be a non-empty '
+                             'study name or trajectory-CSV path; got '
+                             f'{donor!r}')
+        donors.append(donor)
+    return tuple(donors)
+
+def _relay_donor_stem(donor):
+    """The donor's STEM -- its study name: the basename minus
+    '_trajectory.csv' (or minus '.csv' for another CSV name; a bare study
+    name is its own stem). From the argument string only, never the file,
+    so the driver and the stdlib-only supervisor derive the same tag."""
+    base = os.path.basename(os.fspath(donor).rstrip('/\\'))
+    if base.endswith('_trajectory.csv'):
+        return base[:-len('_trajectory.csv')]
+    if base.lower().endswith('.csv'):
+        return base[:-len('.csv')]
+    return base
+
+def _relay_donor_stems(relay_from):
+    """Sorted donor stems of `relay_from`; a repeated donor or two donors
+    with the same stem (different paths) raise ValueError (A4)."""
+    donors = _normalize_relay_from(relay_from)
+    stems = [_relay_donor_stem(donor) for donor in donors]
+    repeated = sorted({stem for stem in stems if stems.count(stem) > 1})
+    if repeated:
+        raise ValueError(f'relay_from: donor stem(s) {repeated} given more '
+                         'than once (a repeated donor, or two paths with the '
+                         f'same study name): {list(donors)}')
+    return sorted(stems)
+
+def relay_donor_path(donor, results_dir=None):
+    """Trajectory-CSV path of a relay donor: an explicit path (a name ending
+    in '.csv', or an existing file) is returned as given; a study name
+    resolves to '<results_dir>/<name>_trajectory.csv' (results_dir None =
+    this package's analyses/results, the engine default). The seed_from
+    resolution rule, plus the '.csv' test so a mistyped path fails as a
+    missing file instead of silently becoming a study name."""
+    donor = os.fspath(donor)
+    if donor.lower().endswith('.csv') or os.path.isfile(donor):
+        return donor
+    if results_dir is None:
+        results_dir = default_results_dir()
+    return os.path.join(results_dir, donor + '_trajectory.csv')
+
+def relay_spec_json(relay_from, relay_kwargs=None):
+    """Canonical JSON of a relay campaign's identity (A6): {'donors': the
+    sorted donor stems, 'kwargs': resolve_relay_kwargs(relay_kwargs)},
+    json.dumps(sort_keys=True, separators=(',', ':')). A function of the
+    ARGUMENTS only (never the donor files), stored as the study system attr
+    'relay_spec' and hashed by relay_study_tag. ValueError when relay_from
+    is empty, a donor stem repeats, or a kwarg is bad."""
+    stems = _relay_donor_stems(relay_from)
+    if not stems:
+        raise ValueError('relay_spec_json: relay_from is empty (relay off)')
+    return json.dumps({'donors': stems,
+                       'kwargs': resolve_relay_kwargs(relay_kwargs)},
+                      sort_keys=True, separators=(',', ':'))
+
+def relay_study_tag(relay_from, relay_kwargs=None):
+    """Study-name tag of a relay campaign (since 2026-09-23): '_rl' + the
+    first 8 hex digits of sha1(relay_spec_json(relay_from, relay_kwargs)),
+    '' when relay_from is None / empty. Computed from the ARGUMENTS only
+    (sorted donor stems + the canonical resolved kwargs), so the driver and
+    the stdlib-only supervisor derive the same name before any file is
+    read; order-insensitive in the donors, sensitive to every kwarg. The
+    Sobol' `_custom<sha1-8>` precedent; 11 characters, placed by
+    default_study_name after the seed tag and before `_burden`. Path budget
+    (spec §3.1; longest_output_paths): the production name is 103
+    characters, and its longest write -- the driver's end-of-run
+    `<pkg>/analyses/results/<name>_param_trajectory_<16-char stamp>.png`
+    (or `_best_vs_baseline_`, the same length) -- is 254 of Windows' 260
+    (MAX_PATH incl. the terminating NUL) on this checkout; the longest
+    run-data file (`_relay_manifest.csv.tmp`) is 239 (check 103)."""
+    if not _normalize_relay_from(relay_from):
+        return ''
+    import hashlib
+    digest = hashlib.sha1(
+        relay_spec_json(relay_from, relay_kwargs).encode('utf-8')).hexdigest()
+    return '_rl' + digest[:8]
+
+def default_results_dir():
+    """The engine's default results directory, <this package>/analyses/
+    results -- what run_kinetic_optimization and relay_donor_path use when
+    results_dir is None (and where the supervisor's RESULTS_DIR points)."""
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        'analyses', 'results')
+
+# Output-path budget (spec §3.1, 2026-09-23): Windows' MAX_PATH is 260
+# characters INCLUDING the terminating NUL (long paths are disabled on the
+# production machine), so a path of 260+ characters cannot be created. The
+# relay tag `_rl<sha1-8>` keeps the production name at 103 characters; the
+# driver and the supervisor report the longest path a study can write
+# (longest_output_paths) and refuse a relay study whose RUN-DATA path would
+# not fit (the plots are written last and only warned about). The suffix
+# lists mirror every writer: the engine (trajectory CSV, in-flight sidecar +
+# its atomic .tmp, the seed log, the optuna SQLite store + its rollback
+# journal, the relay manifest + its .tmp), the supervisor's run log and the
+# driver's four end-of-run plots (stamp strftime('%Y.%m.%d-%H.%M'), 16
+# characters -- check 103 pins the plot suffixes to the driver source).
+#: Stand-in for the driver's plot time stamp (same length as
+#: datetime.strftime('%Y.%m.%d-%H.%M')).
+PLOT_STAMP_PLACEHOLDER = 'YYYY.MM.DD-HH.MM'
+#: Suffixes (after `<results_dir>/<study>`) of every run-data file a study
+#: writes.
+STUDY_OUTPUT_SUFFIXES = ('_trajectory.csv', '_inflight.json',
+                         '_inflight.json.tmp', '_seeds.txt', '.db',
+                         '.db-journal', '_run.log', '_relay_manifest.csv',
+                         '_relay_manifest.csv.tmp')
+#: Suffixes of the driver's end-of-run plots, in the driver's order.
+STUDY_PLOT_SUFFIXES = tuple(f'_{kind}_{PLOT_STAMP_PLACEHOLDER}.png'
+                            for kind in ('trajectories', 'param_trajectory',
+                                         'best_vs_baseline', 'pca'))
+#: Windows MAX_PATH (characters incl. the terminating NUL): a path must be
+#: SHORTER than this.
+WINDOWS_MAX_PATH = 260
+
+def longest_output_paths(results_dir, study_name):
+    """(longest run-data path, longest plot path) a study named
+    `study_name` writes under `results_dir` (None = default_results_dir();
+    made absolute, as the writers' paths resolve) -- STUDY_OUTPUT_SUFFIXES
+    and STUDY_PLOT_SUFFIXES appended to `<results_dir>/<study_name>` (ties:
+    the first suffix). Pure string arithmetic (sim-free, touches no file;
+    since 2026-09-23). A path is writable on Windows only when
+    len(path) < WINDOWS_MAX_PATH."""
+    base = os.path.join(os.path.abspath(results_dir or default_results_dir()),
+                        study_name)
+    return (max((base + s for s in STUDY_OUTPUT_SUFFIXES), key=len),
+            max((base + s for s in STUDY_PLOT_SUFFIXES), key=len))
+
+def relay_rows_sha1(rows):
+    """Selection digest (A5): sha1 hex over the ordered (label, repr(value))
+    list of select_relay_rows' rows -- stored as the study system attr
+    'relay_rows_sha1', so a relaunch that completes an interrupted preload
+    can prove it re-selected the SAME rows."""
+    import hashlib
+    payload = json.dumps([[row['label'], repr(float(row['value']))]
+                          for row in rows], separators=(',', ':'))
+    return hashlib.sha1(payload.encode('utf-8')).hexdigest()
+
+def _relay_float(cell):
+    """A trajectory-CSV cell as a float: '' / None / unparsable -> NaN;
+    'nan', 'inf', '-inf' parse as such (stdlib float(): round-trip exact,
+    unlike pandas' default parser)."""
+    if cell is None:
+        return math.nan
+    try:
+        return float(cell)
+    except (TypeError, ValueError):
+        return math.nan
+
+def _relay_close(recorded, expected, rtol):
+    """recorded ~ expected within rtol (relative to the larger magnitude;
+    0 == 0 passes; NaN never does)."""
+    return abs(recorded - expected) <= rtol*max(abs(recorded), abs(expected))
+
+def select_relay_rows(donor_paths, search_space, value_column, *,
+                      max_rows=RELAY_KWARGS_DEFAULTS['max_rows'],
+                      keep_above=RELAY_KWARGS_DEFAULTS['keep_above'],
+                      dedupe_tol=RELAY_KWARGS_DEFAULTS['dedupe_tol'],
+                      drop_quarantined=RELAY_KWARGS_DEFAULTS['drop_quarantined'],
+                      columns=None, parameter_groups=None,
+                      kinetic_baselines=None, group_references=None,
+                      is_feasible=None):
+    """The donor rows a relay campaign preloads (spec 2026-09-23 §3.1 +
+    A4/A5), sim-free and deterministic (no RNG). Returns (rows, notes).
+
+    Donors (`donor_paths`, trajectory-CSV paths) are processed in SORTED
+    STEM order (stem = basename minus '_trajectory.csv'; the key
+    relay_study_tag hashes), so any permutation of the list returns the
+    same rows; a repeated stem raises. Each donor is read with the stdlib
+    csv module + float() (round-trip exact). A missing file, decision
+    columns (between 'state' and 'objective') other than `search_space`'s
+    names in order, a missing `value_column`, or -- when `columns` (the
+    relay's own trajectory columns) is given -- any other full header
+    raises ValueError naming the donor.
+
+    Per row, in this order (counted per donor under RELAY_DROP_REASONS):
+    state != 'COMPLETE' -> 'state'; a non-finite / blank value_column ->
+    'non_finite'; drop_quarantined and n_sims_run == 5 and final_drift >
+    1e-4 -> 'quarantine' (NaN diagnostics are not quarantined); a
+    non-finite / unparsable decision cell or trial_number ->
+    'bad_decision'; a decision value with `not (low <= x <= high)` or a
+    non-integral int -> 'out_of_band' (DROPPED, never clipped: the recorded
+    value belongs to that exact point); a repeated trial number of the same
+    donor -> 'duplicate'. ANCHOR IDENTITY (when `parameter_groups` and
+    `kinetic_baselines` are given and non-empty): every surviving row's
+    expand_grouped_values(params, parameter_groups, kinetic_baselines,
+    group_references) must reproduce its recorded applied_<member> columns
+    within RELAY_ANCHOR_RTOL, else ValueError naming donor and trial (a
+    B-anchored or differently referenced donor shares the columns but not
+    the anchor).
+
+    DEDUPE: survivors in canonical order (donor order, then trial number)
+    are mapped to the unit cube (external_to_unit); a row whose max-norm
+    distance to an already-kept row is < dedupe_tol is dropped as
+    'duplicate' (first occurrence wins; exact test through a 2-D bucket
+    hash; dedupe_tol 0 keeps everything). KEEP set: unique rows with value
+    >= keep_above (None -> empty), value-descending, ties by canonical
+    order, truncated to max_rows (noted). FILL: the remaining slots by
+    greedy maximin over the other unique rows -- squared EUCLIDEAN unit-cube
+    distance to the selected set, argmax (first index wins ties) -- seeded
+    by the keep set, or, when it is empty, by the best-valued row, which
+    counts toward max_rows. So the best unique row is always selected.
+    FEASIBILITY IDENTITY: every SELECTED row must satisfy `is_feasible`
+    (the relay's own burden / volume predicate; None skips) -- a COMPLETE
+    donor row infeasible here means the donor ran under different caps.
+
+    rows: [{'label': '<donor stem>#<trial>', 'params': {name: float | int},
+    'value': float, 'record': the donor CSV row as {column: cell}}] in
+    selection order (keep set, then fill) -- the preload order, i.e. the
+    optuna trial numbers 0..N-1. notes: a dict -- 'donors' {stem: {'path',
+    'read', 'candidates', 'selected', <each drop reason>}}, 'n_candidates',
+    'n_unique', 'n_keep_above' (before truncation), 'n_keep',
+    'keep_truncated', 'n_fill', 'n_selected', 'best_value', 'best_label',
+    'max_duplicate_spread' (largest value spread inside a collapsed group)
+    + 'max_duplicate_spread_label', 'rows_sha1' (relay_rows_sha1),
+    'elapsed_s', 'kwargs' (resolved), 'value_column', and 'lines' (printable
+    summary lines; the out-of-band total is printed prominently). ValueError
+    when no row survives."""
+    import itertools
+    import time
+    t0 = time.perf_counter()
+    opts = resolve_relay_kwargs(dict(max_rows=max_rows, keep_above=keep_above,
+                                     dedupe_tol=dedupe_tol,
+                                     drop_quarantined=drop_quarantined))
+    max_rows, keep_above = opts['max_rows'], opts['keep_above']
+    dedupe_tol, drop_quarantined = opts['dedupe_tol'], opts['drop_quarantined']
+    names = list(search_space)
+    if isinstance(donor_paths, (str, os.PathLike)):
+        donor_paths = (donor_paths,)
+    donors = [(_relay_donor_stem(path), os.fspath(path)) for path in donor_paths]
+    if not donors:
+        raise ValueError('select_relay_rows: no donor given')
+    stems = [stem for stem, _ in donors]
+    repeated = sorted({stem for stem in stems if stems.count(stem) > 1})
+    if repeated:
+        raise ValueError(f'relay donors: stem(s) {repeated} given more than '
+                         'once (a repeated donor, or two paths with the same '
+                         f'study name): {[path for _, path in donors]}')
+    donors.sort(key=lambda donor: donor[0])
+    groups = {str(g): list(m) for g, m in dict(parameter_groups or {}).items()}
+    check_anchor = bool(groups) and bool(kinetic_baselines)
+    applied_members = [m for members in groups.values() for m in members]
+
+    per_donor, candidates = {}, []
+    for stem, path in donors:
+        if not os.path.isfile(path):
+            raise ValueError(f'relay donor {stem!r}: no trajectory CSV at {path}')
+        with open(path, newline='') as fh:
+            reader = csv.reader(fh)
+            header = next(reader, None)
+            if (header is None or 'trial_number' not in header
+                    or 'state' not in header or 'objective' not in header):
+                raise ValueError(f'relay donor {stem!r} ({path}) is not a '
+                                 "trajectory CSV (no 'trial_number' / 'state' "
+                                 "/ 'objective' columns)")
+            decision = header[header.index('state') + 1:header.index('objective')]
+            if decision != names:
+                raise ValueError(f'relay donor {stem!r}: decision columns '
+                                 f'{decision} differ from this search space '
+                                 f'{names} (a relay donor must have sampled '
+                                 'the SAME space)')
+            if value_column not in header:
+                raise ValueError(f'relay donor {stem!r}: no {value_column!r} '
+                                 'column (the relay value column)')
+            if columns is not None and header != list(columns):
+                extra = [c for c in header if c not in columns]
+                absent = [c for c in columns if c not in header]
+                raise ValueError(
+                    f'relay donor {stem!r}: header differs from this study\'s '
+                    f'trajectory columns (donor-only {extra}, missing '
+                    f'{absent}{"" if extra or absent else ", order differs"})')
+            if check_anchor:
+                missing = [f'applied_{m}' for m in applied_members
+                           if f'applied_{m}' not in header]
+                if missing:
+                    raise ValueError(f'relay donor {stem!r}: no {missing} '
+                                     'columns, so its group anchor cannot be '
+                                     'verified')
+            counts = {'path': path, 'read': 0, 'candidates': 0, 'selected': 0,
+                      **{reason: 0 for reason in RELAY_DROP_REASONS}}
+            donor_rows, seen_trials = [], set()
+            n_columns = len(header)
+            for cells in reader:
+                if not cells:
+                    continue
+                counts['read'] += 1
+                if len(cells) < n_columns:
+                    cells = cells + ['']*(n_columns - len(cells))
+                record = dict(zip(header, cells))
+                if record['state'] != 'COMPLETE':
+                    counts['state'] += 1
+                    continue
+                value = _relay_float(record[value_column])
+                if not math.isfinite(value):
+                    counts['non_finite'] += 1
+                    continue
+                if (drop_quarantined
+                        and _relay_float(record.get('n_sims_run')) == RELAY_QUARANTINE_N_SIMS
+                        and _relay_float(record.get('final_drift')) > RELAY_QUARANTINE_DRIFT):
+                    counts['quarantine'] += 1
+                    continue
+                trial = _relay_float(record['trial_number'])
+                raw = [_relay_float(record[name]) for name in names]
+                if (not math.isfinite(trial) or trial != int(trial)
+                        or not all(math.isfinite(x) for x in raw)):
+                    counts['bad_decision'] += 1
+                    continue
+                params, in_band = {}, True
+                for name, x in zip(names, raw):
+                    sp = search_space[name]
+                    if not (sp['low'] <= x <= sp['high']):
+                        in_band = False
+                        break
+                    if sp.get('int'):
+                        if x != int(x):
+                            in_band = False
+                            break
+                        params[name] = int(x)
+                    else:
+                        params[name] = x
+                if not in_band:
+                    counts['out_of_band'] += 1
+                    continue
+                trial = int(trial)
+                if trial in seen_trials:
+                    counts['duplicate'] += 1
+                    continue
+                seen_trials.add(trial)
+                if check_anchor:
+                    applied = expand_grouped_values(params, groups,
+                                                    kinetic_baselines,
+                                                    group_references)
+                    for member in applied_members:
+                        recorded = _relay_float(record[f'applied_{member}'])
+                        if not _relay_close(recorded, applied[member],
+                                            RELAY_ANCHOR_RTOL):
+                            raise ValueError(
+                                f'relay donor {stem!r} trial {trial}: '
+                                f'applied_{member} = {recorded!r}, but this '
+                                'study\'s group anchor gives '
+                                f'{applied[member]!r} (rel tol '
+                                f'{RELAY_ANCHOR_RTOL:g}) -- the donor ran '
+                                'under a different anchor / group references '
+                                '(e.g. a B-anchored study with the same '
+                                'columns)')
+                counts['candidates'] += 1
+                donor_rows.append((trial, params, value, record))
+        donor_rows.sort(key=lambda r: r[0])        # stable: canonical order
+        for trial, params, value, record in donor_rows:
+            candidates.append({'stem': stem, 'label': f'{stem}#{trial}',
+                               'params': params, 'value': value,
+                               'record': record})
+        per_donor[stem] = counts
+    if not candidates:
+        raise ValueError('relay: no donor row survived the filters '
+                         f'(per donor: {per_donor})')
+
+    # Unit cube, canonical order.
+    X = np.array([external_to_unit(c['params'], search_space)
+                  for c in candidates], dtype=float).reshape(len(candidates), -1)
+    n, d = X.shape
+    values = np.array([c['value'] for c in candidates], dtype=float)
+    # DEDUPE (first occurrence wins). Exact max-norm test against the kept
+    # rows in the neighbouring buckets of a 2-D grid hash on the two
+    # coordinates with the most distinct buckets: |u - v| < tol in every
+    # coordinate puts two rows in the same or adjacent buckets (width
+    # tol*(1 + 1e-9), so a rounding error cannot push them 2 buckets apart).
+    unique, dup_of = [], {}
+    vmin, vmax = [], []
+    if dedupe_tol > 0.0 and d > 0:
+        width = dedupe_tol*(1.0 + 1e-9)
+        B = np.floor(X/width).astype(np.int64)
+        n_distinct = [len(np.unique(B[:, j])) for j in range(d)]
+        dims = sorted(range(d), key=lambda j: (-n_distinct[j], j))[:min(2, d)]
+        offsets = list(itertools.product((-1, 0, 1), repeat=len(dims)))
+        buckets = {}
+        for i in range(n):
+            key = tuple(int(B[i, j]) for j in dims)
+            near = []
+            for off in offsets:
+                near.extend(buckets.get(tuple(k + o for k, o in zip(key, off)), ()))
+            if near:
+                near.sort()
+                rows_near = X[[unique[p] for p in near]]
+                close = np.abs(rows_near - X[i]).max(axis=1) < dedupe_tol
+                if close.any():
+                    p = near[int(np.argmax(close))]       # the earliest kept row
+                    dup_of[i] = p
+                    vmin[p] = min(vmin[p], values[i])
+                    vmax[p] = max(vmax[p], values[i])
+                    per_donor[candidates[i]['stem']]['duplicate'] += 1
+                    continue
+            buckets.setdefault(key, []).append(len(unique))
+            unique.append(i)
+            vmin.append(values[i])
+            vmax.append(values[i])
+    else:
+        unique = list(range(n))
+        vmin = list(values)
+        vmax = list(values)
+    m = len(unique)
+    spreads = np.asarray(vmax, dtype=float) - np.asarray(vmin, dtype=float)
+    p_spread = int(np.argmax(spreads)) if m else 0
+    values_u = values[unique]
+    Xu = X[unique]
+    # KEEP set: value >= keep_above, value-descending, ties canonical.
+    if keep_above is None:
+        keep_pos = []
+    else:
+        keep_pos = [p for p in range(m) if values_u[p] >= keep_above]
+        keep_pos.sort(key=lambda p: (-values_u[p], p))
+    n_keep_above = len(keep_pos)
+    keep_truncated = n_keep_above > max_rows
+    keep_pos = keep_pos[:max_rows]
+    selected = list(keep_pos)
+    # FILL: incremental maximin (squared explicit Euclidean differences).
+    n_fill_slots = max_rows - len(selected)
+    if n_fill_slots > 0 and len(selected) < m:
+        if not selected:
+            best = min(range(m), key=lambda p: (-values_u[p], p))
+            selected.append(best)                 # counts toward max_rows
+            n_fill_slots -= 1
+        d2 = np.full(m, np.inf)
+        for s in selected:
+            d2 = np.minimum(d2, ((Xu - Xu[s])**2).sum(axis=1))
+        d2[selected] = -np.inf
+        for _ in range(n_fill_slots):
+            i = int(np.argmax(d2))
+            if d2[i] == -np.inf:
+                break                             # every unique row selected
+            selected.append(i)
+            d2 = np.minimum(d2, ((Xu - Xu[i])**2).sum(axis=1))
+            d2[i] = -np.inf
+    rows = []
+    for p in selected:
+        c = candidates[unique[p]]
+        per_donor[c['stem']]['selected'] += 1
+        rows.append({'label': c['label'], 'params': dict(c['params']),
+                     'value': float(c['value']), 'record': c['record']})
+    if is_feasible is not None:
+        infeasible = [row['label'] for row in rows
+                      if not is_feasible(dict(row['params']))]
+        if infeasible:
+            raise ValueError(
+                f'relay: {len(infeasible)} selected donor row(s) are '
+                f'INFEASIBLE under this study\'s burden / volume predicate '
+                f'(e.g. {infeasible[:5]}) -- a COMPLETE donor row cannot be '
+                'infeasible unless the donor ran under different caps / '
+                'constants')
+    best_row = max(rows, key=lambda row: row['value'])
+    digest = relay_rows_sha1(rows)
+    elapsed = time.perf_counter() - t0
+    n_out = sum(counts['out_of_band'] for counts in per_donor.values())
+    n_dup = sum(counts['duplicate'] for counts in per_donor.values())
+    notes = {
+        'donors': per_donor, 'n_candidates': n, 'n_unique': m,
+        'n_keep_above': n_keep_above, 'n_keep': len(keep_pos),
+        'keep_truncated': keep_truncated,
+        'n_fill': len(rows) - len(keep_pos), 'n_selected': len(rows),
+        'best_value': best_row['value'], 'best_label': best_row['label'],
+        'max_duplicate_spread': float(spreads[p_spread]) if m else 0.0,
+        'max_duplicate_spread_label': (candidates[unique[p_spread]]['label']
+                                       if m else None),
+        'rows_sha1': digest, 'elapsed_s': elapsed, 'kwargs': opts,
+        'value_column': value_column}
+    lines = [f'{len(donors)} donor(s), value column {value_column!r}, '
+             f'kwargs {opts}']
+    for stem, counts in per_donor.items():
+        dropped = ', '.join(f'{reason} {counts[reason]}'
+                            for reason in RELAY_DROP_REASONS)
+        lines.append(f'  {stem}: read {counts["read"]}, candidates '
+                     f'{counts["candidates"]}, selected {counts["selected"]}; '
+                     f'dropped: {dropped}')
+    lines.append(f'OUT-OF-BAND rows dropped: {n_out} (expected 0 for donors '
+                 'of the same search space)')
+    lines.append(f'{n} candidates -> {m} unique ({n_dup} duplicates within '
+                 f'max-norm {dedupe_tol:g}; largest value spread inside a '
+                 f'collapsed group {notes["max_duplicate_spread"]:.4g} at '
+                 f'{notes["max_duplicate_spread_label"]})')
+    lines.append(f'keep set (value >= {keep_above}): {n_keep_above} unique rows'
+                 + (f', TRUNCATED to max_rows {max_rows}' if keep_truncated
+                    else '')
+                 + f'; maximin fill {notes["n_fill"]}; selected {len(rows)}')
+    lines.append(f'best preloaded {value_column} = {best_row["value"]:.6g} '
+                 f'({best_row["label"]}); selection sha1 {digest}; '
+                 f'{elapsed:.2f} s')
+    notes['lines'] = lines
+    return rows, notes
+
+def relay_frozen_trials(rows, search_space):
+    """optuna FrozenTrials for select_relay_rows' `rows` (the preload of a
+    relay campaign): create_trial(state=COMPLETE, value=row['value'],
+    params (ints cast to int), distributions=search_space_distributions(
+    search_space) -- exactly what the engine's suggest_* calls record, so
+    the GP's search space is never shrunk --, user_attrs = every
+    TRACKED_METRICS column of the donor record as a float (blank / NaN
+    omitted; +-inf kept, as a simulated trial records it) + 'relay_donor' =
+    the label, system_attrs = {'relay': True}). No 'constraints' system attr
+    (hence GP-only with learned_constraints off). optuna is imported here;
+    create_trial validates every value against its distribution."""
+    import optuna
+    from optuna.trial import TrialState
+    distributions = search_space_distributions(search_space)
+    frozen = []
+    for row in rows:
+        params = {name: (int(row['params'][name]) if sp.get('int')
+                         else float(row['params'][name]))
+                  for name, sp in search_space.items()}
+        record = row.get('record') or {}
+        user_attrs = {}
+        for name in TRACKED_METRICS:
+            if name in record:
+                x = _relay_float(record[name])
+                if not math.isnan(x):
+                    user_attrs[name] = x
+        user_attrs[RELAY_TRIAL_USER_ATTR] = row['label']
+        frozen.append(optuna.trial.create_trial(
+            state=TrialState.COMPLETE, value=float(row['value']),
+            params=params, distributions=distributions,
+            user_attrs=user_attrs,
+            system_attrs={RELAY_TRIAL_SYSTEM_ATTR: True}))
+    return frozen
+
+def _is_relay_trial(trial):
+    return bool(trial.system_attrs.get(RELAY_TRIAL_SYSTEM_ATTR))
+
+def n_relay_trials(study):
+    """Number of stored trials carrying the relay marker (system attr
+    {'relay': True}) -- the authoritative preloaded count of a relay
+    campaign (0 for every other study)."""
+    return sum(1 for t in study.get_trials(deepcopy=False) if _is_relay_trial(t))
+
+def best_simulated_trial(study):
+    """The best COMPLETE trial of `study` that is NOT a preloaded relay
+    trial (None when there is none) -- what an end-of-run summary / plot of
+    a relay campaign must report instead of study.best_trial, which may be a
+    donor row. Single-objective studies only (study.direction)."""
+    from optuna.study import StudyDirection
+    from optuna.trial import TrialState
+    trials = [t for t in study.get_trials(deepcopy=False,
+                                          states=(TrialState.COMPLETE,))
+              if not _is_relay_trial(t)]
+    if not trials:
+        return None
+    if study.direction == StudyDirection.MINIMIZE:
+        return min(trials, key=lambda t: t.value)
+    return max(trials, key=lambda t: t.value)
+
+def relay_manifest_path(results_dir, study_name):
+    """<results_dir>/<study>_relay_manifest.csv: one row per preloaded
+    relay trial (write_relay_manifest)."""
+    return os.path.join(results_dir, study_name + '_relay_manifest.csv')
+
+def _relay_label_numbers(study):
+    """{relay label: optuna trial number} of the stored relay trials."""
+    return {t.user_attrs.get(RELAY_TRIAL_USER_ATTR): t.number
+            for t in study.get_trials(deepcopy=False) if _is_relay_trial(t)}
+
+def _write_relay_manifest(path, rows, label_numbers, columns, value_column):
+    """Write the relay manifest (A11) atomically (tmp + os.replace): columns
+    relay_trial_number, donor (the donor STUDY stem; its trial is the
+    record's own trial_number column), donor_objective (the donor's own
+    'objective' cell) + `columns` (the relay's trajectory columns), where
+    'objective' holds the RELAY value (the donor's `value_column` cell);
+    one row per entry of `rows` present in `label_numbers`, sorted by
+    relay_trial_number. Returns the number of rows written."""
+    lines = []
+    for row in rows:
+        number = label_numbers.get(row['label'])
+        if number is None:
+            continue
+        record = row.get('record') or {}
+        out = {c: record.get(c, '') for c in columns}
+        out['objective'] = record.get(value_column, repr(float(row['value'])))
+        out['relay_trial_number'] = number
+        out['donor'] = row['label'].rsplit('#', 1)[0]
+        out['donor_objective'] = record.get('objective', '')
+        lines.append(out)
+    lines.sort(key=lambda out: out['relay_trial_number'])
+    header = ['relay_trial_number', 'donor', 'donor_objective', *columns]
+    tmp = path + '.tmp'
+    with open(tmp, 'w', newline='') as fh:
+        writer = csv.DictWriter(fh, fieldnames=header, extrasaction='ignore')
+        writer.writeheader()
+        for out in lines:
+            writer.writerow(out)
+    os.replace(tmp, path)
+    return len(lines)
+
+def _relay_store_protocol(study, ctx):
+    """The relay store protocol of run_kinetic_optimization (spec A7), run
+    right after the optuna store is opened; returns n_preloaded (the stored
+    relay-trial count). Reads the study system attrs ONCE; a non-relay store
+    with no relay args returns 0 with nothing else read or written (A10).
+
+    - fresh store + relay args: set 'relay_rows_sha1' then 'relay_spec'
+      (the detection key last), ONE study.add_trials(relay_frozen_trials(
+      ...)), write the manifest, then set 'relay_n_preloaded' and
+      'relay_preload_complete'.
+    - store with 'relay_spec': relay args with a different spec ->
+      ValueError. No complete marker (a kill mid-preload): without relay
+      args -> ValueError (relaunch with the same relay_from / relay_kwargs);
+      with them every stored trial must be relay-marked, every stored label
+      must be in the selection and -- when relay trials are already stored
+      -- the stored digest must equal the re-selection's (else ValueError;
+      with none stored the re-selection's digest is simply recorded); the
+      missing rows are inserted, then the manifest and the markers. Complete: the stored relay count must equal
+      'relay_n_preloaded'; a missing manifest is rewritten from the
+      re-selection (relay args) or warned about (no args).
+    - store WITHOUT 'relay_spec' + relay args + stored trials -> ValueError
+      (not a relay study: use a fresh study name)."""
+    storage, study_id = study._storage, study._study_id
+    attrs = storage.get_study_system_attrs(study_id)
+    rows = ctx.relay_rows
+    spec_stored = attrs.get('relay_spec')
+    if spec_stored is None and rows is None:
+        return 0
+    manifest = relay_manifest_path(ctx.results_dir, ctx.study_name)
+    value_column = (ctx.relay_notes or {}).get('value_column',
+                                               ctx.objective_name)
+    trials = study.get_trials(deepcopy=False)
+
+    def _finish(n_label):
+        label_numbers = _relay_label_numbers(study)
+        n_written = _write_relay_manifest(manifest, rows, label_numbers,
+                                          ctx.columns, value_column)
+        n_pre = n_relay_trials(study)
+        storage.set_study_system_attr(study_id, 'relay_n_preloaded', n_pre)
+        storage.set_study_system_attr(study_id, 'relay_preload_complete', True)
+        print(f'Relay preload {n_label}: {n_pre} donor trials stored as '
+              f'trials 0-{n_pre - 1} (manifest {n_written} rows: {manifest}); '
+              f'best preloaded {value_column} = '
+              f"{ctx.relay_notes['best_value']:.6g} "
+              f"({ctx.relay_notes['best_label']}). The campaign's own "
+              f'simulated trials start at trial {n_pre}.')
+        return n_pre
+
+    if spec_stored is None:
+        if trials:
+            raise ValueError(
+                f'relay_from given, but study {ctx.study_name!r} already holds '
+                f'{len(trials)} trials and no relay spec -- it is not a relay '
+                'study; use a fresh study name (default_study_name(relay_tag='
+                'relay_study_tag(...)) gives one).')
+        # 2026-09-23: the digest is written BEFORE 'relay_spec' because a
+        # relaunch detects an interrupted preload by 'relay_spec' alone. A
+        # kill between the two writes then leaves a store with no
+        # 'relay_spec' and 0 trials, which this fresh path simply overwrites.
+        # The reverse order left 'relay_spec' with a None digest, which the
+        # incomplete branch below refused forever ("donor CSVs changed").
+        # Both are still written before the one add_trials call (A7).
+        storage.set_study_system_attr(study_id, 'relay_rows_sha1',
+                                      ctx.relay_rows_sha1)
+        storage.set_study_system_attr(study_id, 'relay_spec', ctx.relay_spec)
+        study.add_trials(relay_frozen_trials(rows, ctx.search_space))
+        return _finish('done')
+    if rows is not None and spec_stored != ctx.relay_spec:
+        raise ValueError(
+            f'study {ctx.study_name!r} was preloaded with relay spec '
+            f'{spec_stored} but this launch passes {ctx.relay_spec}; resume '
+            'with the SAME relay_from / relay_kwargs (or none), or use a '
+            'fresh study name.')
+    relay_trials = [t for t in trials if _is_relay_trial(t)]
+    if not attrs.get('relay_preload_complete'):
+        if rows is None:
+            raise ValueError(
+                f'study {ctx.study_name!r}: relay preload incomplete '
+                f'({len(relay_trials)} of the preload stored, no completion '
+                'marker -- a previous launch was killed mid-preload); '
+                'relaunch with the same relay_from / relay_kwargs to '
+                'complete it.')
+        others = [t.number for t in trials if not _is_relay_trial(t)]
+        if others:
+            raise ValueError(
+                f'study {ctx.study_name!r}: relay preload incomplete but the '
+                f'store holds non-relay trials {others[:10]} -- cannot '
+                'complete the preload safely; use a fresh study name.')
+        # 2026-09-23 (belt-and-braces to the write order above): the digest
+        # guards only an interrupted preload that already INSERTED relay
+        # trials. With none stored, nothing of the interrupted selection is
+        # in the store (a 'relay_spec' with no digest -- a store written in
+        # the old spec-first order and killed between the two attr writes --
+        # or with another digest, killed before its first insert), so the
+        # re-selection's digest is recorded and every row is preloaded,
+        # exactly as on a fresh store.
+        stored_sha1 = attrs.get('relay_rows_sha1')
+        if relay_trials and stored_sha1 != ctx.relay_rows_sha1:
+            raise ValueError(
+                f'study {ctx.study_name!r}: relay preload incomplete and the '
+                'donor re-selection differs from the interrupted one '
+                f"(sha1 {ctx.relay_rows_sha1} vs stored "
+                f"{stored_sha1}: the donor CSVs changed) -- "
+                'use a fresh study name.')
+        if stored_sha1 != ctx.relay_rows_sha1:
+            storage.set_study_system_attr(study_id, 'relay_rows_sha1',
+                                          ctx.relay_rows_sha1)
+        selected = {row['label'] for row in rows}
+        stored = [t.user_attrs.get(RELAY_TRIAL_USER_ATTR) for t in relay_trials]
+        unknown = [label for label in stored if label not in selected]
+        if unknown:
+            raise ValueError(
+                f'study {ctx.study_name!r}: stored relay trials {unknown[:5]} '
+                'are not in the re-selection -- use a fresh study name.')
+        stored_set = set(stored)
+        missing = [row for row in rows if row['label'] not in stored_set]
+        print(f'Relay preload was interrupted: {len(stored)} of {len(rows)} '
+              f'donor trials stored; inserting the {len(missing)} missing.')
+        study.add_trials(relay_frozen_trials(missing, ctx.search_space))
+        return _finish('completed')
+    n_pre = len(relay_trials)
+    if n_pre != attrs.get('relay_n_preloaded'):
+        raise ValueError(
+            f'study {ctx.study_name!r}: {n_pre} relay-marked trials stored but '
+            f"the completed preload recorded {attrs.get('relay_n_preloaded')}"
+            ' -- the store was modified; use a fresh study name.')
+    if rows is not None and attrs.get('relay_rows_sha1') != ctx.relay_rows_sha1:
+        print('WARNING: the donor re-selection differs from the stored '
+              f"preload (sha1 {ctx.relay_rows_sha1} vs "
+              f"{attrs.get('relay_rows_sha1')}: the donor CSVs changed since); "
+              'the stored preload is kept.')
+    if not os.path.isfile(manifest):
+        if rows is None:
+            print(f'WARNING: relay manifest {manifest} is missing; relaunch '
+                  'with the same relay_from / relay_kwargs to rewrite it.')
+        else:
+            label_numbers = _relay_label_numbers(study)
+            selected = {row['label'] for row in rows}
+            absent = [label for label in label_numbers if label not in selected]
+            if absent:
+                print(f'WARNING: relay manifest {manifest} is missing and '
+                      f'{len(absent)} stored relay labels are not in the '
+                      're-selection; manifest not rewritten.')
+            else:
+                n_written = _write_relay_manifest(manifest, rows, label_numbers,
+                                                  ctx.columns, value_column)
+                print(f'Rewrote the missing relay manifest ({n_written} rows): '
+                      f'{manifest}')
+    print(f'Relay study: {n_pre} preloaded donor trials stored (trials '
+          f'0-{n_pre - 1}); they are not budgeted.')
+    return n_pre
 
 #%% Engine
 
@@ -3396,15 +4778,18 @@ def feasibility_constraints_func(*, burden_on, volume_on):
 def feasibility_predicate(*, burden_on, volume_on, burden_model,
                           parameter_groups, kinetic_baselines,
                           baseline_model_kwargs, baseline_max_n_spikes,
-                          volume_cap):
+                          volume_cap, group_references=None):
     """values (EXTERNAL repr) -> bool. AND of the enabled checks. The burden
     check evaluates the EXPANDED member values (baseline x the sampled group
-    multiplier); the volume check reads the feeding values directly. When
-    burden_on is False, burden_model may be None and is never dereferenced."""
+    multiplier, or reference x multiplier for a group in `group_references`
+    -- exactly what evaluate_decision_point hands the burden model); the
+    volume check reads the feeding values directly. When burden_on is
+    False, burden_model may be None and is never dereferenced."""
     def _feasible(values):
         if burden_on and not burden_model.evaluate(
                 expand_grouped_values(values, parameter_groups,
-                                      kinetic_baselines)).feasible:
+                                      kinetic_baselines,
+                                      group_references)).feasible:
             return False
         if volume_on:
             thr, tgt, spk = _resolve_feeding_concs(values, baseline_model_kwargs)
@@ -3426,7 +4811,14 @@ class OptimizationContext:
     simulation -- taken at set-up and refreshed by evaluate_decision_point
     after every COMPLETE / NAN trial, restored after every FAIL trial so a
     failed simulation leaves no trace for the next trial (None when the
-    handles carry no snapshot function, e.g. offline fakes)."""
+    handles carry no snapshot function, e.g. offline fakes). `group_references`
+    is the normalized {group: {member: reference}} of the referenced capacity
+    groups ({} when none; since 2026-09-15): evaluate_decision_point and the
+    sampler predicate expand the group multipliers with it. The relay_*
+    fields (since 2026-09-23) are None unless the study is a relay campaign
+    (relay_from): relay_rows / relay_notes = select_relay_rows' output,
+    relay_spec = relay_spec_json(relay_from, relay_kwargs) (the study system
+    attr 'relay_spec'), relay_rows_sha1 = its selection digest."""
     handles: dict
     r_te: object
     fbs_spec: object
@@ -3443,6 +4835,7 @@ class OptimizationContext:
     search_space: dict
     excluded: list
     parameter_groups: dict
+    group_references: dict
     applied_columns: list
     baseline_model_kwargs: dict
     baseline_max_n_spikes: object
@@ -3455,6 +4848,10 @@ class OptimizationContext:
     seed_points: dict
     seed_notes: list
     state_snapshot: object = None
+    relay_rows: object = None
+    relay_notes: object = None
+    relay_spec: object = None
+    relay_rows_sha1: object = None
 
 
 @dataclasses.dataclass
@@ -3484,7 +4881,8 @@ def _prepare_optimization(objective, *, direction, level, objective_units,
                           spike_conc_bounds, study_name, results_dir, handles,
                           burden_model, volume_feasibility, volume_cap,
                           seed_from, parameter_groups, group_multiplier_bounds,
-                          method_tag=''):
+                          group_references=None, method_tag='',
+                          relay_from=None, relay_kwargs=None):
     """Shared set-up of both engines (run_kinetic_optimization and
     run_kinetic_dual_annealing), in the order and with the prints the TPE
     engine always had: objective resolution -> kinetic baselines -> burden
@@ -3494,12 +4892,28 @@ def _prepare_optimization(objective, *, direction, level, objective_units,
     kin_opt_{scenario_label}_{slug}{method_tag}[_burden] (`method_tag` is
     '' for TPE and '_da' for dual annealing; an explicit study_name is used
     as given) -> csv/inflight paths + columns -> seed_from resolution ->
-    trajectory header guard -> orphan-sidecar recovery. Returns an
-    OptimizationContext."""
+    relay-row selection -> trajectory header guard -> orphan-sidecar
+    recovery. Returns an OptimizationContext.
+
+    `relay_from` / `relay_kwargs` (a relay campaign, since 2026-09-23; None
+    = off, the context's relay_* fields stay None): the donor rows are
+    selected sim-free by select_relay_rows NEXT TO the seed_from block --
+    before the header guard, the orphan recovery, the optuna store and any
+    simulation, so a bad donor fails with no .db / CSV written. The
+    objective must be a REGISTRY name (the value column is that name, a
+    tracked-metric column; a callable is refused) with direction
+    'maximize' (spec A3); relay_kwargs without relay_from is refused. The
+    identity checks use this context's own trajectory columns, group anchor
+    (kinetic_baselines + group_references) and burden / volume predicate."""
     if handles is None:
         handles = get_handles()
     r_te, fbs_spec = handles['r_te'], handles['fbs_spec']
 
+    relay_donors = _normalize_relay_from(relay_from)
+    if relay_kwargs and not relay_donors:
+        raise ValueError(f'relay_kwargs={relay_kwargs!r} given without '
+                         'relay_from (no donors): pass relay_from or drop the '
+                         'relay knobs.')
     if isinstance(objective, str):
         entry = OBJECTIVE_REGISTRY[objective]
         objective_getter = entry['getter']
@@ -3514,6 +4928,27 @@ def _prepare_optimization(objective, *, direction, level, objective_units,
         if direction not in ('maximize', 'minimize'):
             raise ValueError("A custom objective callable requires "
                              "direction='maximize' or 'minimize'.")
+    if relay_donors:
+        # A relay preloads the donors' RECORDED values of this objective,
+        # read from the trajectory column of the same name: a registry
+        # objective that is a tracked metric, maximized (the keep set /
+        # best-first selection assume maximize).
+        if not isinstance(objective, str):
+            raise ValueError('relay_from needs a REGISTRY objective (the relay '
+                             'value column is its name); a custom objective '
+                             'callable is refused.')
+        if (OBJECTIVE_REGISTRY[objective]['direction'] != 'maximize'
+                or direction != 'maximize'):
+            raise ValueError(f'relay_from needs a maximized objective; '
+                             f'{objective!r} runs with direction '
+                             f'{direction!r} (the relay selection assumes '
+                             'maximize).')
+        if objective not in TRACKED_METRICS:
+            raise ValueError(f'relay_from: objective {objective!r} must be a '
+                             'trajectory column (a TRACKED_METRICS name) -- '
+                             'the donors\' recorded values are read from it.')
+        relay_options = resolve_relay_kwargs(relay_kwargs)
+        relay_spec = relay_spec_json(relay_donors, relay_options)
 
     kinetic_baselines = discover_kinetic_parameters(r_te)
     if isinstance(burden_model, str):
@@ -3591,9 +5026,12 @@ def _prepare_optimization(objective, *, direction, level, objective_units,
         spike_conc_bounds=spike_conc_bounds,
         stage_1_max_x_bounds=stage_1_max_x_bounds,
         parameter_groups=parameter_groups,
-        group_multiplier_bounds=group_multiplier_bounds)
+        group_multiplier_bounds=group_multiplier_bounds,
+        group_references=group_references)
     parameter_groups = {str(group): list(members)
                         for group, members in dict(parameter_groups or {}).items()}
+    group_references = {str(group): dict(refs)
+                        for group, refs in dict(group_references or {}).items()}
     applied_columns = [f'applied_{member}'
                        for members in parameter_groups.values()
                        for member in members]
@@ -3609,15 +5047,32 @@ def _prepare_optimization(objective, *, direction, level, objective_units,
           f'{len(excluded)} kinetic parameters excluded: {excluded}')
     for group, members in parameter_groups.items():
         sp = search_space[group]
-        # Each member's LIVE baseline is printed next to its name: the
-        # multiplier is applied to it, so this line is the log's record of
-        # the basis of every applied_<member> column.
-        listed = ', '.join(f'{member} ({kinetic_baselines[member]:g})'
-                           for member in members)
-        print(f"Parameter group {group}: one log-scale multiplier on "
-              f"[{sp['low']:g}, {sp['high']:g}] x baseline applied to "
-              f"{len(members)} members {listed} (baseline 1.0; recorded as "
-              f"applied_<member> columns).")
+        refs = group_references.get(group)
+        if refs is None:
+            # Each member's LIVE baseline is printed next to its name: the
+            # multiplier is applied to it, so this line is the log's record
+            # of the basis of every applied_<member> column.
+            listed = ', '.join(f'{member} ({kinetic_baselines[member]:g})'
+                               for member in members)
+            print(f"Parameter group {group}: one log-scale multiplier on "
+                  f"[{sp['low']:g}, {sp['high']:g}] x baseline applied to "
+                  f"{len(members)} members {listed} (baseline 1.0; recorded "
+                  f"as applied_<member> columns).")
+        else:
+            # A REFERENCED group (group_references, since 2026-09-15): the
+            # multiplier applies to each member's reference, so the
+            # reference -- not the live baseline, which may be 0 -- is the
+            # basis of the applied_<member> columns and is what the log
+            # records (the live value alongside, for the record).
+            anchor = members[0]
+            listed = ', '.join(f'{member} (ref {refs[member]:g}; live '
+                               f'{kinetic_baselines[member]:g})'
+                               for member in members)
+            print(f"Parameter group {group}: one log-scale multiplier on "
+                  f"[{sp['low']:g}, {sp['high']:g}] x REFERENCE applied to "
+                  f"{len(members)} members {listed} (baseline multiplier = "
+                  f"live {anchor} / its reference, clipped into the band; "
+                  f"recorded as applied_<member> columns).")
     if 'stage_1_max_x' in search_space:
         sp = search_space['stage_1_max_x']
         print(f"Operating variable stage_1_max_x (aerobic stage-1 biomass "
@@ -3669,6 +5124,9 @@ def _prepare_optimization(objective, *, direction, level, objective_units,
     slug = objective_slug(objective_name)
     if study_name is None:
         study_name = f'kin_opt_{scenario_label}_{slug}{method_tag}'
+        if relay_donors:
+            # A relay campaign never falls back onto the plain study's store.
+            study_name += relay_study_tag(relay_donors, relay_kwargs)
         if burden_on:
             study_name += BURDEN_STUDY_SUFFIX
     csv_path = os.path.join(results_dir, study_name + '_trajectory.csv')
@@ -3690,6 +5148,32 @@ def _prepare_optimization(objective, *, direction, level, objective_units,
             parameter_groups=parameter_groups)
         seed_points.update(points)
         seed_notes.extend(notes)
+    # Relay donor rows (2026-09-23): selected now, sim-free, so a bad donor
+    # (missing file, other columns / anchor / caps) fails before the header
+    # guard, the store and the first simulation. The identity checks use
+    # this study's own columns, group anchor and feasibility predicate (the
+    # caps, independent of feasible_sampling).
+    relay_rows = relay_notes = relay_rows_sha1_ = None
+    if relay_donors:
+        relay_predicate = None
+        if burden_on or volume_on:
+            relay_predicate = feasibility_predicate(
+                burden_on=burden_on, volume_on=volume_on,
+                burden_model=burden_model, parameter_groups=parameter_groups,
+                group_references=group_references,
+                kinetic_baselines=kinetic_baselines,
+                baseline_model_kwargs=baseline_model_kwargs,
+                baseline_max_n_spikes=baseline_max_n_spikes,
+                volume_cap=volume_cap)
+        relay_rows, relay_notes = select_relay_rows(
+            [relay_donor_path(donor, results_dir) for donor in relay_donors],
+            search_space, objective, **relay_options, columns=columns,
+            parameter_groups=parameter_groups,
+            kinetic_baselines=kinetic_baselines,
+            group_references=group_references, is_feasible=relay_predicate)
+        relay_rows_sha1_ = relay_notes['rows_sha1']
+        for line in relay_notes['lines']:
+            print(f'Relay selection: {line}')
     # Pre-flight: a study name colliding with a trajectory of a different
     # column set (search space or burden on/off changed, e.g. a legacy
     # study_name resumed without burden_model=None) must fail HERE --
@@ -3717,14 +5201,18 @@ def _prepare_optimization(objective, *, direction, level, objective_units,
         burden_model=burden_model, burden_on=burden_on,
         volume_on=volume_on, volume_cap=volume_cap,
         search_space=search_space, excluded=excluded,
-        parameter_groups=parameter_groups, applied_columns=applied_columns,
+        parameter_groups=parameter_groups, group_references=group_references,
+        applied_columns=applied_columns,
         baseline_model_kwargs=baseline_model_kwargs,
         baseline_max_n_spikes=baseline_max_n_spikes,
         baseline_stage_1_max_x=baseline_stage_1_max_x,
         results_dir=results_dir, study_name=study_name,
         csv_path=csv_path, inflight_path=inflight_path, columns=columns,
         seed_points=seed_points, seed_notes=seed_notes,
-        state_snapshot=state_snapshot)
+        state_snapshot=state_snapshot,
+        relay_rows=relay_rows, relay_notes=relay_notes,
+        relay_spec=(relay_spec if relay_donors else None),
+        relay_rows_sha1=relay_rows_sha1_)
 
 
 def _snapshot_flowsheet(ctx):
@@ -3770,12 +5258,14 @@ def evaluate_decision_point(ctx, values, trial_number):
     Returns an Evaluation."""
     handles, r_te, fbs_spec = ctx.handles, ctx.r_te, ctx.fbs_spec
     csv_path, columns = ctx.csv_path, ctx.columns
-    # Group multipliers -> individual member values (baseline x m):
+    # Group multipliers -> individual member values (baseline x m, or
+    # reference x m for a referenced group):
     # what the burden model evaluates and what reaches the model. The
     # CSV keeps the multipliers as the decision columns and records
     # the members as applied_<member>.
     applied_kinetics = expand_grouped_values(values, ctx.parameter_groups,
-                                             ctx.kinetic_baselines)
+                                             ctx.kinetic_baselines,
+                                             ctx.group_references)
     threshold, target, spike = _resolve_feeding_concs(
         values, ctx.baseline_model_kwargs)
     model_kwargs = dict(target_conc=target, threshold_conc=threshold,
@@ -3931,8 +5421,11 @@ def run_kinetic_optimization(objective='IRR',
                              seed_from=None,
                              parameter_groups=None,
                              group_multiplier_bounds=DEFAULT_GROUP_MULTIPLIER_BOUNDS,
+                             group_references=None,
                              method='tpe',
                              gp_kwargs=None,
+                             relay_from=None,
+                             relay_kwargs=None,
                              ):
     """Run the Bayesian optimization. `objective` is a name in
     OBJECTIVE_REGISTRY (direction/level/units filled from the entry) or a
@@ -4111,6 +5604,14 @@ def run_kinetic_optimization(objective='IRR',
     concentration at the scenario-baseline snapshot (fbs_spec.spike_conc
     at study start; no spike_delta column). The metabolic_minimal preset
     passes all three (resolve_study_preset).
+    `group_references` ({group: {member: reference}}, None = none; since
+    2026-09-15) makes a group a REFERENCED capacity group: reference x
+    multiplier instead of live baseline x multiplier (build_search_space
+    validates it and exempts the members from the positive-live-baseline
+    check; baseline_decision_point starts it at live anchor / reference,
+    clipped) -- the metabolic_split_12d preset's ehrlich_downstream group,
+    whose members are zero on the scenario-A model. Same CSV structure:
+    the multiplier is the decision column, applied_<member> the products.
 
     `method` ('tpe', the default, or 'gp'; since 2026-09-11 pm; dual
     annealing has its own entry point, run_kinetic_dual_annealing) selects
@@ -4130,12 +5631,12 @@ def run_kinetic_optimization(objective='IRR',
     startup_sampling / resume) works as under TPE; FAIL / NAN / INFEASIBLE
     trials stay PRUNED and invisible to the GP. `gp_kwargs` (dict; only
     under 'gp', else ValueError; keys = GP_KWARGS_DEFAULTS):
-    learned_constraints (True: fit optuna's constraint GP on the burden /
-    volume violations, ConstrainedLogEI; False: plain log-EI; inert with no
-    active cap; it can be switched OFF on a resume but not back ON for a
-    study whose stored COMPLETE trials carry no constraint values -- the
-    engine then prints a note and continues with it off),
-    deterministic_objective (False), n_fallback_candidates (2048) and
+    learned_constraints (default False; True: fit optuna's constraint GP on
+    the burden / volume violations, ConstrainedLogEI; False: plain log-EI;
+    inert with no active cap; it can be switched OFF on a resume but not
+    back ON for a study whose stored COMPLETE trials carry no constraint
+    values -- the engine then prints a note and continues with it off),
+    deterministic_objective (default True), n_fallback_candidates (2048) and
     max_fallback_batches (20). Optuna's constraint GP (when
     learned_constraints is True) is fit on COMPLETE trials only -- every
     COMPLETE trial is feasible under the engine's pre-sim INFEASIBLE prune,
@@ -4150,6 +5651,37 @@ def run_kinetic_optimization(objective='IRR',
     `--stall-timeout-min` of about 10 or more to the supervisor for a GP
     study expected to pass a few hundred COMPLETE trials.
 
+    `relay_from` / `relay_kwargs` (since 2026-09-23; spec
+    docs/superpowers/specs/2026-09-23-relay-preload-pi-campaign-design.md,
+    amendments A1-A11) make the study a RELAY campaign: `relay_from` is a
+    sequence of donor studies (study names resolved in results_dir, or
+    trajectory-CSV paths) of the SAME search space, `relay_kwargs` the
+    selection knobs (RELAY_KWARGS_DEFAULTS: max_rows, keep_above,
+    dedupe_tol, drop_quarantined). The donors' COMPLETE rows -- which
+    recorded this study's objective as a tracked metric -- are selected
+    sim-free (select_relay_rows: filters, identity checks, unit-cube dedupe,
+    keep set + maximin fill) before the store is opened, and a FRESH store
+    receives them as COMPLETE trials 0..N-1 carrying the donors' recorded
+    values (relay_frozen_trials; system attr 'relay', user attr
+    'relay_donor'), with no re-simulation; <study>_relay_manifest.csv lists
+    them. GP only (check_method_kwargs); a registry, maximized objective
+    that is a tracked metric; learned_constraints must stay False (the
+    donor rows carry no constraint values) -- all refused with ValueError
+    before any .db / CSV exists. `n_trials` then counts this campaign's
+    SIMULATED trials only (n_done = stored trials - n_relay_trials, which
+    also drives the seed offset, the seeds sidecar and the fresh-study
+    enqueue branch), so a relay study simulates exactly `n_trials` across
+    any number of resumes; its trajectory CSV holds only simulated rows,
+    from trial_number N. The GP start-up GATE counts the preloaded trials
+    (N >= n_startup -> GP guidance from the first simulated trial) while the
+    LHS row index skips them (design sized n_startup - N). A resume needs
+    no relay args (the stored spec is authoritative); passing different
+    ones raises; a launch killed mid-preload is completed idempotently by a
+    relaunch with the same args (store system attrs 'relay_spec',
+    'relay_rows_sha1', 'relay_n_preloaded', 'relay_preload_complete'). None
+    / empty = off: nothing of this runs (one extra read of the study system
+    attrs), so every non-relay study behaves exactly as before.
+
     Returns (study, csv_path, kinetic_baselines)."""
     import optuna
     if method not in ('tpe', 'gp'):
@@ -4161,6 +5693,24 @@ def run_kinetic_optimization(objective='IRR',
                          f"{method!r}; gp_kwargs is only meaningful under "
                          "method='gp'")
     gp_options = resolve_gp_kwargs(gp_kwargs)     # validates even the defaults
+    relay_donors = _normalize_relay_from(relay_from)
+    if relay_donors:
+        # Relay refusals BEFORE _prepare_optimization (no .db, no CSV, no
+        # LOST row from an orphan sidecar): GP only (A1) and no learned
+        # constraints (A2 -- the preloaded trials carry no 'constraints'
+        # system attr, and optuna's constraint GP would raise on them).
+        check_method_kwargs(method, relay_from=relay_donors)
+        if gp_options['learned_constraints']:
+            raise ValueError(
+                "relay_from with gp_kwargs['learned_constraints']=True: the "
+                'preloaded donor trials carry no constraint values, so '
+                "optuna's constraint GP cannot be fit; keep "
+                'learned_constraints=False for a relay campaign.')
+        resolve_relay_kwargs(relay_kwargs)       # a bad knob fails here too
+    elif relay_kwargs:
+        raise ValueError(f'relay_kwargs={relay_kwargs!r} given without '
+                         'relay_from (no donors): pass relay_from or drop the '
+                         'relay knobs.')
     ctx = _prepare_optimization(
         objective, direction=direction, level=level,
         objective_units=objective_units, objective_name=objective_name,
@@ -4182,7 +5732,9 @@ def run_kinetic_optimization(objective='IRR',
         volume_cap=volume_cap, seed_from=seed_from,
         parameter_groups=parameter_groups,
         group_multiplier_bounds=group_multiplier_bounds,
-        method_tag=method_study_tag(method))
+        group_references=group_references,
+        method_tag=method_study_tag(method),
+        relay_from=relay_donors or None, relay_kwargs=relay_kwargs)
     # Local names for the sampler / enqueue / finally code below (unchanged).
     handles, r_te = ctx.handles, ctx.r_te
     objective_name, direction = ctx.objective_name, ctx.direction
@@ -4190,6 +5742,7 @@ def run_kinetic_optimization(objective='IRR',
     burden_model, burden_on = ctx.burden_model, ctx.burden_on
     volume_on, volume_cap = ctx.volume_on, ctx.volume_cap
     search_space, parameter_groups = ctx.search_space, ctx.parameter_groups
+    group_references = ctx.group_references
     baseline_model_kwargs = ctx.baseline_model_kwargs
     baseline_max_n_spikes = ctx.baseline_max_n_spikes
     baseline_stage_1_max_x = ctx.baseline_stage_1_max_x
@@ -4209,7 +5762,24 @@ def run_kinetic_optimization(objective='IRR',
     study = optuna.create_study(study_name=study_name, storage=storage,
                                 direction=direction,
                                 load_if_exists=True)
-    n_done = len(study.trials)
+    # Relay store protocol (2026-09-23, spec A7): preloads a fresh relay
+    # store, completes an interrupted preload, validates a resumed one; for
+    # every non-relay study it only READS the study system attrs and
+    # returns 0. n_done then counts this campaign's own (simulated /
+    # enqueued) trials only -- the seed offset, the seeds sidecar, the
+    # fresh-study branch and the budget below are unchanged for non-relay
+    # studies and exclude the preloaded trials of a relay study (A8).
+    n_preloaded = _relay_store_protocol(study, ctx)
+    if n_preloaded and method != 'gp':
+        raise ValueError(
+            f'study {study_name!r} holds {n_preloaded} preloaded relay trials: '
+            f"a relay campaign is GP-only (got method={method!r}).")
+    if n_preloaded and gp_options['learned_constraints']:
+        raise ValueError(
+            f'study {study_name!r} holds {n_preloaded} preloaded relay trials, '
+            "which carry no constraint values: gp_kwargs['learned_constraints']"
+            '=True is refused for a relay campaign.')
+    n_done = len(study.trials) - n_preloaded
     if seed is None:
         seed = default_seed_from_datetime()
         print(f'Default sampler seed from the launch datetime: {seed} '
@@ -4256,27 +5826,45 @@ def run_kinetic_optimization(objective='IRR',
     # read back thereafter. A 'random' run never touches study system-attrs.
     # Use the STORAGE-level API: study.set_system_attr/system_attrs are
     # @deprecated_func (3.1.0 -> removal 5.0.0) and warn on every launch.
+    # A relay campaign's preloaded trials count toward the start-up GATE but
+    # consume no design row (spec A9), so its design has n_startup -
+    # n_preloaded rows and is not built at all when the preload covers the
+    # start-up (n_lhs == n_startup for every non-relay study).
+    n_lhs = max(0, n_startup - n_preloaded)
     lhs_design = None
-    if startup_sampling == 'lhs' and n_startup > 0:
+    if startup_sampling == 'lhs' and n_lhs > 0:
         stored = study._storage.get_study_system_attrs(
             study._study_id).get('lhs_seed')
         lhs_seed = stored if stored is not None else seed
         if stored is None:
             study._storage.set_study_system_attr(
                 study._study_id, 'lhs_seed', lhs_seed)
-        lhs_design = LHSDesign(search_space, n_startup, lhs_seed)
-        print(f'Start-up sampling: Latin hypercube ({n_startup}-row design, '
-              f'lhs_seed {lhs_seed}).')
+        lhs_design = LHSDesign(search_space, n_lhs, lhs_seed)
+        print(f'Start-up sampling: Latin hypercube ({n_lhs}-row design, '
+              f'lhs_seed {lhs_seed})'
+              + (f'; the {n_preloaded} preloaded relay trials fill the rest '
+                 f'of the {n_startup}-trial start-up' if n_preloaded else '')
+              + '.')
+    elif startup_sampling == 'lhs' and n_startup > 0:
+        print(f'Start-up sampling: none needed -- the {n_preloaded} preloaded '
+              f'relay trials already fill the {n_startup}-trial start-up (no '
+              'LHS design).')
     elif startup_sampling == 'lhs':
         print('Start-up sampling: Latin hypercube requested but n_startup=0; '
               'no start-up phase.')
     else:
         print('Start-up sampling: uniform random.')
     feasible_on = bool(feasible_sampling and (burden_on or volume_on))
+    # The start-up GATE counts every stored trial (a relay study's preloaded
+    # trials included), so guidance begins once n_done + n_preloaded reach
+    # n_startup (optuna numbering: after trial n_startup - 1).
+    n_gate = n_done + n_preloaded
     print(f'{"GP" if method == "gp" else "TPE"} random start-up: {n_startup} '
-          f'trials ({startup_rule}); {n_done} trials already stored, so '
-          'guidance begins '
-          f'{"now" if n_done >= n_startup else f"after trial {n_startup - 1}"}'
+          f'trials ({startup_rule}); {n_done} trials already stored'
+          + (f' + {n_preloaded} preloaded relay trials (counted by the '
+             'start-up gate)' if n_preloaded else '')
+          + ', so guidance begins '
+          f'{"now" if n_gate >= n_startup else f"after trial {n_startup - 1}"}'
           + (' (feasibility-aware: joint uniform-feasible draws)'
              if feasible_on else '') + '.')
     predicate = None
@@ -4289,6 +5877,7 @@ def run_kinetic_optimization(objective='IRR',
             burden_on=burden_on, volume_on=volume_on,
             burden_model=burden_model,
             parameter_groups=parameter_groups,
+            group_references=group_references,
             kinetic_baselines=kinetic_baselines,
             baseline_model_kwargs=baseline_model_kwargs,
             baseline_max_n_spikes=baseline_max_n_spikes,
@@ -4296,7 +5885,7 @@ def run_kinetic_optimization(objective='IRR',
     if method == 'gp':
         learned = bool(gp_options['learned_constraints']
                        and (burden_on or volume_on))
-        if learned and n_done:
+        if learned and n_gate:        # keyed on the TOTAL stored count (A8)
             # optuna's constraint GP needs the 'constraints' system attr on
             # EVERY stored COMPLETE trial (it raises 'The number of
             # constraints must be the same for all trials' otherwise), so a
@@ -4375,13 +5964,22 @@ def run_kinetic_optimization(objective='IRR',
             search_space, kinetic_baselines, baseline_model_kwargs,
             baseline_max_n_spikes,
             baseline_stage_1_max_x=baseline_stage_1_max_x,
-            parameter_groups=parameter_groups)
+            parameter_groups=parameter_groups,
+            group_references=group_references)
         if enqueue_baseline:
             study.enqueue_trial(baseline_point)
-            print('Enqueued the scenario baseline configuration as trial 0.')
+            # (a relay study's preloaded trials hold numbers 0..N-1)
+            print('Enqueued the scenario baseline configuration as trial '
+                  f'{n_preloaded}.')
         else:
+            # (a relay study's preloaded trials hold numbers 0..N-1, so its
+            # first sampled trial is N; 2026-09-23, A8. For n_preloaded == 0
+            # the line is byte-identical to the pre-relay one.)
             print('Baseline NOT enqueued (enqueue_baseline=False): no trial '
-                  'is pre-seeded; the sampler draws every trial from trial 0.')
+                  'is pre-seeded; the sampler draws every trial from trial '
+                  f'{n_preloaded}'
+                  + (f' (trials 0-{n_preloaded - 1} are the preloaded relay '
+                     'rows)' if n_preloaded else '') + '.')
         if enqueue_knockouts:
             # Then the single-knockout probes (one k_* at its floor, all
             # else at the baseline), FIFO in search-space order, so the
@@ -4400,7 +5998,7 @@ def run_kinetic_optimization(objective='IRR',
             # The probes follow the baseline only when it was enqueued, so
             # they start at trial 1 with enqueue_baseline and at trial 0
             # without it.
-            first = 1 if enqueue_baseline else 0
+            first = (1 if enqueue_baseline else 0) + n_preloaded
             span = (f'as trials {first}-{first + len(probes) - 1} '
                     if probes else '')
             print(f'Enqueued {len(probes)} single-knockout probes {span}'
@@ -4419,6 +6017,19 @@ def run_kinetic_optimization(objective='IRR',
     elif seed_points:
         print(f'Resumed study: the {len(seed_points)} seed points are NOT '
               're-enqueued (a fresh study enqueues them once).')
+
+    # Relay study (2026-09-23): the status line counts and ranks THIS
+    # campaign's simulated trials only (study.best_value may be a donor
+    # row's; the preloaded best is printed once by the preload summary).
+    relay_best = [np.nan]
+    if n_preloaded:
+        stored_sim = [t.value for t in study.get_trials(
+                          deepcopy=False,
+                          states=(optuna.trial.TrialState.COMPLETE,))
+                      if not _is_relay_trial(t)]
+        if stored_sim:
+            relay_best[0] = (max(stored_sim) if direction == 'maximize'
+                             else min(stored_sim))
 
     def _objective(trial):
         values = {name: (trial.suggest_int(name, sp['low'], sp['high'])
@@ -4440,7 +6051,28 @@ def run_kinetic_optimization(objective='IRR',
         obj = ev.objective
         for mname in TRACKED_METRICS:
             trial.set_user_attr(mname, ev.record[mname])
-        if trial.number % print_status_every == 0:
+        if n_preloaded:
+            # Relay study: best over this campaign's simulated COMPLETE
+            # trials (this one included), never a preloaded donor value.
+            if (np.isnan(relay_best[0])
+                    or (obj > relay_best[0] if direction == 'maximize'
+                        else obj < relay_best[0])):
+                relay_best[0] = obj
+        sim_index = trial.number - n_preloaded   # == trial.number (non-relay)
+        if sim_index % print_status_every == 0:
+            if n_preloaded:
+                # The trial line and the solver line are printed separately,
+                # so the ranking survives handles without solver details.
+                try:
+                    print(f'\nTrial {trial.number} (simulated {sim_index + 1}'
+                          f'/{n_trials}): {objective_name} = {obj:.6g} '
+                          f'(best simulated so far {relay_best[0]:.6g})')
+                    print(f'integrator: {r_te.integrator.getName()}; '
+                          'HXN Qbal error = '
+                          f"{handles['HXN'].energy_balance_percent_error:.2f} %")
+                except Exception:  # cosmetic only -- never abort the study
+                    pass
+                return obj
             try:
                 best = study.best_value
             except Exception:  # no completed trial stored yet
@@ -4458,8 +6090,10 @@ def run_kinetic_optimization(objective='IRR',
 
     n_remaining = max(0, n_trials - n_done)
     if n_done:
-        print(f'Resuming study {study_name}: {n_done} trials stored; '
-              f'running {n_remaining} more (budget {n_trials}).')
+        print(f'Resuming study {study_name}: {n_done} trials stored'
+              + (f' (plus {n_preloaded} preloaded relay trials, not budgeted)'
+                 if n_preloaded else '')
+              + f'; running {n_remaining} more (budget {n_trials}).')
     from biorefineries.isobutanol import system as _system
     if burden_on:
         _system.set_active_burden(burden_model)
@@ -4555,6 +6189,7 @@ def run_kinetic_dual_annealing(objective='IRR',
                                volume_cap=None,
                                parameter_groups=None,
                                group_multiplier_bounds=DEFAULT_GROUP_MULTIPLIER_BOUNDS,
+                               group_references=None,
                                initial_temp=5230.0,
                                restart_temp_ratio=2e-5,
                                visit=2.62,
@@ -4568,7 +6203,7 @@ def run_kinetic_dual_annealing(objective='IRR',
     and in-flight sidecar as run_kinetic_optimization -- the alternative to
     the TPE sampler (spec docs/superpowers/specs/2026-09-11-dual-annealing-
     kinetic-optimization-design.md). The shared kwargs mean exactly what
-    they mean there (search space, bands, groups, burden_model 'auto'/None/
+    they mean there (search space, bands, groups and group_references, burden_model 'auto'/None/
     instance, volume_feasibility / volume_cap, enqueue_baseline, handles,
     results_dir); there are NO n_startup_trials / feasible_sampling /
     startup_sampling / enqueue_knockouts / seed_from (optuna sampler and
@@ -4651,6 +6286,7 @@ def run_kinetic_dual_annealing(objective='IRR',
         volume_cap=volume_cap, seed_from=None,
         parameter_groups=parameter_groups,
         group_multiplier_bounds=group_multiplier_bounds,
+        group_references=group_references,
         method_tag='_da')
     handles, r_te = ctx.handles, ctx.r_te
     search_space, direction = ctx.search_space, ctx.direction
@@ -4686,7 +6322,8 @@ def run_kinetic_dual_annealing(objective='IRR',
                 search_space, ctx.kinetic_baselines, ctx.baseline_model_kwargs,
                 ctx.baseline_max_n_spikes,
                 baseline_stage_1_max_x=ctx.baseline_stage_1_max_x,
-                parameter_groups=ctx.parameter_groups)
+                parameter_groups=ctx.parameter_groups,
+                group_references=ctx.group_references)
             x0 = external_to_unit(baseline_point, search_space)
             print('Fresh study: annealing starts at the scenario baseline '
                   '(trial 0 = the baseline configuration).')
@@ -4824,3 +6461,369 @@ def run_kinetic_dual_annealing(objective='IRR',
         n_infeasible=state['n_infeasible'], stop_reason=stop_reason,
         message=message)
     return result, ctx.csv_path, ctx.kinetic_baselines
+
+#%% Trial reproduction (read-only)
+# Re-simulate ONE recorded trial of an ethanol_isobutanol x
+# metabolic_split_12d study on the live model and compare it with the
+# recorded trajectory row (spec docs/superpowers/specs/2026-09-18-reproduce-
+# split12d-trial-design.md). Read-only: nothing here writes a study CSV, a
+# sidecar or an optuna store, and evaluate_decision_point is deliberately
+# NOT reused (it appends rows and prunes / snapshots).
+
+#: The one preset reproduce_split12d_trial supports (not arguments).
+SPLIT12D_STUDY_TARGET_PRODUCTS = 'ethanol_isobutanol'
+SPLIT12D_STUDY_TYPE = 'metabolic_split_12d'
+
+def split12d_trajectory_path(study_name, results_dir=None):
+    """Trajectory-CSV path of a split_12d study, after the PRESET GUARD:
+    the BASENAME of `study_name` must contain both
+    SPLIT12D_STUDY_TARGET_PRODUCTS and SPLIT12D_STUDY_TYPE (ValueError
+    naming the missing token(s) otherwise -- the reconstruction below is
+    specific to that preset's referenced ehrlich_downstream group).
+    `study_name` ending in '.csv' is taken as the path itself; otherwise
+    the path is {results_dir}/{study_name}_trajectory.csv, results_dir
+    defaulting to analyses/results next to this module (the engines'
+    default). Pure; the file need not exist."""
+    study_name = str(study_name)
+    basename = os.path.basename(study_name)
+    missing = [token for token in (SPLIT12D_STUDY_TARGET_PRODUCTS,
+                                   SPLIT12D_STUDY_TYPE)
+               if token not in basename]
+    if missing:
+        raise ValueError(
+            f'study {basename!r} is not an {SPLIT12D_STUDY_TARGET_PRODUCTS} '
+            f'x {SPLIT12D_STUDY_TYPE} study (its name lacks {missing}); '
+            'reproduce_split12d_trial supports that preset only.')
+    if study_name.lower().endswith('.csv'):
+        return study_name
+    if results_dir is None:
+        results_dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            'analyses', 'results')
+    return os.path.join(results_dir, f'{study_name}_trajectory.csv')
+
+def read_trajectory_row(csv_path, trial_number):
+    """The RAW row (dict of strings, csv.DictReader) of `csv_path` whose
+    trial_number equals `trial_number` (both compared as int(float(.)), so
+    '7', '7.0' and 7 match). KeyError naming the available range if absent;
+    a missing file raises FileNotFoundError as usual. Raw strings are kept
+    so the caller decides how to parse blanks (NaN) and '-inf'."""
+    trial_number = int(float(trial_number))
+    with open(csv_path, newline='') as csvfile:
+        rows = list(csv.DictReader(csvfile))
+    numbers = []
+    for row in rows:
+        try:
+            number = int(float(row['trial_number']))
+        except (KeyError, TypeError, ValueError):
+            continue
+        numbers.append(number)
+        if number == trial_number:
+            return row
+    span = (f'{min(numbers)}-{max(numbers)} ({len(numbers)} rows)'
+            if numbers else 'no rows')
+    raise KeyError(f'trial_number {trial_number} is not in {csv_path}; '
+                   f'available trial numbers: {span}')
+
+#: How reconstruct_trial_kinetics obtains the group MEMBER values:
+#: 'rederive' = expand_grouped_values on the recorded multipliers (preset
+#: references + the anchor's live baselines); 'replay' = the recorded
+#: applied_<member> columns; 'both' = re-derive, cross-check against the
+#: replay, simulate the RE-DERIVED values.
+REPRODUCTION_MODES = ('rederive', 'replay', 'both')
+
+def _relative_delta(a, b):
+    """|a - b| / max(|a|, |b|); 0.0 when both are 0. Python floats only."""
+    scale = max(abs(a), abs(b))
+    return 0.0 if scale == 0.0 else abs(a - b)/scale
+
+def reconstruct_trial_kinetics(row, search_space, parameter_groups,
+                               kinetic_baselines, group_references=None, *,
+                               mode='both', cross_check_tol=1e-6):
+    """(values, applied, cross_check) for one RAW trajectory row
+    (read_trajectory_row). `values` is the decision dict in `search_space`
+    order (int(float(.)) for an 'int' entry -- max_n_spikes -- else float);
+    `applied` is what reaches the model: every non-group entry of `values`
+    passed through plus the group MEMBERS (group keys dropped) -- from
+    expand_grouped_values for mode 'rederive' / 'both', from the recorded
+    applied_<member> columns for 'replay'. 'both' compares the two per
+    member (relative delta > `cross_check_tol` -> an entry in
+    cross_check['mismatches'] and a RuntimeWarning: the expected signal
+    when the study ran under another anchor / reference than the one
+    passed, e.g. a pre-2026-09-16 B-anchored split_12d store) and returns
+    the RE-DERIVED values. cross_check = dict(mode, simulated ('rederive' |
+    'replay'), max_rel_delta (None unless 'both'), mismatches [(member,
+    rederived, replayed, rel_delta)]). ValueError: unknown mode; a blank /
+    missing decision column; (replay / both) a blank / missing
+    applied_<member> column. Pure."""
+    if mode not in REPRODUCTION_MODES:
+        raise ValueError(f'mode {mode!r} not in {REPRODUCTION_MODES}')
+    groups = {str(group): list(members)
+              for group, members in dict(parameter_groups or {}).items()}
+    blank = [name for name in search_space if row.get(name) in (None, '')]
+    if blank:
+        raise ValueError(f'trial row {row.get("trial_number")!r} has no value '
+                         f'for decision column(s) {blank}: not a row of this '
+                         'search space')
+    values = {name: (int(float(row[name])) if entry.get('int')
+                     else float(row[name]))
+              for name, entry in search_space.items()}
+    members = [member for group_members in groups.values()
+               for member in group_members]
+    rederived = replayed = None
+    if mode in ('rederive', 'both'):
+        rederived = expand_grouped_values(values, groups, kinetic_baselines,
+                                          group_references)
+    if mode in ('replay', 'both'):
+        absent = [f'applied_{member}' for member in members
+                  if row.get(f'applied_{member}') in (None, '')]
+        if absent:
+            raise ValueError(f'mode={mode!r} needs the recorded applied_* '
+                             f'columns, but the trial row lacks {absent}; '
+                             "use mode='rederive'")
+        replayed = {name: value for name, value in values.items()
+                    if name not in groups}
+        for member in members:
+            replayed[member] = float(row[f'applied_{member}'])
+    mismatches, max_rel_delta = [], None
+    if mode == 'both':
+        max_rel_delta = 0.0
+        for member in members:
+            rel = _relative_delta(rederived[member], replayed[member])
+            max_rel_delta = max(max_rel_delta, rel)
+            if rel > cross_check_tol:
+                mismatches.append((member, rederived[member],
+                                   replayed[member], rel))
+                warnings.warn(
+                    f'trial {row.get("trial_number")}: re-derived {member} = '
+                    f'{rederived[member]:.9g} differs from the recorded '
+                    f'applied_{member} = {replayed[member]:.9g} (rel '
+                    f'{rel:.3g} > {cross_check_tol:g}); the study likely ran '
+                    'under a different anchor / group reference. Simulating '
+                    'the RE-DERIVED value.', RuntimeWarning, stacklevel=2)
+    applied = replayed if mode == 'replay' else rederived
+    cross_check = dict(mode=mode,
+                       simulated='replay' if mode == 'replay' else 'rederive',
+                       max_rel_delta=max_rel_delta, mismatches=mismatches)
+    return values, applied, cross_check
+
+#: Tracked metrics that describe the CONVERGENCE PATH, not the decision
+#: point: they depend on the flowsheet state the simulation started from
+#: (the study's previous trial vs. the anchor baseline of a reproduction),
+#: so compare_tracked_metrics reports them but never flags them.
+REPRODUCTION_DIAGNOSTIC_METRICS = ('spike_feed_residual', 'n_sims_run',
+                                   'final_drift')
+
+def _csv_float(cell):
+    """A trajectory-CSV cell as a Python float: blank / None -> NaN;
+    'nan', 'inf', '-inf' parse as such."""
+    if cell is None or cell == '':
+        return math.nan
+    return float(cell)
+
+def compare_tracked_metrics(reproduced_metrics, row, metric_check_tol=0.02):
+    """(metric_check, metric_warnings): every entry of `reproduced_metrics`
+    ({name: value}, TRACKED_METRICS order) whose name is a column of the
+    RAW trajectory `row`, as (name, reproduced, recorded, rel_delta) with
+    Python floats (cast BEFORE any comparison: flexsolve's global
+    np.seterr(invalid='raise') makes a numpy-scalar NaN comparison raise).
+    A finite pair is flagged when its relative delta (_relative_delta)
+    exceeds `metric_check_tol`; a non-finite pair has rel_delta NaN and
+    passes only if both are NaN or both the SAME infinity (finite <->
+    non-finite is flagged). REPRODUCTION_DIAGNOSTIC_METRICS are never
+    flagged. Each flagged name is appended to metric_warnings and raised as
+    a RuntimeWarning. The study's objective is one of the tracked metrics,
+    so it is covered without parsing the study name."""
+    metric_check, metric_warnings = [], []
+    for name, value in reproduced_metrics.items():
+        if name not in row:
+            continue
+        value, recorded = float(value), _csv_float(row[name])
+        if math.isfinite(value) and math.isfinite(recorded):
+            rel = _relative_delta(value, recorded)
+            ok = rel <= metric_check_tol
+        else:
+            rel = math.nan
+            ok = ((math.isnan(value) and math.isnan(recorded))
+                  or (math.isinf(value) and value == recorded))
+        metric_check.append((name, value, recorded, rel))
+        if not ok and name not in REPRODUCTION_DIAGNOSTIC_METRICS:
+            metric_warnings.append(name)
+            warnings.warn(f'reproduced {name} = {value:.6g} vs recorded '
+                          f'{recorded:.6g} (rel {rel:.3g}, tol '
+                          f'{metric_check_tol:g})', RuntimeWarning,
+                          stacklevel=2)
+    return metric_check, metric_warnings
+
+def _simulate_trial_reproduction(handles, kinetic_baselines, values, applied,
+                                 baseline_model_kwargs):
+    """evaluate_decision_point's APPLY steps without its side effects (no
+    trajectory row, no sidecar, no INFEASIBLE prune, no snapshot / restore):
+    set every kinetic parameter present in `applied` on r_te (all others
+    keep the loaded anchor's value), the spike cap, then
+    model_specification at the reconstructed feeding concentrations
+    (_resolve_feeding_concs: spike pinned at the baseline snapshot for this
+    preset) -> solve_TEA -> every TRACKED_METRICS getter. The k_7 / k_8
+    derating happens at system.load_simulate's choke point through the
+    active burden, exactly as during the study. A raising simulation
+    (system.EnzymeBurdenInfeasibleError for an over-cap point, a
+    FeedingStrategyError, a convergence failure) is REPORTED, not raised.
+    Returns (feeding, reproduced, error)."""
+    threshold, target, spike = _resolve_feeding_concs(values,
+                                                      baseline_model_kwargs)
+    r_te, fbs_spec = handles['r_te'], handles['fbs_spec']
+    for pname in kinetic_baselines:
+        if pname in applied:
+            setattr(r_te, pname, applied[pname])
+    if 'max_n_spikes' in values:
+        fbs_spec.max_n_spikes = values['max_n_spikes']
+    feeding = dict(threshold=threshold, target=target, spike=spike,
+                   max_n_spikes=fbs_spec.max_n_spikes)
+    reproduced, error = dict(MPSPs=None, IRR=None, metrics={}), None
+    try:
+        handles['model_specification'](target_conc=target,
+                                       threshold_conc=threshold,
+                                       spike_conc=spike)
+        solution = handles['solve_TEA'](stream_IDs=('ethanol', 'isobutanol'))
+        handles['latest_TEA_solution'].update(solution)
+        reproduced = dict(MPSPs=dict(solution['MPSPs']), IRR=solution['IRR'],
+                          metrics={name: getter(handles)
+                                   for name, getter in TRACKED_METRICS.items()})
+    except Exception as e:
+        error = repr(e)
+    return feeding, reproduced, error
+
+def _print_reproduction_summary(result):
+    """Compact human-readable report of a reproduce_split12d_trial result."""
+    print(f"Reproduction of trial {result['trial_number']} of "
+          f"{result['study_name']} (anchor scenario "
+          f"{result['anchor_scenario']}; recorded state "
+          f"{result['recorded_state']}):")
+    feeding = result['feeding']
+    print(f"  feeding: threshold {feeding['threshold']:g} / target "
+          f"{feeding['target']:g} / spike {feeding['spike']:g} g/L, spike "
+          f"cap {feeding['max_n_spikes']}")
+    cross_check = result['cross_check']
+    if cross_check['mode'] == 'both':
+        print(f"  cross-check (re-derived vs recorded applied_*): max rel "
+              f"delta {cross_check['max_rel_delta']:.3g}, "
+              f"{len(cross_check['mismatches'])} mismatch(es); simulated the "
+              'RE-DERIVED values')
+        for member, rederived, replayed, rel in cross_check['mismatches']:
+            print(f'    WARNING {member}: re-derived {rederived:.9g} vs '
+                  f'recorded {replayed:.9g} (rel {rel:.3g})')
+    else:
+        print(f"  kinetics: mode={cross_check['mode']!r} (no cross-check)")
+    if result['error'] is not None:
+        print(f"  SIMULATION FAILED: {result['error']}")
+        return
+    reproduced = result['reproduced']
+    print(f"  MPSPs {reproduced['MPSPs']}, IRR {reproduced['IRR']}")
+    print(f"  {'metric':<24}{'reproduced':>16}{'recorded':>16}{'rel delta':>12}")
+    for name, value, recorded, rel in result['metric_check']:
+        flag = '  <-- WARNING' if name in result['metric_warnings'] else ''
+        print(f'  {name:<24}{value:>16.6g}{recorded:>16.6g}{rel:>12.3g}{flag}')
+    if not result['metric_warnings']:
+        print('  all tracked metrics reproduced within tolerance '
+              '(convergence diagnostics are informational).')
+
+def reproduce_split12d_trial(anchor_scenario, study_name, trial_number, *,
+                             mode='both', burden=True, results_dir=None,
+                             cross_check_tol=1e-6, metric_check_tol=0.02,
+                             restore=True, verbose=True):
+    """Re-simulate trial `trial_number` of the ethanol_isobutanol x
+    metabolic_split_12d study `study_name` (a study name, or the path of its
+    trajectory CSV) on the live model, anchored on scenario
+    `anchor_scenario`, and compare it with the recorded row. READ-ONLY: no
+    study CSV / sidecar / optuna store is written. Requires
+    biorefineries.isobutanol.load() to have run in this kernel (the contract
+    of scenarios.load_scenario); analyses/reproduce_split12d_trial.py is the
+    runner.
+
+    The anchoring scenario supplies every NON-sampled kinetic parameter and
+    the basis of the un-referenced groups (glycolysis, inhib_*: live
+    baseline x multiplier); the referenced ehrlich_downstream group is
+    reference x multiplier with the preset's scenario-A-anchored references
+    (resolve_study_preset -> group_references). The split_12d studies ran
+    from anchor 'A'. `mode`: REPRODUCTION_MODES (see
+    reconstruct_trial_kinetics; 'both' simulates the RE-DERIVED values and
+    warns when they disagree with the recorded applied_<member> columns
+    beyond `cross_check_tol`). `burden`: True (default) installs the
+    A-referenced enzyme burden as the studies did, None = the anchor's
+    burden_default, False = burden-free; load_scenario raises ValueError
+    for an anchor whose own baseline is over the cap (scenario B). The
+    decision columns come from build_search_space with the preset's kwargs
+    on the anchor's live kinetics -- the path _prepare_optimization uses.
+
+    Every input error (unknown mode, preset-guard mismatch, missing CSV,
+    missing trial) raises BEFORE the model is touched. A raising simulation
+    is reported in result['error'] (e.g. an INFEASIBLE / FAIL recorded row
+    reproducing its failure). `restore` (default True) sets every kinetic
+    parameter and fbs_spec.max_n_spikes back to the anchor snapshot in a
+    finally WITHOUT re-simulating (the flowsheet stays at the reproduced
+    trial): the scenario-A workbook has no k_13-k_17 / isobutanol-inhibition
+    rows, so load_scenario alone cannot undo them and a second call in the
+    same kernel would re-derive its groups from contaminated baselines.
+    restore=False leaves the trial's kinetics live for inspection. Either
+    way the flowsheet is NOT re-simulated, so a solve_TEA() in the same
+    kernel after the call reads the reproduced TRIAL's TEA, not the anchor
+    baseline's. load_scenario also leaves its scenario-level active burden
+    installed on return (as any load_scenario call does), so later model
+    work in the same kernel inherits it until the next load_scenario.
+
+    Returns dict(anchor_scenario, study_name, trial_number, csv_path,
+    recorded_state, values, applied, feeding, reproduced (MPSPs, IRR,
+    metrics), recorded_row, cross_check, metric_check [(name, reproduced,
+    recorded, rel_delta)], metric_warnings [names], error). Tracked metrics
+    are compared with `metric_check_tol` (compare_tracked_metrics); the
+    study's objective is one of them."""
+    if mode not in REPRODUCTION_MODES:
+        raise ValueError(f'mode {mode!r} not in {REPRODUCTION_MODES}')
+    csv_path = split12d_trajectory_path(study_name, results_dir)
+    row = read_trajectory_row(csv_path, trial_number)
+    preset = resolve_study_preset(SPLIT12D_STUDY_TARGET_PRODUCTS,
+                                  SPLIT12D_STUDY_TYPE)
+    # Lazy: keeps this module importable without load() (offline test,
+    # stdlib-only supervisor).
+    from biorefineries.isobutanol import scenarios
+    scenarios.load_scenario(anchor_scenario, burden=burden)
+    handles = get_handles()
+    r_te, fbs_spec = handles['r_te'], handles['fbs_spec']
+    # The anchor's FULL live kinetics: the non-sampled fill and the
+    # un-referenced group bases. load_scenario has just baseline-simulated,
+    # so current_specifications IS the anchor's feeding baseline (the pinned
+    # spike concentration is read from it, as the engine does).
+    kinetic_baselines = discover_kinetic_parameters(r_te)
+    baseline_model_kwargs = {
+        k: fbs_spec.current_specifications[k]
+        for k in ('target_conc', 'threshold_conc', 'spike_conc')}
+    baseline_max_n_spikes = fbs_spec.max_n_spikes
+    search_space, _ = build_search_space(
+        kinetic_baselines,
+        **{key: value for key, value in preset.items()
+           if key not in ('scenario', 'kinetic_bounds_scenario')})
+    values, applied, cross_check = reconstruct_trial_kinetics(
+        row, search_space, preset['parameter_groups'], kinetic_baselines,
+        preset['group_references'], mode=mode,
+        cross_check_tol=cross_check_tol)
+    try:
+        feeding, reproduced, error = _simulate_trial_reproduction(
+            handles, kinetic_baselines, values, applied,
+            baseline_model_kwargs)
+    finally:
+        if restore:
+            for pname, baseline in kinetic_baselines.items():
+                setattr(r_te, pname, baseline)
+            fbs_spec.max_n_spikes = baseline_max_n_spikes
+    metric_check, metric_warnings = ([], []) if error is not None else (
+        compare_tracked_metrics(reproduced['metrics'], row, metric_check_tol))
+    result = dict(anchor_scenario=anchor_scenario, study_name=study_name,
+                  trial_number=int(float(trial_number)), csv_path=csv_path,
+                  recorded_state=row.get('state'), values=values,
+                  applied=applied, feeding=feeding, reproduced=reproduced,
+                  recorded_row=row, cross_check=cross_check,
+                  metric_check=metric_check, metric_warnings=metric_warnings,
+                  error=error)
+    if verbose:
+        _print_reproduction_summary(result)
+    return result

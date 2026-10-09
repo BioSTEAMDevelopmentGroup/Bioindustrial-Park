@@ -104,6 +104,10 @@ nsk = {'y_IBO_glu_added': 0.1, '[s_IBO]': 20.0, 'time': 40.0,
        '[s_acetate]': 1.6}
 handles = {'V406': SimpleNamespace(nsk_results_specific_tau_dict=nsk, tau=55.0),
            'tea': SimpleNamespace(TCI=350e6, NPV=35e6),
+           # 'Price-weighted yield' reads the model's static reference prices
+           # off V514/V513 (set once at load(), NOT the stream .price).
+           'f': SimpleNamespace(V514=SimpleNamespace(isobutanol_price=1.4),
+                                V513=SimpleNamespace(ethanol_price=0.8)),
            'latest_TEA_solution': {'IRR': 0.21,
                                    'MPSPs': {'ethanol': 0.4, 'isobutanol': 0.9}}}
 assert ko.OBJECTIVE_REGISTRY['IBO yield']['getter'](handles) == 0.1
@@ -111,10 +115,30 @@ assert ko.OBJECTIVE_REGISTRY['IBO productivity']['getter'](handles) == 0.5
 assert ko.OBJECTIVE_REGISTRY['IBO yield x titer']['getter'](handles) == 0.1*20.0
 assert ko.OBJECTIVE_REGISTRY['EtOH productivity']['getter'](handles) == 2.0
 assert ko.OBJECTIVE_REGISTRY['Cell density']['getter'](handles) == 30.0
+# 'Price-weighted yield': y_IBO_glu_added*isobutanol_price +
+# y_EtOH_glu_added*ethanol_price = 0.1*1.4 + 0.3*0.8 = 0.38 (revenue-per-
+# sugar proxy; static V514/V513 reference prices, glucose-added yields).
+assert abs(ko.OBJECTIVE_REGISTRY['Price-weighted yield']['getter'](handles)
+           - (0.1*1.4 + 0.3*0.8)) < 1e-12
+assert ko.OBJECTIVE_REGISTRY['Price-weighted yield']['direction'] == 'maximize'
+assert ko.OBJECTIVE_REGISTRY['Price-weighted yield']['level'] == 'kinetic'
+assert ko.OBJECTIVE_REGISTRY['Price-weighted yield']['energy_scale'] == 0.01
+assert 'Price-weighted yield' not in ko.TRACKED_METRICS   # objective-only
+# Its slug keeps the hyphen and carries no parentheses into a study name.
+assert ko.objective_slug('Price-weighted yield') == 'price-weighted_yield'
 assert ko.OBJECTIVE_REGISTRY['IRR']['getter'](handles) == 0.21
 assert ko.OBJECTIVE_REGISTRY['EtOH MPSP']['getter'](handles) == 0.4
 assert ko.OBJECTIVE_REGISTRY['IBO MPSP']['getter'](handles) == 0.9
 assert ko.OBJECTIVE_REGISTRY['TCI']['getter'](handles) == 350.0
+# 'NPV' (raw NPV in MM$; maximized, system-level): NPV / 1e6, objective-only
+# (not tracked -> no new CSV column), slug carries no parentheses.
+assert ko.OBJECTIVE_REGISTRY['NPV']['getter'](handles) == 35.0
+assert ko.OBJECTIVE_REGISTRY['NPV']['direction'] == 'maximize'
+assert ko.OBJECTIVE_REGISTRY['NPV']['level'] == 'system'
+assert ko.OBJECTIVE_REGISTRY['NPV']['units'] == 'MM$'
+assert ko.OBJECTIVE_REGISTRY['NPV']['energy_scale'] == 2.0
+assert 'NPV' not in ko.TRACKED_METRICS
+assert ko.objective_slug('NPV') == 'npv'
 assert ko.OBJECTIVE_REGISTRY['PI']['getter'](handles) == 35e6/350e6   # NPV / TCI
 assert ko.TRACKED_METRICS['PI'](handles) == 35e6/350e6
 # PI (log-tail): positive branch is the identity (PI = 0.1 >= 0), so it
@@ -493,17 +517,18 @@ assert wb_B.endswith('parameter-distributions_corn_IBO_EtOH_B.xlsx')
 if os.path.isfile(wb_A) and os.path.isfile(wb_B):
     names_A = ko.kinetic_param_names_from_scenario('A')
     names_B = ko.kinetic_param_names_from_scenario('B')
-    assert len(names_B) == 55 and len(names_A) == 40, (len(names_B), len(names_A))   # 55 since the 2026-09-13 K_16i drop (nskinetics b61360e)
+    assert len(names_B) == 59 and len(names_A) == 40, (len(names_B), len(names_A))   # 59 since the 2026-09-15 r16/r17 split (+ k_17, K_17, k_17r, K_17e); 55 after the 2026-09-13 K_16i drop
     assert all(n[:2].lower() == 'k_' for n in names_A + names_B)
     assert len(set(names_B)) == len(names_B) and len(set(names_A)) == len(names_A)
     assert names_B[:5] == ['k_1l', 'K_1l', 'k_1h', 'K_1h', 'k_1e']  # workbook order
-    for dropped in ('k_6r', 'k_16r', 'K_2', 'K_9', 'K_16i'):   # commit 1e4efee1; K_16i 2026-09-13
+    for dropped in ('k_6r', 'k_16r', 'K_2', 'K_9', 'K_16i', 'k_16ia', 'k_16ie'):   # commit 1e4efee1; K_16i 2026-09-13; k_16ia/k_16ie repointed to k_17ia/k_17ie 2026-09-15
         assert dropped not in names_B and dropped not in names_A, dropped
     assert 'k_13' in names_B and 'k_13' not in names_A  # IBO pathway: B only
+    assert 'k_17' in names_B and 'k_17ie' in names_B and 'k_17' not in names_A
     wb_baselines = ko.workbook_kinetic_baselines('B')
     assert list(wb_baselines) == names_B
     assert all(v > 0.0 for v in wb_baselines.values())
-    PASS('workbook readers: 55 B / 40 A kinetic names in workbook order; constrained params absent')
+    PASS('workbook readers: 59 B / 40 A kinetic names in workbook order; constrained params absent')
 else:
     print('SKIP 14: parameter-distribution workbooks not found')
 
@@ -721,13 +746,13 @@ PASS('LOST rows: excluded by _completed, drawn as crosses in the PCA landscape, 
 
 #%% 19. rate_multiplier_bounds: k_* band separate from the K_* band; None = legacy single band
 kb19 = {'k_1e': 47.1, 'K_1e': 0.12, 'k_7': 0.5, 'K_1i': 2.0, 'k_13': 0.0}
-assert ko.DEFAULT_RATE_MULTIPLIER_BOUNDS == (1e-3, 10.0)   # 1e-5 before 2026-09-06 (pm)
+assert ko.DEFAULT_RATE_MULTIPLIER_BOUNDS == (1e-3, 4.0)   # 1e-5 before 2026-09-06 (pm)
 assert ko.DEFAULT_SATURATION_MULTIPLIER_BOUNDS == (0.1, 10.0)
 space19, excl19 = ko.build_search_space(
     kb19, multiplier_bounds=ko.DEFAULT_SATURATION_MULTIPLIER_BOUNDS,
     rate_multiplier_bounds=ko.DEFAULT_RATE_MULTIPLIER_BOUNDS)
-assert space19['k_1e'] == dict(low=1e-3*47.1, high=10.0*47.1, log=True)
-assert space19['k_7'] == dict(low=1e-3*0.5, high=10.0*0.5, log=True)
+assert space19['k_1e'] == dict(low=1e-3*47.1, high=4.0*47.1, log=True)
+assert space19['k_7'] == dict(low=1e-3*0.5, high=4.0*0.5, log=True)
 assert space19['K_1e'] == dict(low=0.1*0.12, high=10.0*0.12, log=True)   # uppercase: saturation band
 assert space19['K_1i'] == dict(low=0.1*2.0, high=10.0*2.0, log=True)
 assert excl19 == ['k_13']                       # zero baseline still excluded
@@ -791,12 +816,12 @@ _probe20 = (
 _out20 = _subprocess.run([_sys.executable, '-c', _probe20],
                          capture_output=True, text=True)
 assert _out20.returncode == 0, _out20.stderr
-assert _out20.stdout.strip() == '65 []', _out20.stdout + _out20.stderr
+assert _out20.stdout.strip() == '71 []', _out20.stdout + _out20.stderr   # 65 before the 2026-09-15 r16/r17 split (+ k_17, K_17, k_17r, K_17e, k_17ia, k_17ie)
 roles20 = ko.kinetic_parameter_roles()
 from collections import Counter as _Counter
 assert _Counter(roles20.values()) == {
-    'capacity': 20, 'affinity': 16, 'product_inhibition': 13,
-    'substrate_regulation': 4, 'product_self_inhibition': 4,
+    'capacity': 21, 'affinity': 17, 'product_inhibition': 15,
+    'substrate_regulation': 4, 'product_self_inhibition': 6,
     'lethality': 3, 'lethality_threshold': 3, 'initial_state': 2}
 assert roles20['k_7'] == 'capacity' and roles20['K_1i'] == 'substrate_regulation'
 assert roles20['K_6e'] == 'product_self_inhibition' and roles20['k_10ii'] == 'lethality'
@@ -809,10 +834,11 @@ PASS('kinetic_parameter_roles: role table loaded by file path, no heavy import i
 
 #%% 21. resolve_study_preset: set sizes by (target products x study type), roles, errors
 assert ko.DEFAULT_STUDY_TARGET_PRODUCTS == 'ethanol_isobutanol'
-assert ko.DEFAULT_STUDY_TYPE == 'metabolic_protein'
+assert ko.DEFAULT_STUDY_TYPE == 'metabolic_split_14d'
 assert set(ko.STUDY_TARGET_PRODUCTS) == {'ethanol_only', 'ethanol_isobutanol'}
 assert set(ko.STUDY_TYPE_ROLES) == {'metabolic', 'metabolic_protein', 'metabolic_minimal',
-                                    'metabolic_minimal_subset', 'metabolic_14d'}
+                                    'metabolic_minimal_subset', 'metabolic_14d', 'metabolic_split_14d',
+                                    'metabolic_split_12d'}
 assert set(ko.STUDY_TYPE_ROLES['metabolic_minimal']) == {
     'capacity', 'product_inhibition', 'lethality'}
 assert set(ko.STUDY_TYPE_ROLES['metabolic']) == {
@@ -848,8 +874,8 @@ for bad21 in (('ethanol', 'metabolic'), ('ethanol_only', 'protein')):
 if os.path.isfile(wb_A) and os.path.isfile(wb_B):
     expected21 = {('ethanol_only', 'metabolic'): 29,
                   ('ethanol_only', 'metabolic_protein'): 40,
-                  ('ethanol_isobutanol', 'metabolic'): 40,
-                  ('ethanol_isobutanol', 'metabolic_protein'): 55}   # 56 before the 2026-09-13 K_16i drop
+                  ('ethanol_isobutanol', 'metabolic'): 41,
+                  ('ethanol_isobutanol', 'metabolic_protein'): 59}   # 40 / 55 before the 2026-09-15 r16/r17 split (k_17 capacity; K_17 affinity; k_17r, K_17e self-inhibition)
     roles21 = ko.kinetic_parameter_roles()
     for (stp21, st21), n21 in expected21.items():
         p21 = ko.resolve_study_preset(stp21, st21)
@@ -858,9 +884,11 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
                             'rate_params', 'parameter_multiplier_bounds',
                             'exclude_params', 'stage_1_max_x_bounds',
                             'parameter_groups', 'group_multiplier_bounds',
-                            'spike_delta_bounds'}
+                            'spike_delta_bounds', 'group_references',
+                            'param_bounds_override'}
         # The three 2026-09-07 keys are inert on every pre-existing preset.
         assert p21['parameter_groups'] is None
+        assert p21['group_references'] is None
         assert p21['group_multiplier_bounds'] == ko.DEFAULT_GROUP_MULTIPLIER_BOUNDS
         assert p21['spike_delta_bounds'] == ko.DEFAULT_SPIKE_DELTA_BOUNDS
         assert p21['scenario'] == 'A'                       # both start at the A baseline
@@ -871,7 +899,7 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
         assert p21['exclude_params'] == ko.DEFAULT_EXCLUDED_PARAMETERS
         assert p21['kinetic_bounds_scenario'] == ('A' if stp21 == 'ethanol_only' else 'B')
         assert p21['multiplier_bounds'] == (0.1, 10.0)
-        assert p21['rate_multiplier_bounds'] == (1e-3, 10.0)
+        assert p21['rate_multiplier_bounds'] == (1e-3, 4.0)
         # k_10 (active-biomass decay capacity, r10) keeps a 0.1x floor:
         # a near-zero decay rate is not an engineering target.
         assert p21['parameter_multiplier_bounds'] == {'k_10': (0.1, 10.0)}
@@ -885,11 +913,11 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
         # rate_params: the RATE CONSTANTS (role capacity) of the set
         # scenario's workbook, workbook order -- the only names the k_*
         # band applies to (inhibition coefficients k_*i* share the K_*
-        # band since 2026-09-06). 16 in A's workbook, 20 in B's (+ the
-        # four Ehrlich capacities); every one is in every study type.
+        # band since 2026-09-06). 16 in A's workbook, 21 in B's (+ the
+        # five Ehrlich capacities k_13-k_17); every one is in every study type.
         rp21 = p21['rate_params']
         assert rp21 == [n for n in wb21 if roles21[n] == 'capacity']
-        assert len(rp21) == (16 if stp21 == 'ethanol_only' else 20)
+        assert len(rp21) == (16 if stp21 == 'ethanol_only' else 21)   # + k_17 since 2026-09-15
         assert all(n in inc21 for n in rp21)
         assert rp21 == ko.rate_constant_names(wb21, roles=roles21)
         assert not any(n in rp21 for n in ('k_1ie', 'k_1ia', 'k_7ie', 'k_10ie'))
@@ -899,7 +927,7 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
         else:
             assert inc21 == wb21                            # every workbook row
     p21_eo = ko.resolve_study_preset('ethanol_only', 'metabolic_protein')['include_params']
-    for ibo21 in ('k_13', 'K_16', 'k_1ii', 'k_7ii', 'k_10ii', 'k_16ie'):
+    for ibo21 in ('k_13', 'K_16', 'k_1ii', 'k_7ii', 'k_10ii', 'k_17ie', 'k_17', 'K_17'):
         assert ibo21 not in p21_eo, ibo21
     # A workbook row missing from the role table must raise, not leak.
     roles_missing21 = dict(roles21); del roles_missing21['k_7']
@@ -909,7 +937,7 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
         assert 'k_7' in str(e21)
     else:
         raise AssertionError('missing role-table entry did not raise KeyError')
-    PASS('resolve_study_preset: 29/40/40/55 sets, role filter, A start, workbook order, errors')
+    PASS('resolve_study_preset: 29/40/41/59 sets, role filter, A start, workbook order, errors')
 else:
     print('SKIP 21: parameter-distribution workbooks not found')
 
@@ -939,23 +967,23 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
         param_bounds_override=override22, include_params=p22['include_params'],
         exclude_params=p22['exclude_params'])
     # k_10 (active-biomass decay) is excluded by default (2026-09-06 pm):
-    # 55 sampled kinetic parameters, no k_10 column, no k_10 probe.
-    assert excl22 == ['k_10'] and len(space22) == 54 + 4   # 55 B rows minus k_10, + 4 feeding
+    # 58 sampled kinetic parameters, no k_10 column, no k_10 probe.
+    assert excl22 == ['k_10'] and len(space22) == 58 + 4   # 59 B rows minus k_10, + 4 feeding
     assert 'k_10' not in space22
     assert all(space22[n]['log'] for n in base22_B if n != 'k_10')
-    # Bands by ROLE (2026-09-06): rate constants (capacity) 1e-3x-10x
+    # Bands by ROLE (2026-09-06): rate constants (capacity) 1e-3x-4x
     # (1e-5x until later that day); inhibition coefficients (k_*i*:
     # product_inhibition, lethality) and the K_* terms (regulation,
     # affinity, self-inhibition) 0.1x-10x.
     for n22, b22 in base22_B.items():
         if n22 == 'k_10':
             continue
-        assert space22[n22]['high'] == 10.0*b22
+        assert space22[n22]['high'] == (4.0*b22 if n22 in p22['rate_params'] else 10.0*b22)
         assert space22[n22]['low'] == (1e-3*b22 if n22 in p22['rate_params']
                                        else 0.1*b22), n22
-    for inh22 in ('k_1ie', 'k_1ii', 'k_7ii', 'k_10ie', 'k_10ii', 'k_16ie'):
+    for inh22 in ('k_1ie', 'k_1ii', 'k_7ii', 'k_10ie', 'k_10ii', 'k_17ie'):
         assert space22[inh22]['low'] == 0.1*base22_B[inh22], inh22
-    for rate22 in ('k_1h', 'k_2', 'k_7', 'k_13'):
+    for rate22 in ('k_1h', 'k_2', 'k_7', 'k_13', 'k_17'):
         assert space22[rate22]['low'] == 1e-3*base22_B[rate22], rate22
     # The workbook bounds still carry k_10's per-parameter band (in force
     # only when a caller re-includes it with exclude_params=()).
@@ -967,7 +995,7 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
         parameter_multiplier_bounds=p22['parameter_multiplier_bounds'],
         param_bounds_override=override22, include_params=p22['include_params'],
         exclude_params=())
-    assert excl22_k10 == [] and len(space22_k10) == 55 + 4
+    assert excl22_k10 == [] and len(space22_k10) == 59 + 4
     assert space22_k10['k_10'] == dict(low=0.1*0.06, high=10.0*0.06, log=True)
     assert {n: v for n, v in space22_k10.items() if n != 'k_10'} == space22
     pt22 = ko.baseline_decision_point(
@@ -985,8 +1013,8 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
                                                     rate_params=p22['rate_params'])
     assert 'k_10' not in probes22 and 'k_10' not in at_floor22
     assert set(at_floor22) == set(ehrlich22)
-    assert len(probes22) == 20 - 1 - len(ehrlich22)       # 20 rate constants - k_10 - 4 clipped
-    PASS('preset trial 0: role-based bands (capacity 1e-3x, inhibition/K_* 0.1x); k_10 excluded (55 sampled, no probe; re-included on 0.1x-10x with exclude_params=()); Ehrlich rates clipped to exactly 1e-3 x b_B, every other baseline unchanged')
+    assert len(probes22) == 21 - 1 - len(ehrlich22)       # 21 rate constants - k_10 - 4 clipped
+    PASS('preset trial 0: role-based bands (capacity 1e-3x, inhibition/K_* 0.1x); k_10 excluded (58 sampled, no probe; re-included on 0.1x-10x with exclude_params=()); Ehrlich rates clipped to exactly 1e-3 x b_B, every other baseline unchanged')
 else:
     print('SKIP 22: parameter-distribution workbooks not found')
 
@@ -1010,11 +1038,11 @@ sup23 = _runpy.run_path(os.path.join(
 assert sup23['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_protein') \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-10_ib0.1-10_xk10_s1x1-50'
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-4_ib0.1-10_xk10_aA_s1x1-50'
 assert sup23['default_study_name']('A', 'IBO titer', 'B',
                                    study_target_products='ethanol_only',
                                    study_type='metabolic') \
-    == 'kin_opt_ethanol_only_metabolic_ibo_titer_kbB_rb0.001-10_ib0.1-10_xk10_s1x1-50'
+    == 'kin_opt_ethanol_only_metabolic_ibo_titer_kbB_rb0.001-4_ib0.1-10_xk10_aA_s1x1-50'
     # ethanol_only's own kinetic_bounds_scenario is 'A' (STUDY_TARGET_PRODUCTS);
     # the explicit 'B' here differs, so it IS tagged (Finding 1 fix -- this
     # name used to silently drop the override and collide with the default).
@@ -1027,13 +1055,13 @@ assert sup23['default_study_name']('A', 'IRR', 'B') == 'kin_opt_A_kbB_irr'
 # is silent.
 assert sup23['default_study_name']('B', 'IRR', None,
                                    'ethanol_isobutanol', 'metabolic_protein') \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_scB_rb0.001-10_ib0.1-10_xk10_s1x1-50'
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_scB_rb0.001-4_ib0.1-10_xk10_aA_s1x1-50'
 assert sup23['default_study_name'](None, 'IRR', 'A',
                                    'ethanol_isobutanol', 'metabolic_protein') \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_kbA_rb0.001-10_ib0.1-10_xk10_s1x1-50'
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_kbA_rb0.001-4_ib0.1-10_xk10_aA_s1x1-50'
 assert sup23['default_study_name']('A', 'IRR', 'B',
                                    'ethanol_isobutanol', 'metabolic_protein') \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-10_ib0.1-10_xk10_s1x1-50'  # both match the preset: no sc/kb tag
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-4_ib0.1-10_xk10_aA_s1x1-50'  # both match the preset: no sc/kb tag
 # child_code forwards both kwargs (and None under --legacy-flags).
 code23 = sup23['child_code'](None, 'IRR', 2000, None, False, 'x',
                              study_target_products='ethanol_only',
@@ -1220,11 +1248,12 @@ else:
         k_4 = 4.8; k_5 = 0.0104; k_5e = 0.775; k_6 = 2.82
         k_7 = 1.203; k_8 = 0.589
         k_13 = 0.0; k_14 = 0.0; k_15 = 0.0; k_16 = 0.0
+        k_17 = 44.0            # Adh6 (r17): native/constitutive, ON in scenario A too (2026-09-15 split)
         K_1e = 0.12
         def getGlobalParameterIds(self):
             return ['k_1h', 'k_1l', 'k_1e', 'k_2', 'k_3', 'k_4', 'k_5',
                     'k_5e', 'k_6', 'k_7', 'k_8', 'k_13', 'k_14', 'k_15',
-                    'k_16', 'K_1e', 'not_kinetic']
+                    'k_16', 'k_17', 'K_1e', 'not_kinetic']
     te25 = _FakeTE25()
     seen_k7 = []          # k_7 on the fake model at each model_specification call
     def _model_specification25(**kw):
@@ -1288,11 +1317,12 @@ else:
     # offline no-load harness does not exercise. The burden columns
     # (k_7_eff etc.) are still recorded by the pre-sim evaluate.
     assert np.isclose(df25['k_7'][1], 9.0*1.203)
-    assert np.isclose(df25['burden_factor'][1], 0.17701, rtol=1e-3)   # 0.13276 at TRANSLATION_FRACTION_WT = 0.30
-    assert np.isclose(df25['k_7_eff'][1], 1.9165, rtol=1e-3)          # 1.4374 at 0.30
-    assert np.isclose(df25['k_8_eff'][1], 0.17701*0.589, rtol=1e-3)
-    # Phi_M,wt = the report's 0.0637 (at P = 0.45) x PROTEIN_CONTENT/0.45
-    assert np.isclose(df25['Phi_M'][1], 0.0637*eb.PROTEIN_CONTENT/eb.POOL_TABLE_PROTEIN_CONTENT)
+    assert np.isclose(df25['burden_factor'][1], 0.17634, rtol=1e-3)   # 0.17701 before the 2026-09-15 r17-native pool (Phi_M,wt rose); 0.13276 at TRANSLATION_FRACTION_WT = 0.30
+    assert np.isclose(df25['k_7_eff'][1], 1.9092, rtol=1e-3)          # 1.9165 before r17-native; 1.4374 at 0.30
+    assert np.isclose(df25['k_8_eff'][1], 0.17634*0.589, rtol=1e-3)
+    # Phi_M,wt = the sum of the native-step pools (now includes r17, the
+    # 2026-09-15 Adh6 native step; 0.0637 x PROTEIN_CONTENT/0.45 before it)
+    assert np.isclose(df25['Phi_M'][1], sum(pool for pool, _ in eb.NATIVE_STEPS.values()))
     assert np.isclose(df25['phi_T'][1], 9.0*eb.PHI_T_WT)
     assert df25['objective'][1] == 0.2
     # trial 2: the reference is inert
@@ -1453,11 +1483,11 @@ assert sup26['default_study_name'](None, 'IRR', None, burden=True) == 'kin_opt_B
 assert sup26['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_protein', burden=True) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-10_ib0.1-10_xk10_s1x1-50_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-4_ib0.1-10_xk10_aA_s1x1-50_burden'
 assert sup26['default_study_name']('B', 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_protein', burden=True) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_scB_rb0.001-10_ib0.1-10_xk10_s1x1-50_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_scB_rb0.001-4_ib0.1-10_xk10_aA_s1x1-50_burden'
 # child_code forwards the flag both ways; supervise()'s default is ON and it
 # derives the study name WITH the flag (so resume/stall-kill hit the store
 # the child writes).
@@ -1606,7 +1636,7 @@ assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic',
 assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic',
                              burden=True,
                              rate_multiplier_bounds=ko.DEFAULT_RATE_MULTIPLIER_BOUNDS) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_irr_rb0.001-10_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_irr_rb0.001-4_burden'
 assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic',
                              burden=True, rate_multiplier_bounds=(1e-5, 10.0)) \
     == 'kin_opt_ethanol_isobutanol_metabolic_irr_rb1e-05-10_burden'
@@ -1623,7 +1653,7 @@ assert sup27['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic', burden=True,
                                    rate_multiplier_bounds=(0.1, 10.0)) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_irr_rb0.1-10_ib0.1-10_xk10_s1x1-50_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_irr_rb0.1-10_ib0.1-10_xk10_aA_s1x1-50_burden'
 assert sup27['default_study_name']('A', 'IRR', 'B', rate_multiplier_bounds=(0.1, 10.0)) \
     == 'kin_opt_A_kbB_irr'                                    # legacy path: band not encoded
 code27 = sup27['child_code'](None, 'IRR', 200, None, False, 'x',
@@ -1728,7 +1758,7 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
     for sc28 in ('A', 'B'):
         base28_wb = ko.workbook_kinetic_baselines(sc28)
         rp28_wb = ko.rate_constant_names(base28_wb, roles=roles28_real)
-        assert len(rp28_wb) == (16 if sc28 == 'A' else 20)
+        assert len(rp28_wb) == (16 if sc28 == 'A' else 21)   # + k_17 since 2026-09-15
         wbb28 = ko.workbook_kinetic_bounds(
             sc28, multiplier_bounds=(0.1, 10.0),
             rate_multiplier_bounds=(1e-5, 10.0), rate_params=rp28_wb)
@@ -1820,12 +1850,12 @@ else:
 PASS('role-based bands: rate constants on the rate band, inhibition coefficients and K_* 0.1x-10x; rate_params threaded (None = legacy prefix rule); probes only for rate constants; _ib naming tag; driver/supervisor plumbing')
 
 #%% 29. per-parameter multiplier bands (2026-09-06 pm): the rate band is
-# 1e-3x-10x and k_10 (active-biomass decay capacity, r10) keeps 0.1x-10x
+# 1e-3x-4x and k_10 (active-biomass decay capacity, r10) keeps 0.1x-10x
 # via DEFAULT_PARAMETER_MULTIPLIER_BOUNDS; parameter_multiplier_bounds
 # threaded through build_search_space / workbook_kinetic_bounds / the
 # engine / the driver; precedence absolute override > per-parameter band
 # > role band; every preset name tags the effective rate band.
-assert ko.DEFAULT_RATE_MULTIPLIER_BOUNDS == (1e-3, 10.0)
+assert ko.DEFAULT_RATE_MULTIPLIER_BOUNDS == (1e-3, 4.0)
 assert ko.DEFAULT_PARAMETER_MULTIPLIER_BOUNDS == {'k_10': (0.1, 10.0)}
 assert 'DEFAULT_PARAMETER_MULTIPLIER_BOUNDS' in ko.__all__
 kb29 = {'k_1e': 47.1, 'k_10': 0.06, 'k_10ie': 0.04, 'K_1e': 0.12, 'k_7': 1.203}
@@ -1928,7 +1958,7 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
         p29 = ko.resolve_study_preset(stp29, st29)
         assert p29['parameter_multiplier_bounds'] == ko.DEFAULT_PARAMETER_MULTIPLIER_BOUNDS
         assert p29['parameter_multiplier_bounds'] is not ko.DEFAULT_PARAMETER_MULTIPLIER_BOUNDS
-        assert p29['rate_multiplier_bounds'] == (1e-3, 10.0)
+        assert p29['rate_multiplier_bounds'] == (1e-3, 4.0)
 else:
     print('SKIP 29 (workbook part): parameter-distribution workbooks not found')
 # Naming: the EFFECTIVE rate band is always tagged on preset names (engine
@@ -1943,12 +1973,12 @@ sup29 = _runpy.run_path(os.path.join(
 assert sup29['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_protein', burden=True) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-10_ib0.1-10_xk10_s1x1-50_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-4_ib0.1-10_xk10_aA_s1x1-50_burden'
 assert sup29['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_protein', burden=True,
                                    rate_multiplier_bounds=(1e-5, 10.0)) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb1e-05-10_ib0.1-10_xk10_s1x1-50_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb1e-05-10_ib0.1-10_xk10_aA_s1x1-50_burden'
 assert sup29['default_study_name']('A', 'IRR', 'B', burden=True) == 'kin_opt_A_kbB_irr_burden'
 src29_sup = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                               'optimize_kinetics_BO_supervised.py')).read()
@@ -1961,11 +1991,12 @@ drv29 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
 assert ("'rate_multiplier_bounds', 'rate_params',\n"
         "                    'parameter_multiplier_bounds', 'stage_1_max_x_bounds',\n"
         "                    'parameter_groups', 'group_multiplier_bounds',\n"
-        "                    'spike_delta_bounds'):") in drv29
+        "                    'spike_delta_bounds', 'group_references',\n"
+        "                    'param_bounds_override'):") in drv29
 assert "parameter_multiplier_bounds=engine_kwargs.get('parameter_multiplier_bounds')" in drv29
 assert "rate_multiplier_bounds=engine_kwargs['rate_multiplier_bounds']" in drv29
 assert 'explicit_rate_bounds' not in drv29
-PASS('per-parameter bands: rate band 1e-3x-10x, k_10 0.1x-10x via DEFAULT_PARAMETER_MULTIPLIER_BOUNDS; precedence override > per-parameter > role; probes at own floor; workbook/preset/engine/driver plumbing; _rb always tagged')
+PASS('per-parameter bands: rate band 1e-3x-4x, k_10 0.1x-10x via DEFAULT_PARAMETER_MULTIPLIER_BOUNDS; precedence override > per-parameter > role; probes at own floor; workbook/preset/engine/driver plumbing; _rb always tagged')
 
 #%% 30. n_startup_trials: the TPE random start-up length is an engine kwarg
 # (None = the default rule max(10, n_trials//4)), forwarded by the driver's
@@ -2338,11 +2369,12 @@ else:
         k_4 = 4.8; k_5 = 0.0104; k_5e = 0.775; k_6 = 2.82
         k_7 = 1.203; k_8 = 0.589
         k_13 = 0.0; k_14 = 0.0; k_15 = 0.0; k_16 = 0.0
+        k_17 = 44.0            # Adh6 (r17): native/constitutive, ON in scenario A too (2026-09-15 split)
         K_1e = 0.12
         def getGlobalParameterIds(self):
             return ['k_1h', 'k_1l', 'k_1e', 'k_2', 'k_3', 'k_4', 'k_5',
                     'k_5e', 'k_6', 'k_7', 'k_8', 'k_13', 'k_14', 'k_15',
-                    'k_16', 'K_1e', 'not_kinetic']
+                    'k_16', 'k_17', 'K_1e', 'not_kinetic']
     def _solve_TEA35(stream_IDs=None):
         return {'IRR': 0.2, 'MPSPs': {'ethanol': 0.5, 'isobutanol': 1.0}}
     handles35 = dict(handles17, r_te=_FakeTE35(),
@@ -2529,12 +2561,12 @@ assert sup37['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic', burden=True,
                                    exclude_params=()) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_irr_rb0.001-10_ib0.1-10_s1x1-50_burden'   # the production study's name + the _s1x tag (resume it with a bare --stage-1-max-x-bounds)
+    == 'kin_opt_ethanol_isobutanol_metabolic_irr_rb0.001-4_ib0.1-10_aA_s1x1-50_burden'   # the production study's name + the _s1x tag (resume it with a bare --stage-1-max-x-bounds)
 assert sup37['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic', burden=True,
                                    exclude_params=('k_10', 'k_7')) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_irr_rb0.001-10_ib0.1-10_xk10+k7_s1x1-50_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_irr_rb0.001-4_ib0.1-10_xk10+k7_aA_s1x1-50_burden'
 assert sup37['default_study_name']('A', 'IRR', 'B', exclude_params=('k_10',)) \
     == 'kin_opt_A_kbB_irr'                                             # legacy path: never tagged
 src37_sup = _inspect.getsource(sup37['supervise'])
@@ -2703,7 +2735,8 @@ drv40 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           'optimize_kinetics_BO.py')).read()
 assert ("'parameter_multiplier_bounds', 'stage_1_max_x_bounds',\n"
         "                    'parameter_groups', 'group_multiplier_bounds',\n"
-        "                    'spike_delta_bounds'):") in drv40
+        "                    'spike_delta_bounds', 'group_references',\n"
+        "                    'param_bounds_override'):") in drv40
 assert "stage_1_max_x_bounds=engine_kwargs['stage_1_max_x_bounds']," in drv40
 sup40 = _runpy.run_path(os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
@@ -2730,17 +2763,17 @@ assert 'stage_1_max_x_bounds=(2.0, 30.0),' in code40c
 assert sup40['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_protein', burden=True) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-10_ib0.1-10_xk10_s1x1-50_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-4_ib0.1-10_xk10_aA_s1x1-50_burden'
 assert sup40['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_protein', burden=True,
                                    stage_1_max_x_bounds=None) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-10_ib0.1-10_xk10_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-4_ib0.1-10_xk10_aA_burden'
 assert sup40['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_protein', burden=True,
                                    stage_1_max_x_bounds=(2.0, 30.0)) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-10_ib0.1-10_xk10_s1x2-30_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-4_ib0.1-10_xk10_aA_s1x2-30_burden'
 assert sup40['default_study_name']('A', 'IRR', 'B', stage_1_max_x_bounds=(1.0, 50.0)) \
     == 'kin_opt_A_kbB_irr'
 src40_sup = _inspect.getsource(sup40['supervise'])
@@ -2899,7 +2932,7 @@ assert sup41['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic', burden=True,
                                    seed_from=seeds41_cli) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_irr_rb0.001-10_ib0.1-10_xk10_s1x1-50_seed3_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_irr_rb0.001-4_ib0.1-10_xk10_aA_s1x1-50_seed3_burden'
 assert sup41['default_study_name']('A', 'IRR', 'B', seed_from=seeds41_cli) \
     == 'kin_opt_A_kbB_irr_seed3'
 assert sup41['default_study_name']('A', 'IRR', 'B') == 'kin_opt_A_kbB_irr'
@@ -2926,7 +2959,7 @@ PASS('seed points: clip_to_search_space, seed_points_from_trajectory (labels, cl
 # individual space; expand_grouped_values; spike_delta_bounds=None pins the
 # spike (no column); baseline point 1.0 per group; no knockout probe for a
 # group; every validation ValueError; plots tolerate a pinned spike.
-assert ko.DEFAULT_GROUP_MULTIPLIER_BOUNDS == (0.2, 2.0)
+assert ko.DEFAULT_GROUP_MULTIPLIER_BOUNDS == (0.75, 1.5)
 assert ko.DEFAULT_SPIKE_DELTA_BOUNDS == (0.5, 595.0)
 assert {'DEFAULT_GROUP_MULTIPLIER_BOUNDS', 'DEFAULT_SPIKE_DELTA_BOUNDS',
         'expand_grouped_values'} <= set(ko.__all__)
@@ -2939,7 +2972,7 @@ assert list(space42_off) == ['k_1e', 'k_1ie', 'k_4ie', 'k_1ia', 'k_10', 'K_1e',
                              *ko.FEEDING_VARIABLES]
 assert excl42_off == []
 # Groups on: members gone, group entries after the kinetics and before the
-# feeding variables (input order), band (0.2, 2.0) log; grouped members are
+# feeding variables (input order), band (0.75, 1.5) log; grouped members are
 # NOT listed in `excluded` (they are sampled, through their group).
 space42, excl42 = ko.build_search_space(kb42, parameter_groups=groups42,
                                         exclude_params=('k_10',),
@@ -2948,8 +2981,8 @@ space42, excl42 = ko.build_search_space(kb42, parameter_groups=groups42,
 assert list(space42) == ['k_1e', 'K_1e', 'inhib_ethanol', 'inhib_acetate',
                          'threshold_conc', 'target_delta', 'max_n_spikes',
                          'stage_1_max_x'], list(space42)
-assert space42['inhib_ethanol'] == dict(low=0.2, high=2.0, log=True)
-assert space42['inhib_acetate'] == dict(low=0.2, high=2.0, log=True)
+assert space42['inhib_ethanol'] == dict(low=0.75, high=1.5, log=True)
+assert space42['inhib_acetate'] == dict(low=0.75, high=1.5, log=True)
 assert excl42 == ['k_10']
 assert 'spike_delta' not in space42
 # A list of pairs is accepted like a dict; a custom band applies to every group.
@@ -3068,29 +3101,44 @@ assert ko.EFFECTOR_ORDER == ('ethanol', 'isobutanol', 'acetate')
 assert ko.STUDY_TYPE_OPTIONS == {
     'metabolic_minimal': dict(exclude_params=('k_10', 'k_7', 'k_8'),
                               group_roles=('product_inhibition', 'lethality'),
-                              group_multiplier_bounds={'inhib_ethanol': (0.3, 2.0)},
+                              group_multiplier_bounds={},
                               spike_delta_bounds=None),
     'metabolic_minimal_subset': dict(rate_params=ko.METABOLIC_MINIMAL_SUBSET_RATES,
                                      parameter_groups=ko.METABOLIC_MINIMAL_SUBSET_GROUPS,
-                                     group_multiplier_bounds={'inhib_ethanol': (0.3, 2.0)},
+                                     group_multiplier_bounds={},
                                      exclude_params=(),
                                      spike_delta_bounds=None,
                                      stage_1_max_x_bounds=None),
     'metabolic_14d': dict(rate_params=ko.METABOLIC_14D_RATES,
                           parameter_groups=ko.METABOLIC_MINIMAL_SUBSET_GROUPS,
                           rate_parameter_groups=ko.METABOLIC_14D_RATE_GROUPS,
-                          group_multiplier_bounds={'glycolysis': (0.2, 5.0),
-                                                   'inhib_ethanol': (0.3, 2.0)},
+                          group_multiplier_bounds={'glycolysis': (0.2, 4.0)},
                           exclude_params=(),
-                          spike_delta_bounds=None)}
+                          spike_delta_bounds=None),
+    'metabolic_split_14d': dict(rate_params=ko.METABOLIC_SPLIT_14D_RATES,
+                                parameter_groups=ko.METABOLIC_SPLIT_14D_GROUPS,
+                                rate_parameter_groups=ko.METABOLIC_14D_RATE_GROUPS,
+                                group_multiplier_bounds={'glycolysis': (0.2, 4.0)},
+                                exclude_params=(),
+                                spike_delta_bounds=None,
+                                stage_1_max_x_bounds=None),
+    'metabolic_split_12d': dict(rate_params=ko.METABOLIC_SPLIT_12D_RATES,
+                                parameter_groups=ko.METABOLIC_SPLIT_14D_GROUPS,
+                                rate_parameter_groups=ko.METABOLIC_SPLIT_12D_RATE_GROUPS,
+                                rate_group_weights={'ehrlich_downstream': ko.EHRLICH_DOWNSTREAM_WEIGHTS},
+                                group_multiplier_bounds={'glycolysis': (0.2, 4.0),
+                                                         'ehrlich_downstream': (1e-3, 4.0)},
+                                exclude_params=(),
+                                spike_delta_bounds=None,
+                                stage_1_max_x_bounds=None)}
 assert {'STUDY_TYPE_OPTIONS', 'EFFECTOR_ORDER', 'kinetic_parameter_effectors',
         'study_type_name_defaults'} <= set(ko.__all__)
 # Naming defaults per study type (workbook-free): the minimal type's group
-# band (a per-effector-family dict flooring inhib_ethanol at 0.3x) stands
-# in for the inhibition band (_ibe0.3-2) and its exclusion set is
+# band (an empty dict -> every family at the default band) stands
+# in for the inhibition band (_ib0.75-1.5) and its exclusion set is
 # k_10 + k_7 + k_8; every other type keeps the module defaults.
 assert ko.study_type_name_defaults('metabolic_minimal') == dict(
-    inhibition_multiplier_bounds={'inhib_ethanol': (0.3, 2.0)},
+    inhibition_multiplier_bounds={},
     exclude_params=('k_10', 'k_7', 'k_8'),
     stage_1_max_x_bounds=(1.0, 50.0))
 for st43 in ('metabolic', 'metabolic_protein'):
@@ -3105,10 +3153,15 @@ except ValueError as e43:
 else:
     raise AssertionError('unknown study_type did not raise')
 NAME43 = ('kin_opt_ethanol_isobutanol_metabolic_minimal_irr'
-          '_rb0.001-10_ibe0.3-2_xk10+k7+k8_s1x1-50_burden')
+          '_rb0.001-4_ib0.75-1.5_xk10+k7+k8_s1x1-50_burden')
+# Supervisor/driver preset names carry the scenario-A IBO-pathway
+# anchoring tag `_aA` (after the exclusion tag, before `_s1x`); the bare
+# NAME43 is still what a direct ko.default_study_name(...) call (no marker)
+# below produces.
+NAME43_aA = NAME43.replace('_s1x1-50', '_aA_s1x1-50')
 assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_minimal',
-                             rate_multiplier_bounds=(1e-3, 10.0),
-                             inhibition_multiplier_bounds={'inhib_ethanol': (0.3, 2.0)},
+                             rate_multiplier_bounds=(1e-3, 4.0),
+                             inhibition_multiplier_bounds={},
                              exclude_params=('k_10', 'k_7', 'k_8'),
                              stage_1_max_x_bounds=(1.0, 50.0), burden=True) == NAME43
 # Driver: the three new keys are setdefault'ed like the others and the
@@ -3117,7 +3170,8 @@ assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_minimal',
 drv43 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           'optimize_kinetics_BO.py')).read()
 assert "'parameter_groups', 'group_multiplier_bounds'," in drv43
-assert "'spike_delta_bounds'):" in drv43
+assert ("'spike_delta_bounds', 'group_references',\n"
+        "                    'param_bounds_override'):") in drv43
 assert 'engine_kwargs.setdefault(key, preset[key])' in drv43
 assert "Parameter groups" in drv43 and 'spike feed pinned at the baseline' in drv43
 # The _ib tag follows the band that actually SIZES the inhibition entries:
@@ -3137,16 +3191,16 @@ sup43 = _runpy.run_path(os.path.join(
     'optimize_kinetics_BO_supervised.py'))
 assert sup43['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
-                                   study_type='metabolic_minimal', burden=True) == NAME43
+                                   study_type='metabolic_minimal', burden=True) == NAME43_aA
 assert sup43['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_minimal', burden=True,
                                    exclude_params=('k_10',)) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_minimal_irr_rb0.001-10_ibe0.3-2_xk10_s1x1-50_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_minimal_irr_rb0.001-4_ib0.75-1.5_xk10_aA_s1x1-50_burden'
 assert sup43['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_protein', burden=True) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-10_ib0.1-10_xk10_s1x1-50_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-4_ib0.1-10_xk10_aA_s1x1-50_burden'
 src43_sup = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                               'optimize_kinetics_BO_supervised.py')).read()
 assert 'ko.study_type_name_defaults(study_type)' in src43_sup
@@ -3158,7 +3212,8 @@ eff43 = ko.kinetic_parameter_effectors()
 assert eff43 is ko.kinetic_parameter_effectors()            # cached
 assert set(eff43) == set(ko.kinetic_parameter_roles())
 assert eff43['k_1ie'] == 'ethanol' and eff43['k_1ii'] == 'isobutanol' \
-    and eff43['k_16ia'] == 'acetate' and eff43['k_10ie'] == 'ethanol'
+    and eff43['k_16ia'] == 'acetate' and eff43['k_10ie'] == 'ethanol' \
+    and eff43['k_17ia'] == 'acetate' and eff43['k_17ie'] == 'ethanol'
 assert eff43['k_1e'] is None and eff43['k_7'] is None
 assert ko.kinetic_parameter_effectors(ko.kinetic_parameter_roles_path()) == eff43
 if os.path.isfile(wb_A) and os.path.isfile(wb_B):
@@ -3166,31 +3221,31 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
     p43 = ko.resolve_study_preset('ethanol_isobutanol', 'metabolic_minimal')
     assert p43['scenario'] == 'A' and p43['kinetic_bounds_scenario'] == 'B'
     assert p43['exclude_params'] == ('k_10', 'k_7', 'k_8')
-    # multiplier_bounds is the inert saturation-band tuple for a grouped
+    # multiplier_bounds is the inert default group-band tuple for a grouped
     # preset (every inhibition coefficient is grouped); the _ib tag comes
-    # from the per-group dict below (-> _ibe0.3-2), not from this.
-    assert p43['multiplier_bounds'] == (0.2, 2.0)
-    assert p43['group_multiplier_bounds'] == {'inhib_ethanol': (0.3, 2.0)}
+    # from the (empty) per-group dict below (-> _ib0.75-1.5), not from this.
+    assert p43['multiplier_bounds'] == (0.75, 1.5)
+    assert p43['group_multiplier_bounds'] == {}
     assert p43['spike_delta_bounds'] is None
     assert p43['rate_multiplier_bounds'] == ko.DEFAULT_RATE_MULTIPLIER_BOUNDS
     assert p43['parameter_multiplier_bounds'] == {'k_10': (0.1, 10.0)}
     assert p43['stage_1_max_x_bounds'] == (1.0, 50.0)
     assert p43['parameter_groups'] == {
-        'inhib_ethanol': ['k_1ie', 'k_4ie', 'k_7ie', 'k_10ie', 'k_16ie'],
+        'inhib_ethanol': ['k_1ie', 'k_4ie', 'k_7ie', 'k_10ie', 'k_17ie'],
         'inhib_isobutanol': ['k_1ii', 'k_4ii', 'k_6ii', 'k_7ii', 'k_10ii'],
-        'inhib_acetate': ['k_1ia', 'k_4ia', 'k_6ia', 'k_7ia', 'k_10ia', 'k_16ia']}
+        'inhib_acetate': ['k_1ia', 'k_4ia', 'k_6ia', 'k_7ia', 'k_10ia', 'k_17ia']}
     assert list(p43['parameter_groups']) == ['inhib_ethanol', 'inhib_isobutanol', 'inhib_acetate']
     inc43 = p43['include_params']
-    assert len(inc43) == 36                                    # 20 capacities + 16 inhibition rows
+    assert len(inc43) == 37                                    # 21 capacities + 16 inhibition rows (k_17 since 2026-09-15)
     assert all(roles43[n] in ('capacity', 'product_inhibition', 'lethality') for n in inc43)
     assert not any(n.startswith('K_') for n in inc43)         # K_1i etc. are OUT
     grouped43 = {m for ms in p43['parameter_groups'].values() for m in ms}
     individual43 = [n for n in inc43 if n not in grouped43 and n not in p43['exclude_params']]
-    assert len(individual43) == 17 and all(roles43[n] == 'capacity' for n in individual43)
+    assert len(individual43) == 18 and all(roles43[n] == 'capacity' for n in individual43)
     assert not {'k_10', 'k_7', 'k_8'} & set(individual43)
-    assert len(p43['rate_params']) == 20                       # the workbook's capacities, as before
+    assert len(p43['rate_params']) == 21                       # the workbook's capacities (+ k_17)
     # The resulting space (live baselines = the B workbook values here):
-    # 17 + 3 + 4 = 24 decision variables, in the documented order.
+    # 18 + 3 + 4 = 25 decision variables, in the documented order.
     kb43 = ko.workbook_kinetic_baselines('B')
     space43, excl43 = ko.build_search_space(
         kb43, include_params=inc43, exclude_params=p43['exclude_params'],
@@ -3201,9 +3256,9 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
         group_multiplier_bounds=p43['group_multiplier_bounds'],
         spike_delta_bounds=p43['spike_delta_bounds'],
         stage_1_max_x_bounds=p43['stage_1_max_x_bounds'])
-    assert len(space43) == 24, len(space43)
-    assert list(space43)[:17] == individual43
-    assert list(space43)[17:] == ['inhib_ethanol', 'inhib_isobutanol', 'inhib_acetate',
+    assert len(space43) == 25, len(space43)
+    assert list(space43)[:18] == individual43
+    assert list(space43)[18:] == ['inhib_ethanol', 'inhib_isobutanol', 'inhib_acetate',
                                   'threshold_conc', 'target_delta', 'max_n_spikes',
                                   'stage_1_max_x']
     assert set(excl43) == set(kb43) - set(individual43) - grouped43
@@ -3277,23 +3332,24 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
                                           if kw['parameter_groups'] else
                                           kw['multiplier_bounds']),
             exclude_params=kw['exclude_params'],
-            stage_1_max_x_bounds=kw['stage_1_max_x_bounds'], n_seeds=0)
+            stage_1_max_x_bounds=kw['stage_1_max_x_bounds'], n_seeds=0,
+            ibo_pathway_anchoring='scenario_A')
     for stp43, st43 in ((a, b) for a in ko.STUDY_TARGET_PRODUCTS for b in ko.STUDY_TYPE_ROLES):
         driver_name43 = _driver_name43(stp43, st43)
         assert sup43['default_study_name'](None, 'IRR', None, study_target_products=stp43,
                                            study_type=st43, burden=True) == driver_name43, (stp43, st43)
     # An EXPLICIT group band must get its own study: it sizes the same
     # columns, and optuna accepts a changed numeric range on a resume, so
-    # only the name keeps a 0.5x-3x run off the preset's 0.2x-2x store.
-    assert _driver_name43('ethanol_isobutanol', 'metabolic_minimal') == NAME43
+    # only the name keeps a 0.5x-3x run off the preset's 0.75x-1.5x store.
+    assert _driver_name43('ethanol_isobutanol', 'metabolic_minimal') == NAME43_aA
     name43_wide = _driver_name43('ethanol_isobutanol', 'metabolic_minimal',
                                  group_multiplier_bounds=(0.5, 3.0))
-    assert '_ib0.5-3' in name43_wide and name43_wide != NAME43, name43_wide
+    assert '_ib0.5-3' in name43_wide and name43_wide != NAME43_aA, name43_wide
     # ... while an ungrouped preset ignores group_multiplier_bounds entirely.
     assert _driver_name43('ethanol_isobutanol', 'metabolic_protein',
                           group_multiplier_bounds=(0.5, 3.0)) \
         == _driver_name43('ethanol_isobutanol', 'metabolic_protein')
-    PASS('metabolic_minimal preset: 3 effector groups (5/5/6) + 17 rates + 4 = 24 and the ethanol_only space built too (2 groups + 13 + 4 = 19, no spike_delta), K_* out, spike pinned, _ibe0.3-2 / _xk10+k7+k8 naming via study_type_name_defaults (the _ib tag reads the per-group GROUP band under a grouped preset -- inhib_ethanol floored at 0.3 -- so an explicit 0.5-3 renames the study), effector table by file path, existing presets untouched')
+    PASS('metabolic_minimal preset: 3 effector groups (5/5/6) + 17 rates + 4 = 24 and the ethanol_only space built too (2 groups + 13 + 4 = 19, no spike_delta), K_* out, spike pinned, _ib0.75-1.5 / _xk10+k7+k8 naming via study_type_name_defaults (the _ib tag reads the per-group GROUP band under a grouped preset -- every family at the default 0.75x-1.5x band -- so an explicit 0.5-3 renames the study), effector table by file path, existing presets untouched')
 else:
     print('SKIP 43 (preset part): parameter-distribution workbooks not found')
     PASS('metabolic_minimal naming + effector table (workbook-free part)')
@@ -3620,7 +3676,7 @@ assert ko.STUDY_TYPE_ROLES['metabolic_minimal_subset'] == ()       # no role fil
 opt45 = ko.STUDY_TYPE_OPTIONS['metabolic_minimal_subset']
 assert opt45 == dict(rate_params=ko.METABOLIC_MINIMAL_SUBSET_RATES,
                      parameter_groups=ko.METABOLIC_MINIMAL_SUBSET_GROUPS,
-                     group_multiplier_bounds={'inhib_ethanol': (0.3, 2.0)},
+                     group_multiplier_bounds={},
                      exclude_params=(),
                      spike_delta_bounds=None, stage_1_max_x_bounds=None)
 assert 'group_roles' not in opt45                                   # explicit, not role-grouped
@@ -3628,7 +3684,7 @@ assert 'group_roles' not in opt45                                   # explicit, 
 # no exclusions (no _x tag) and reports the group band as the inhibition
 # band; the three older types keep the default (1, 50) g/L band.
 assert ko.study_type_name_defaults('metabolic_minimal_subset') == dict(
-    inhibition_multiplier_bounds={'inhib_ethanol': (0.3, 2.0)}, exclude_params=(),
+    inhibition_multiplier_bounds={}, exclude_params=(),
     stage_1_max_x_bounds=None)
 for st45 in ('metabolic', 'metabolic_protein', 'metabolic_minimal'):
     assert ko.study_type_name_defaults(st45)['stage_1_max_x_bounds'] == (1.0, 50.0), st45
@@ -3638,32 +3694,36 @@ for st45 in ('metabolic', 'metabolic_protein', 'metabolic_minimal'):
 # _UNSET -> the type's name default, no longer the hard-coded (1, 50))
 # agree; an EXPLICIT --stage-1-max-x-bounds is still tagged; NAME43 and
 # the metabolic_protein default are untouched.
-NAME45 = 'kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-10_ibe0.3-2_burden'
+NAME45 = 'kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-4_ib0.75-1.5_burden'
+# The supervisor/driver preset name carries the `_aA` anchoring tag (no
+# _xk10 / _s1x here, so it lands right before `_burden`); the bare NAME45
+# is what a direct ko.default_study_name(...) call (no marker) produces.
+NAME45_aA = NAME45.replace('_burden', '_aA_burden')
 assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_minimal_subset',
-                             rate_multiplier_bounds=(1e-3, 10.0),
-                             inhibition_multiplier_bounds={'inhib_ethanol': (0.3, 2.0)},
+                             rate_multiplier_bounds=(1e-3, 4.0),
+                             inhibition_multiplier_bounds={},
                              exclude_params=(), stage_1_max_x_bounds=None,
                              burden=True) == NAME45
 assert sup43['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_minimal_subset',
-                                   burden=True) == NAME45
+                                   burden=True) == NAME45_aA
 assert sup43['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_minimal_subset',
                                    burden=True, stage_1_max_x_bounds=(2.0, 30.0)) \
-    == NAME45.replace('_burden', '_s1x2-30_burden')
+    == NAME45_aA.replace('_burden', '_s1x2-30_burden')
 assert sup43['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_minimal_subset',
-                                   burden=True, stage_1_max_x_bounds=None) == NAME45
+                                   burden=True, stage_1_max_x_bounds=None) == NAME45_aA
 assert sup43['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
-                                   study_type='metabolic_minimal', burden=True) == NAME43
+                                   study_type='metabolic_minimal', burden=True) == NAME43_aA
 assert sup43['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_protein', burden=True) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-10_ib0.1-10_xk10_s1x1-50_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-4_ib0.1-10_xk10_aA_s1x1-50_burden'
 # Source guard: the omitted-flag default reads the name-defaults table,
 # not ko.DEFAULT_STAGE_1_MAX_X_BOUNDS.
 src45_sup_name = _inspect.getsource(sup43['default_study_name'])
@@ -3674,7 +3734,7 @@ assert 'metabolic_minimal_subset' in src43_sup
 # results dir stays under Windows' 260-character limit (long paths are
 # disabled on this machine; the mechanical _x tag of an exclusion-based
 # definition would have reached 271).
-assert len(NAME45) == 82, len(NAME45)   # _ibe0.3-2 (per-group tag) is one char over _ib0.2-2
+assert len(NAME45) == 83, len(NAME45)   # _ib0.75-1.5 (all-default group tag) is 3 chars longer than _ib0.5-2
 if os.path.isfile(wb_A) and os.path.isfile(wb_B):
     p45 = ko.resolve_study_preset('ethanol_isobutanol', 'metabolic_minimal_subset')
     assert p45['stage_1_max_x_bounds'] is None
@@ -3691,19 +3751,21 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
     p45 = ko.resolve_study_preset('ethanol_isobutanol', 'metabolic_minimal_subset')
     assert p45['scenario'] == 'A' and p45['kinetic_bounds_scenario'] == 'B'
     assert p45['include_params'] == list(ko.METABOLIC_MINIMAL_SUBSET_RATES)
-    assert p45['parameter_groups'] == {
-        g: list(ms) for g, ms in ko.METABOLIC_MINIMAL_SUBSET_GROUPS.items()}
+    assert p45['parameter_groups'] == {   # k_16ie / k_16ia dropped by the intersection since the 2026-09-15 repoint (inert names)
+        'inhib_ethanol': ['k_1ie', 'k_4ie', 'k_7ie', 'k_10ie'],
+        'inhib_isobutanol': ['k_1ii', 'k_4ii', 'k_6ii', 'k_7ii', 'k_10ii'],
+        'inhib_acetate': ['k_1ia', 'k_4ia', 'k_6ia', 'k_7ia', 'k_10ia']}
     assert list(p45['parameter_groups']) == ['inhib_ethanol', 'inhib_isobutanol', 'inhib_acetate']
     assert p45['exclude_params'] == ()
-    # multiplier_bounds is the inert saturation-band tuple (all inhibition
-    # coefficients are grouped); the _ib tag comes from the per-group dict.
-    assert p45['multiplier_bounds'] == (0.2, 2.0)
-    assert p45['group_multiplier_bounds'] == {'inhib_ethanol': (0.3, 2.0)}
+    # multiplier_bounds is the inert default group-band tuple (all inhibition
+    # coefficients are grouped); the _ib tag comes from the (empty) per-group dict.
+    assert p45['multiplier_bounds'] == (0.75, 1.5)
+    assert p45['group_multiplier_bounds'] == {}
     assert p45['spike_delta_bounds'] is None
     assert p45['stage_1_max_x_bounds'] is None
     assert p45['rate_multiplier_bounds'] == ko.DEFAULT_RATE_MULTIPLIER_BOUNDS
     assert p45['parameter_multiplier_bounds'] == {'k_10': (0.1, 10.0)}
-    assert len(p45['rate_params']) == 20                       # the B workbook's capacities, as for every preset
+    assert len(p45['rate_params']) == 21                       # the B workbook's capacities (+ k_17 since 2026-09-15)
     assert set(p45['include_params']) <= set(p45['rate_params'])
     assert all(roles45[n] == 'capacity' for n in p45['include_params'])
     assert all(roles45[m] in ('product_inhibition', 'lethality')
@@ -3711,7 +3773,7 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
     assert set(p45) == set(ko.resolve_study_preset('ethanol_isobutanol', 'metabolic_minimal'))
     # The space it builds (live baselines = the B workbook values here, so
     # every listed rate sits above its floor): 9 rates (rate band, log)
-    # + 3 groups (0.2-2, log) + 3 feeding variables = 15; spike_delta and
+    # + 3 groups (0.75-1.5, log) + 3 feeding variables = 15; spike_delta and
     # stage_1_max_x absent; the group members are not individual entries;
     # 9 knockout probes (a live ethanol_isobutanol study starts at A with
     # k_13-k_16 clipped to the floor, so it gets 5 -- not tested here).
@@ -3732,12 +3794,11 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
                                  'threshold_conc', 'target_delta', 'max_n_spikes']
     assert 'spike_delta' not in space45 and 'stage_1_max_x' not in space45
     for r45 in ko.METABOLIC_MINIMAL_SUBSET_RATES:
-        assert space45[r45] == dict(low=1e-3*kb45[r45], high=10.0*kb45[r45], log=True), r45
-    # The per-group band floors ONLY inhib_ethanol at 0.3x; the other two
-    # families keep the 0.2x default (group_bounds_for on the dict).
+        assert space45[r45] == dict(low=1e-3*kb45[r45], high=4.0*kb45[r45], log=True), r45
+    # Every family takes the default band, 0.75x-1.5x (empty group dict ->
+    # group_bounds_for falls back to DEFAULT_GROUP_MULTIPLIER_BOUNDS).
     for g45 in ko.METABOLIC_MINIMAL_SUBSET_GROUPS:
-        lo45 = 0.3 if g45 == 'inhib_ethanol' else 0.2
-        assert space45[g45] == dict(low=lo45, high=2.0, log=True), g45
+        assert space45[g45] == dict(low=0.75, high=1.5, log=True), g45
     grouped45 = {m for ms in p45['parameter_groups'].values() for m in ms}
     assert set(excl45) == set(kb45) - set(ko.METABOLIC_MINIMAL_SUBSET_RATES) - grouped45
     assert 'k_10' in excl45 and 'k_7' in excl45 and 'k_2' in excl45     # not in the set: at baseline
@@ -3796,7 +3857,7 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
     assert ko.STUDY_TYPE_OPTIONS['metabolic_minimal_subset'] is good45
     # The role-filtered presets are untouched (same values as check 43).
     p45_mm = ko.resolve_study_preset('ethanol_isobutanol', 'metabolic_minimal')
-    assert len(p45_mm['include_params']) == 36 and p45_mm['exclude_params'] == ('k_10', 'k_7', 'k_8')
+    assert len(p45_mm['include_params']) == 37 and p45_mm['exclude_params'] == ('k_10', 'k_7', 'k_8')
     assert p45_mm['stage_1_max_x_bounds'] == (1.0, 50.0)
     # Driver name == supervisor name for the subset on both targets
     # (_driver_name43 mirrors the driver's inhibition-band choice).
@@ -3804,7 +3865,7 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
         assert sup43['default_study_name'](None, 'IRR', None, study_target_products=stp45,
                                            study_type='metabolic_minimal_subset', burden=True) \
             == _driver_name43(stp45, 'metabolic_minimal_subset'), stp45
-    assert _driver_name43('ethanol_isobutanol', 'metabolic_minimal_subset') == NAME45
+    assert _driver_name43('ethanol_isobutanol', 'metabolic_minimal_subset') == NAME45_aA
 else:
     print('SKIP 45 (space part): parameter-distribution workbooks not found')
 # Driver: no logic change (every returned key is already setdefault'ed,
@@ -4866,7 +4927,7 @@ assert sup70['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_minimal_subset',
                                    burden=True, method='dual_annealing') == \
-    'kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_da_rb0.001-10_ibe0.3-2_burden'
+    'kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_da_rb0.001-4_ib0.75-1.5_aA_burden'
 assert sup70['default_study_name']('A', 'IRR', 'B', burden=True,
                                    method='dual_annealing') == 'kin_opt_A_kbB_irr_da_burden'
 assert sup70['default_study_name']('B', 'IBO titer', None,
@@ -4939,18 +5000,20 @@ assert ko.record_seed_used(os.path.join(_td71, 'gone', 'x_trajectory.csv'),
 PASS('seed sidecar: record_seed_used appends <study>_seeds.txt; both engines log the resolved base seed; best-effort on I/O error')
 
 #%% 72. Per-group group_multiplier_bounds (2026-09-11): a {group: (lo, hi)}
-# dict floors ONLY inhib_ethanol at 0.3x in the metabolic_minimal /
-# metabolic_minimal_subset presets, leaving inhib_isobutanol / inhib_acetate
-# at 0.2x; a plain (lo, hi) tuple still applies to every group (backward
-# compat); default_study_name renders the dict as the effector-coded _ibe0.3-2
-# tag (in EFFECTOR_ORDER) so a 0.3-floored study never resumes an old 0.2
-# study; the group_bounds_for helper normalizes and validates both forms.
+# dict can floor ONE effector family (here inhib_ethanol at 0.3x), leaving
+# the others at the default (0.5x); a plain (lo, hi) tuple still applies to
+# every group (backward compat); default_study_name renders a dict with a
+# differing family as the effector-coded _ibe0.3-2 tag (in EFFECTOR_ORDER)
+# so a 0.3-floored study never resumes a default study; the group_bounds_for
+# helper normalizes and validates both forms. (The grouped presets no longer
+# floor any family -- they pass {} and take the default band; the mechanism
+# below is exercised with explicit dicts.)
 assert 'group_bounds_for' in ko.__all__
 # group_bounds_for: dict lookup, missing-group fallback to the default,
 # tuple broadcast, float return, and 0 < lo < hi validation.
 assert ko.group_bounds_for('inhib_ethanol', {'inhib_ethanol': (0.3, 2.0)}) == (0.3, 2.0)
 assert ko.group_bounds_for('inhib_acetate', {'inhib_ethanol': (0.3, 2.0)}) \
-    == ko.DEFAULT_GROUP_MULTIPLIER_BOUNDS                       # absent -> default (0.2, 2.0)
+    == ko.DEFAULT_GROUP_MULTIPLIER_BOUNDS                       # absent -> default (0.75, 1.5)
 assert ko.group_bounds_for('anything', (0.5, 3.0)) == (0.5, 3.0)   # tuple broadcasts to every group
 _lo72, _hi72 = ko.group_bounds_for('inhib_ethanol', {'inhib_ethanol': (0.3, 2.0)})
 assert isinstance(_lo72, float) and isinstance(_hi72, float)
@@ -4969,7 +5032,8 @@ for bad72 in ((0.0, 2.0), (-1.0, 2.0), (2.0, 0.2), (1.0, 1.0)):
         raise AssertionError(f'group_bounds_for accepted bad dict band {bad72}')
 # ... a bad band for a DIFFERENT group is never resolved (fallback is valid).
 assert ko.group_bounds_for('other', {'g': (2.0, 0.2)}) == ko.DEFAULT_GROUP_MULTIPLIER_BOUNDS
-# build_search_space: the dict floors inhib_ethanol at 0.3, others at 0.2.
+# build_search_space: the dict floors inhib_ethanol at 0.3, others at the
+# default 0.75.
 _members72 = [m for ms in ko.METABOLIC_MINIMAL_SUBSET_GROUPS.values() for m in ms]
 kb72 = {'k_1e': 47.1, **{m: 0.05 for m in _members72}}
 groups72 = {g: list(ms) for g, ms in ko.METABOLIC_MINIMAL_SUBSET_GROUPS.items()}
@@ -4977,15 +5041,16 @@ space72, _ = ko.build_search_space(
     kb72, parameter_groups=groups72,
     group_multiplier_bounds={'inhib_ethanol': (0.3, 2.0)})
 assert space72['inhib_ethanol'] == dict(low=0.3, high=2.0, log=True)
-assert space72['inhib_isobutanol'] == dict(low=0.2, high=2.0, log=True)
-assert space72['inhib_acetate'] == dict(low=0.2, high=2.0, log=True)
+assert space72['inhib_isobutanol'] == dict(low=0.75, high=1.5, log=True)
+assert space72['inhib_acetate'] == dict(low=0.75, high=1.5, log=True)
 # backward compat: a plain (0.2, 2.0) tuple floors all three at 0.2.
 space72t, _ = ko.build_search_space(
     kb72, parameter_groups=groups72, group_multiplier_bounds=(0.2, 2.0))
 for g72 in groups72:
     assert space72t[g72] == dict(low=0.2, high=2.0, log=True), g72
-# default_study_name: dict -> _ibe0.3-2, tuple -> _ib0.2-2, all-default dict
-# -> _ib0.2-2; a multi-group dict codes each differing group in EFFECTOR_ORDER.
+# default_study_name: dict with a differing family -> _ibe0.3-2, explicit
+# tuple -> _ib0.2-2, all-default dict -> _ib0.75-1.5; a multi-group dict codes
+# each differing group in EFFECTOR_ORDER.
 def _name72(ib):
     return ko.default_study_name(
         'IRR', 'ethanol_isobutanol', 'metabolic_minimal_subset',
@@ -4993,18 +5058,19 @@ def _name72(ib):
         exclude_params=(), stage_1_max_x_bounds=None, burden=True)
 assert _name72({'inhib_ethanol': (0.3, 2.0)}).endswith('_ibe0.3-2_burden')
 assert _name72((0.2, 2.0)).endswith('_ib0.2-2_burden')
-assert _name72({'inhib_isobutanol': (0.2, 2.0)}) == _name72((0.2, 2.0))   # all-default dict collapses
+assert _name72({'inhib_isobutanol': ko.DEFAULT_GROUP_MULTIPLIER_BOUNDS}) \
+    == _name72(ko.DEFAULT_GROUP_MULTIPLIER_BOUNDS)   # all-default dict collapses
 # EFFECTOR_ORDER (ethanol, isobutanol, acetate); codes are the effector's
 # first letter, derived from EFFECTOR_ORDER (not a hard-coded map).
 assert '_ibe0.3-2a0.5-3_' in _name72({'inhib_acetate': (0.5, 3.0),
                                       'inhib_ethanol': (0.3, 2.0)})
-# resolve_study_preset: both grouped presets carry the per-group dict and
-# derive a name with the distinct _ibe0.3-2 tag (never _ib0.2-2).
+# resolve_study_preset: both grouped presets carry an empty per-group dict
+# (every family at the default band) and derive a name with the _ib0.75-1.5 tag.
 if os.path.isfile(wb_A) and os.path.isfile(wb_B):
     for st72 in ('metabolic_minimal', 'metabolic_minimal_subset'):
         for tp72 in ('ethanol_isobutanol', 'ethanol_only'):
             pp72 = ko.resolve_study_preset(tp72, st72)
-            assert pp72['group_multiplier_bounds'] == {'inhib_ethanol': (0.3, 2.0)}, (tp72, st72)
+            assert pp72['group_multiplier_bounds'] == {}, (tp72, st72)
             assert isinstance(pp72['multiplier_bounds'], tuple)      # stays a plain tuple
             nm72 = ko.default_study_name(
                 'IRR', tp72, st72, scenario=pp72['scenario'],
@@ -5013,10 +5079,10 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
                 inhibition_multiplier_bounds=pp72['group_multiplier_bounds'],
                 exclude_params=pp72['exclude_params'],
                 stage_1_max_x_bounds=pp72['stage_1_max_x_bounds'])
-            assert '_ibe0.3-2' in nm72 and '_ib0.2-2' not in nm72, (tp72, st72, nm72)
+            assert '_ib0.75-1.5' in nm72 and '_ibe0.3-2' not in nm72, (tp72, st72, nm72)
 else:
     print('SKIP 72 (preset part): parameter-distribution workbooks not found')
-PASS('per-group group_multiplier_bounds: {inhib_ethanol: (0.3, 2.0)} floors only inhib_ethanol at 0.3 (others 0.2), tuple still broadcasts, group_bounds_for normalizes/validates both forms, default_study_name renders _ibe0.3-2 (EFFECTOR_ORDER codes) vs _ib0.2-2, both minimal presets carry the dict + distinct name tag')
+PASS('per-group group_multiplier_bounds: an explicit {inhib_ethanol: (0.3, 2.0)} floors only inhib_ethanol at 0.3 (others 0.75), tuple still broadcasts, group_bounds_for normalizes/validates both forms, default_study_name renders _ibe0.3-2 (EFFECTOR_ORDER codes) vs _ib0.2-2, both minimal presets carry {} + the _ib0.75-1.5 name tag')
 
 #%% 73. Supervisor --group-multiplier-bounds LO HI (2026-09-11): an explicit
 # SHARED effector-family band overriding the grouped presets' per-group dict
@@ -5034,11 +5100,11 @@ for _fn73 in ('supervise', 'child_code', 'default_study_name'):
 _nm73 = lambda **kw: sup73['default_study_name'](
     None, 'IRR', None, study_target_products='ethanol_isobutanol',
     study_type='metabolic_minimal_subset', burden=True, **kw)
-assert _nm73() == 'kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-10_ibe0.3-2_burden'
+assert _nm73() == 'kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-4_ib0.75-1.5_aA_burden'
 assert _nm73(group_multiplier_bounds=(0.2, 2.0)) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-10_ib0.2-2_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-4_ib0.2-2_aA_burden'
 assert _nm73(group_multiplier_bounds=(0.5, 3.0)) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-10_ib0.5-3_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-4_ib0.5-3_aA_burden'
 # legacy naming ignores it (no groups on that path)
 assert sup73['default_study_name']('A', 'IRR', 'B', group_multiplier_bounds=(0.2, 2.0)) == 'kin_opt_A_kbB_irr'
 _code73 = sup73['child_code'](None, 'IRR', 5, None, False, 'x',
@@ -5069,11 +5135,11 @@ _file73 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
 assert "'--group-multiplier-bounds'" in _file73 and "metavar=('LO', 'HI')" in _file73
 assert 'args.group_multiplier_bounds' in _file73        # forwarded by main
 assert 'group_multiplier_bounds={group_multiplier_bounds!r}' in _file73  # settings: line
-PASS('supervisor --group-multiplier-bounds LO HI -> shared group band: name tag mirrors the driver (_ib0.2-2 / _ib0.5-3 vs preset _ibe0.3-2), emitted into the child call only when given, refused up front for ungrouped / legacy')
+PASS('supervisor --group-multiplier-bounds LO HI -> shared group band: name tag mirrors the driver (_ib0.2-2 / _ib0.5-3 vs preset _ib0.75-1.5), emitted into the child call only when given, refused up front for ungrouped / legacy')
 
 #%% 74. metabolic_14d preset (2026-09-11): metabolic_minimal_subset with the
 # glycolysis rate family (k_1l / k_1h / k_1e) sampled as ONE capacity-group
-# multiplier (0.2x-5x) and stage_1_max_x a decision variable. Adds the
+# multiplier (0.2x-4x) and stage_1_max_x a decision variable. Adds the
 # rate_parameter_groups options key -> validated against RATE_CONSTANT_ROLES
 # (capacity) and merged glycolysis-FIRST into parameter_groups. 14 decision
 # variables for ethanol_isobutanol, 9 for ethanol_only; no glycolysis band tag.
@@ -5086,22 +5152,25 @@ assert opt74 == dict(
     rate_params=ko.METABOLIC_14D_RATES,
     parameter_groups=ko.METABOLIC_MINIMAL_SUBSET_GROUPS,
     rate_parameter_groups=ko.METABOLIC_14D_RATE_GROUPS,
-    group_multiplier_bounds={'glycolysis': (0.2, 5.0), 'inhib_ethanol': (0.3, 2.0)},
+    group_multiplier_bounds={'glycolysis': (0.2, 4.0)},
     exclude_params=(),
     spike_delta_bounds=None)
 assert 'stage_1_max_x_bounds' not in opt74                         # omitted -> sampled (1,50)
 # Name defaults: stage_1_max_x sampled at the default (1,50) g/L; no exclusions;
 # the inhibition band = the group dict (glycolysis rides along, ignored by _ib).
 assert ko.study_type_name_defaults('metabolic_14d') == dict(
-    inhibition_multiplier_bounds={'glycolysis': (0.2, 5.0), 'inhib_ethanol': (0.3, 2.0)},
+    inhibition_multiplier_bounds={'glycolysis': (0.2, 4.0)},
     exclude_params=(), stage_1_max_x_bounds=(1.0, 50.0))
-# The default name: rate band, _ibe0.3-2 (only inhib_ethanol differs from the
-# 0.2 default; glycolysis is NOT tagged), no _x tag, _s1x1-50 (sampled), burden.
-NAME74 = 'kin_opt_ethanol_isobutanol_metabolic_14d_irr_rb0.001-10_ibe0.3-2_s1x1-50_burden'
+# The default name: rate band, _ib0.75-1.5 (every inhibition family at the 0.75
+# default; glycolysis is NOT tagged), no _x tag, _s1x1-50 (sampled), burden.
+NAME74 = 'kin_opt_ethanol_isobutanol_metabolic_14d_irr_rb0.001-4_ib0.75-1.5_s1x1-50_burden'
+# The supervisor derives the same name WITH the `_aA` anchoring tag (before
+# `_s1x`); bare NAME74 is the direct engine (no-marker) result below.
+NAME74_aA = NAME74.replace('_s1x1-50', '_aA_s1x1-50')
 assert ko.default_study_name(
     'IRR', 'ethanol_isobutanol', 'metabolic_14d',
-    rate_multiplier_bounds=(1e-3, 10.0),
-    inhibition_multiplier_bounds={'glycolysis': (0.2, 5.0), 'inhib_ethanol': (0.3, 2.0)},
+    rate_multiplier_bounds=(1e-3, 4.0),
+    inhibition_multiplier_bounds={'glycolysis': (0.2, 4.0)},
     exclude_params=(), stage_1_max_x_bounds=(1.0, 50.0), burden=True) == NAME74
 # The supervisor derives the SAME name from the study_type alone.
 sup74 = _runpy.run_path(os.path.join(
@@ -5109,7 +5178,7 @@ sup74 = _runpy.run_path(os.path.join(
     'optimize_kinetics_BO_supervised.py'))
 assert sup74['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
-                                   study_type='metabolic_14d', burden=True) == NAME74
+                                   study_type='metabolic_14d', burden=True) == NAME74_aA
 # Typo guard: a rate_parameter_groups member that is NOT a capacity row is
 # rejected up front (KeyError naming the parameter and the preset), and the
 # inhibition-group guard is preserved for a parameter_groups member that is
@@ -5151,12 +5220,11 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
     assert list(p74['parameter_groups']) == ['glycolysis', 'inhib_ethanol',
                                              'inhib_isobutanol', 'inhib_acetate']
     assert p74['parameter_groups']['glycolysis'] == ['k_1l', 'k_1h', 'k_1e']
-    assert p74['parameter_groups']['inhib_ethanol'] == list(
-        ko.METABOLIC_MINIMAL_SUBSET_GROUPS['inhib_ethanol'])
+    assert p74['parameter_groups']['inhib_ethanol'] == ['k_1ie', 'k_4ie', 'k_7ie', 'k_10ie']   # k_16ie dropped by the workbook intersection since the 2026-09-15 repoint (inert name; metabolic_split_14d carries k_17ie)
+    assert p74['parameter_groups']['inhib_acetate'] == ['k_1ia', 'k_4ia', 'k_6ia', 'k_7ia', 'k_10ia']
     assert p74['exclude_params'] == ()
-    assert p74['multiplier_bounds'] == (0.2, 2.0)                  # inert tuple (all inhib grouped)
-    assert p74['group_multiplier_bounds'] == {'glycolysis': (0.2, 5.0),
-                                              'inhib_ethanol': (0.3, 2.0)}
+    assert p74['multiplier_bounds'] == (0.75, 1.5)                 # inert tuple (all inhib grouped)
+    assert p74['group_multiplier_bounds'] == {'glycolysis': (0.2, 4.0)}
     assert p74['spike_delta_bounds'] is None
     assert p74['stage_1_max_x_bounds'] == (1.0, 50.0)             # sampled
     assert p74['rate_multiplier_bounds'] == ko.DEFAULT_RATE_MULTIPLIER_BOUNDS
@@ -5183,13 +5251,13 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
     for m74 in ('k_1l', 'k_1h', 'k_1e'):
         assert m74 not in space74                                  # grouped, not individual
     assert 'spike_delta' not in space74
-    assert space74['glycolysis'] == dict(low=0.2, high=5.0, log=True)
-    assert space74['inhib_ethanol'] == dict(low=0.3, high=2.0, log=True)
-    assert space74['inhib_isobutanol'] == dict(low=0.2, high=2.0, log=True)
-    assert space74['inhib_acetate'] == dict(low=0.2, high=2.0, log=True)
+    assert space74['glycolysis'] == dict(low=0.2, high=4.0, log=True)
+    assert space74['inhib_ethanol'] == dict(low=0.75, high=1.5, log=True)
+    assert space74['inhib_isobutanol'] == dict(low=0.75, high=1.5, log=True)
+    assert space74['inhib_acetate'] == dict(low=0.75, high=1.5, log=True)
     assert space74['stage_1_max_x'] == dict(low=1.0, high=50.0, log=True)
     for r74 in ('k_3', 'k_6', 'k_13', 'k_14', 'k_15', 'k_16'):
-        assert space74[r74] == dict(low=1e-3*kb74[r74], high=10.0*kb74[r74], log=True), r74
+        assert space74[r74] == dict(low=1e-3*kb74[r74], high=4.0*kb74[r74], log=True), r74
     # ethanol_only: no k_13-k_16, no isobutanol coefficients in the A workbook.
     # 2 rates + glycolysis + inhib_ethanol + inhib_acetate + 3 feeding + stage_1_max_x = 9.
     p74_eo = ko.resolve_study_preset('ethanol_only', 'metabolic_14d')
@@ -5212,10 +5280,10 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
     assert list(space74_eo)[2:] == ['glycolysis', 'inhib_ethanol', 'inhib_acetate',
                                     'threshold_conc', 'target_delta', 'max_n_spikes',
                                     'stage_1_max_x']
-    assert space74_eo['glycolysis'] == dict(low=0.2, high=5.0, log=True)
+    assert space74_eo['glycolysis'] == dict(low=0.2, high=4.0, log=True)
 else:
     print('SKIP 74 (preset part): parameter-distribution workbooks not found')
-PASS('metabolic_14d preset: 14/9 vars, glycolysis capacity group (0.2-5x) merged glycolysis-first, stage_1_max_x sampled, rate_parameter_groups typo guard (capacity) + inhibition guard preserved, name _ibe0.3-2_s1x1-50 (no glycolysis tag), supervisor agrees')
+PASS('metabolic_14d preset: 14/9 vars, glycolysis capacity group (0.2-4x) merged glycolysis-first, stage_1_max_x sampled, rate_parameter_groups typo guard (capacity) + inhibition guard preserved, name _ib0.75-1.5_s1x1-50 (no glycolysis tag), supervisor agrees')
 
 #%% 75. GP method surface (GP spec 2026-09-11, §1): 'gp' is the third
 # OPTIMIZATION_METHODS value, tagged `_gp` right after the objective slug on
@@ -5252,16 +5320,16 @@ except ValueError as e75:
 else:
     raise AssertionError('unknown method accepted by check_method_kwargs')
 assert ko.GP_MAX_DIMENSIONS == 15
-assert ko.GP_KWARGS_DEFAULTS == {'learned_constraints': True,
-                                 'deterministic_objective': False,
+assert ko.GP_KWARGS_DEFAULTS == {'learned_constraints': False,
+                                 'deterministic_objective': True,
                                  'n_fallback_candidates': 2048,
                                  'max_fallback_batches': 20}
 assert ko.resolve_gp_kwargs(None) == ko.GP_KWARGS_DEFAULTS
 assert ko.resolve_gp_kwargs({}) == ko.GP_KWARGS_DEFAULTS
 assert ko.resolve_gp_kwargs(None) is not ko.GP_KWARGS_DEFAULTS         # a copy
-assert ko.resolve_gp_kwargs({'learned_constraints': False,
+assert ko.resolve_gp_kwargs({'learned_constraints': True,
                              'n_fallback_candidates': 64}) == {
-    'learned_constraints': False, 'deterministic_objective': False,
+    'learned_constraints': True, 'deterministic_objective': True,
     'n_fallback_candidates': 64, 'max_fallback_batches': 20}
 for bad75 in ({'bogus': 1}, {'n_fallback_candidates': 0},
               {'max_fallback_batches': 2.5}, {'max_fallback_batches': True}):
@@ -5513,8 +5581,9 @@ else:
     assert len(ko.load_trajectory(csv79)) == 12
     assert all(t.state == TS33.COMPLETE for t in st79b.trials[8:])   # GP-phase trials simulated
     assert len(open(ko.seed_sidecar_path(csv79), encoding='utf-8').read().splitlines()) == 2
-    # ACTIVE cap (volume on, handles59 geometry): predicate installed, learned
-    # constraints wired by default, no INFEASIBLE row
+    # ACTIVE cap (volume on, handles59 geometry): predicate installed; the
+    # default gp_kwargs now wire learned constraints OFF + deterministic ON,
+    # so no constraint GP is fit and no 'constraints' system attr is recorded
     outdir79c = tempfile.mkdtemp()
     common79c = dict(objective='IRR', scenario_label='X', seed=1,
                      results_dir=outdir79c, handles=handles59,
@@ -5524,12 +5593,21 @@ else:
     st79c, csv79c, _ = ko.run_kinetic_optimization(method='gp', n_trials=4,
                                                    n_startup_trials=3, **common79c)
     assert callable(st79c.sampler._is_feasible)
-    assert st79c.sampler._constraints_func is not None
-    assert st79c.sampler._deterministic is False
+    assert st79c.sampler._constraints_func is None         # learned off by default
+    assert st79c.sampler._deterministic is True            # deterministic on by default
     assert st79c.sampler.n_fallback_candidates == 2048 and st79c.sampler.max_fallback_batches == 20
     assert ko.load_trajectory(csv79c)['state'].tolist() == ['COMPLETE']*4
-    assert all('constraints' in t.system_attrs for t in st79c.trials)
-    # learned_constraints=False -> plain log-EI; deterministic + fallback knobs forwarded
+    assert all('constraints' not in t.system_attrs for t in st79c.trials)
+    # explicit learned_constraints=True -> ConstrainedLogEI wired, constraint
+    # values recorded on every COMPLETE trial (fresh study, no prior trials)
+    st79cc, _, _ = ko.run_kinetic_optimization(
+        method='gp', n_trials=4, n_startup_trials=3,
+        gp_kwargs={'learned_constraints': True},
+        **dict(common79c, results_dir=tempfile.mkdtemp()))
+    assert st79cc.sampler._constraints_func is not None
+    assert st79cc.sampler._deterministic is True
+    assert all('constraints' in t.system_attrs for t in st79cc.trials)
+    # explicit learned_constraints=False -> plain log-EI; deterministic + fallback knobs forwarded
     st79d, _, _ = ko.run_kinetic_optimization(
         method='gp', n_trials=4, n_startup_trials=3,
         gp_kwargs={'learned_constraints': False, 'deterministic_objective': True,
@@ -5537,9 +5615,11 @@ else:
         **common79c)
     assert st79d.sampler._constraints_func is None and st79d.sampler._deterministic is True
     assert st79d.sampler.n_fallback_candidates == 64 and st79d.sampler.max_fallback_batches == 3
-    # feasible_sampling=False under an active cap: no predicate, LHS kept, learned still wired
+    # feasible_sampling=False under an active cap: no predicate, LHS kept;
+    # learned constraints still wire when explicitly requested
     st79e, _, _ = ko.run_kinetic_optimization(
         method='gp', n_trials=3, n_startup_trials=3, feasible_sampling=False,
+        gp_kwargs={'learned_constraints': True},
         **dict(common79c, results_dir=tempfile.mkdtemp()))
     assert st79e.sampler._is_feasible is None and st79e.sampler._lhs_design is not None
     assert st79e.sampler._constraints_func is not None
@@ -5550,8 +5630,9 @@ else:
                                 gp_kwargs={'learned_constraints': False}, **common79f)
     buf79f = _io.StringIO()
     with _contextlib.redirect_stdout(buf79f):
-        st79f, _, _ = ko.run_kinetic_optimization(method='gp', n_trials=5,
-                                                  n_startup_trials=3, **common79f)
+        st79f, _, _ = ko.run_kinetic_optimization(
+            method='gp', n_trials=5, n_startup_trials=3,
+            gp_kwargs={'learned_constraints': True}, **common79f)
     assert st79f.sampler._constraints_func is None
     assert 'continuing with learned_constraints=False' in buf79f.getvalue()
     assert len(st79f.trials) == 5 and all(t.state == TS33.COMPLETE for t in st79f.trials)
@@ -5628,7 +5709,7 @@ assert sup81['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_minimal_subset',
                                    burden=True, method='gp') == \
-    'kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_gp_rb0.001-10_ibe0.3-2_burden'
+    'kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_gp_rb0.001-4_ib0.75-1.5_aA_burden'
 assert sup81['default_study_name']('A', 'IRR', 'B', burden=True,
                                    method='gp') == 'kin_opt_A_kbB_irr_gp_burden'
 assert sup81['default_study_name']('B', 'IBO titer', None, method='gp') == 'kin_opt_B_ibo_titer_gp'
@@ -5692,5 +5773,2221 @@ assert space82c['threshold_conc']['high'] == 120.0
 PASS('build_search_space: threshold-anchored feeding space feasible by '
      'construction (threshold_conc high < TARGET_CONC_MAX; worst corner '
      'keeps threshold < target < spike)')
+
+#%% 83. metabolic_split_14d preset (2026-09-15): metabolic_14d with the two
+# alcohol dehydrogenases as INDEPENDENT knobs -- Adh1 (r6, k_6) and Adh6 (r17,
+# k_17, new with the nskinetics r16/r17 split) -- the inhibition groups on the
+# LIVE cross-product coefficients k_17ie / k_17ia (the repointed workbook rows)
+# and stage_1_max_x PINNED, so the ethanol_isobutanol count stays at 14.
+assert ko.METABOLIC_SPLIT_14D_RATES == ('k_3', 'k_6', 'k_13', 'k_14', 'k_15', 'k_16', 'k_17')
+assert ko.METABOLIC_SPLIT_14D_GROUPS == {
+    'inhib_ethanol':    ('k_1ie', 'k_4ie', 'k_7ie', 'k_10ie', 'k_17ie'),
+    'inhib_isobutanol': ('k_1ii', 'k_4ii', 'k_6ii', 'k_7ii', 'k_10ii'),
+    'inhib_acetate':    ('k_1ia', 'k_4ia', 'k_6ia', 'k_7ia', 'k_10ia', 'k_17ia')}
+assert {'METABOLIC_SPLIT_14D_RATES', 'METABOLIC_SPLIT_14D_GROUPS'} <= set(ko.__all__)
+assert ko.STUDY_TYPE_ROLES['metabolic_split_14d'] == ()             # no role filter: explicit set
+opt83 = ko.STUDY_TYPE_OPTIONS['metabolic_split_14d']
+assert opt83 == dict(
+    rate_params=ko.METABOLIC_SPLIT_14D_RATES,
+    parameter_groups=ko.METABOLIC_SPLIT_14D_GROUPS,
+    rate_parameter_groups=ko.METABOLIC_14D_RATE_GROUPS,          # glycolysis, shared with metabolic_14d
+    group_multiplier_bounds={'glycolysis': (0.2, 4.0)},
+    exclude_params=(),
+    spike_delta_bounds=None,
+    stage_1_max_x_bounds=None)                                   # PINNED: the difference from metabolic_14d
+# metabolic_14d itself is untouched (still samples stage_1_max_x, still lists the inert k_16ie/k_16ia)
+assert 'stage_1_max_x_bounds' not in ko.STUDY_TYPE_OPTIONS['metabolic_14d']
+assert 'k_16ie' in ko.METABOLIC_MINIMAL_SUBSET_GROUPS['inhib_ethanol']
+# Name defaults: no _s1x tag (pinned), no _x tag, the group dict as the _ib band.
+assert ko.study_type_name_defaults('metabolic_split_14d') == dict(
+    inhibition_multiplier_bounds={'glycolysis': (0.2, 4.0)},
+    exclude_params=(), stage_1_max_x_bounds=None)
+NAME83 = 'kin_opt_ethanol_isobutanol_metabolic_split_14d_irr_rb0.001-4_ib0.75-1.5_burden'
+# Supervisor/driver preset name carries `_aA` (no _xk10 / _s1x, so before
+# `_burden`); bare NAME83 is the direct engine (no-marker) result below.
+NAME83_aA = NAME83.replace('_burden', '_aA_burden')
+assert len(NAME83) == 78
+assert ko.default_study_name(
+    'IRR', 'ethanol_isobutanol', 'metabolic_split_14d',
+    rate_multiplier_bounds=(1e-3, 4.0),
+    inhibition_multiplier_bounds={'glycolysis': (0.2, 4.0)},
+    exclude_params=(), stage_1_max_x_bounds=None, burden=True) == NAME83
+assert ko.default_study_name(
+    'IRR', 'ethanol_isobutanol', 'metabolic_split_14d',
+    rate_multiplier_bounds=(1e-3, 4.0),
+    inhibition_multiplier_bounds={'glycolysis': (0.2, 4.0)},
+    exclude_params=(), stage_1_max_x_bounds=None, burden=True,
+    method='gp') == NAME83.replace('_irr_', '_irr_gp_')
+assert ko.default_study_name(
+    'IRR', 'ethanol_isobutanol', 'metabolic_split_14d',
+    rate_multiplier_bounds=(1e-3, 4.0),
+    inhibition_multiplier_bounds={'glycolysis': (0.2, 4.0)},
+    exclude_params=(), stage_1_max_x_bounds=None, burden=True,
+    method='dual_annealing') == NAME83.replace('_irr_', '_irr_da_')
+# The supervisor derives the SAME name from the study_type alone, and lists the type.
+sup83 = _runpy.run_path(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    'optimize_kinetics_BO_supervised.py'))
+assert sup83['default_study_name'](None, 'IRR', None,
+                                   study_target_products='ethanol_isobutanol',
+                                   study_type='metabolic_split_14d', burden=True) == NAME83_aA
+assert 'metabolic_split_14d' in ko.STUDY_TYPE_ROLES              # = the supervisor's --study-type choices
+# Typo guards (role table): every listed rate a capacity row, every group member an inhibition row.
+roles83 = ko.kinetic_parameter_roles()
+assert all(roles83[n] == 'capacity' for n in ko.METABOLIC_SPLIT_14D_RATES)
+assert roles83['k_17'] == 'capacity' and roles83['k_17ie'] == 'product_inhibition' \
+    and roles83['k_17ia'] == 'product_inhibition'
+assert all(roles83[m] in ('product_inhibition', 'lethality')
+           for ms in ko.METABOLIC_SPLIT_14D_GROUPS.values() for m in ms)
+ko.STUDY_TYPE_ROLES['_bad_rate_83'] = ()
+ko.STUDY_TYPE_OPTIONS['_bad_rate_83'] = dict(
+    rate_params=('k_3', 'k_17ie'), parameter_groups={},             # inhibition coeff listed as a rate
+    rate_parameter_groups={}, group_multiplier_bounds={}, exclude_params=(),
+    spike_delta_bounds=None, stage_1_max_x_bounds=None)
+try:
+    try:
+        ko.resolve_study_preset('ethanol_isobutanol', '_bad_rate_83')
+        raise AssertionError('rate typo guard did not fire')
+    except KeyError as e83:
+        assert 'k_17ie' in str(e83) and '_bad_rate_83' in str(e83), str(e83)
+finally:
+    del ko.STUDY_TYPE_ROLES['_bad_rate_83']
+    del ko.STUDY_TYPE_OPTIONS['_bad_rate_83']
+if os.path.isfile(wb_A) and os.path.isfile(wb_B):
+    # ethanol_isobutanol: 7 rates + glycolysis + 3 inhibition groups + 3 feeding = 14, no stage_1_max_x.
+    p83 = ko.resolve_study_preset('ethanol_isobutanol', 'metabolic_split_14d')
+    assert p83['scenario'] == 'A' and p83['kinetic_bounds_scenario'] == 'B'
+    assert p83['include_params'] == list(ko.METABOLIC_SPLIT_14D_RATES)   # k_17 admitted: the ._k_17 workbook row
+    assert list(p83['parameter_groups']) == ['glycolysis', 'inhib_ethanol',
+                                             'inhib_isobutanol', 'inhib_acetate']
+    assert p83['parameter_groups']['glycolysis'] == ['k_1l', 'k_1h', 'k_1e']
+    assert p83['parameter_groups']['inhib_ethanol'] == ['k_1ie', 'k_4ie', 'k_7ie', 'k_10ie', 'k_17ie']
+    assert p83['parameter_groups']['inhib_isobutanol'] == ['k_1ii', 'k_4ii', 'k_6ii', 'k_7ii', 'k_10ii']
+    assert p83['parameter_groups']['inhib_acetate'] == ['k_1ia', 'k_4ia', 'k_6ia', 'k_7ia', 'k_10ia', 'k_17ia']
+    assert p83['exclude_params'] == () and p83['spike_delta_bounds'] is None
+    assert p83['stage_1_max_x_bounds'] is None                    # pinned
+    assert p83['group_multiplier_bounds'] == {'glycolysis': (0.2, 4.0)}
+    assert p83['rate_multiplier_bounds'] == ko.DEFAULT_RATE_MULTIPLIER_BOUNDS
+    assert 'k_17' in p83['rate_params'] and len(p83['rate_params']) == 21
+    kb83 = ko.workbook_kinetic_baselines('B')
+    assert kb83['k_17'] == 44.0 and kb83['k_17ie'] == 0.02 and kb83['k_17ia'] == 0.06
+    space83, excl83 = ko.build_search_space(
+        kb83, include_params=p83['include_params'],
+        exclude_params=p83['exclude_params'],
+        rate_multiplier_bounds=p83['rate_multiplier_bounds'],
+        rate_params=p83['rate_params'],
+        parameter_multiplier_bounds=p83['parameter_multiplier_bounds'],
+        parameter_groups=p83['parameter_groups'],
+        group_multiplier_bounds=p83['group_multiplier_bounds'],
+        spike_delta_bounds=p83['spike_delta_bounds'],
+        stage_1_max_x_bounds=p83['stage_1_max_x_bounds'])
+    grouped83 = {m for ms in p83['parameter_groups'].values() for m in ms}
+    assert set(excl83) == set(kb83) - set(ko.METABOLIC_SPLIT_14D_RATES) - grouped83   # not in the set: at baseline (K_17, k_17r, K_17e, k_2, ...)
+    assert {'K_17', 'k_17r', 'K_17e', 'k_10', 'k_7'} <= set(excl83) and 'k_17' not in excl83
+    assert len(space83) == 14, list(space83)
+    assert list(space83) == ['k_3', 'k_6', 'k_13', 'k_14', 'k_15', 'k_16', 'k_17',
+                             'glycolysis', 'inhib_ethanol', 'inhib_isobutanol',
+                             'inhib_acetate', 'threshold_conc', 'target_delta',
+                             'max_n_spikes']
+    assert 'stage_1_max_x' not in space83 and 'spike_delta' not in space83
+    assert space83['k_17'] == dict(low=1e-3*44.0, high=4.0*44.0, log=True)
+    assert space83['k_6'] == dict(low=1e-3*kb83['k_6'], high=4.0*kb83['k_6'], log=True)
+    assert space83['glycolysis'] == dict(low=0.2, high=4.0, log=True)
+    for g83 in ('inhib_ethanol', 'inhib_isobutanol', 'inhib_acetate'):
+        assert space83[g83] == dict(low=0.75, high=1.5, log=True)
+    assert len(space83) <= ko.GP_MAX_DIMENSIONS                    # every method applies
+    # the expanded members: k_17ie / k_17ia scale with their families
+    exp83 = ko.expand_grouped_values(
+        {'inhib_ethanol': 2.0, 'inhib_isobutanol': 1.0, 'inhib_acetate': 0.5},
+        p83['parameter_groups'], kb83)
+    assert exp83['k_17ie'] == 2.0*0.02 and exp83['k_17ia'] == 0.5*0.06 and exp83['k_1ie'] == 2.0*kb83['k_1ie']
+    # ethanol_only: no k_13-k_17, no isobutanol / Adh6 coefficients in the A workbook -> 2 + 1 + 2 + 3 = 8.
+    p83_eo = ko.resolve_study_preset('ethanol_only', 'metabolic_split_14d')
+    assert p83_eo['include_params'] == ['k_3', 'k_6']
+    assert list(p83_eo['parameter_groups']) == ['glycolysis', 'inhib_ethanol', 'inhib_acetate']
+    assert p83_eo['parameter_groups']['inhib_ethanol'] == ['k_1ie', 'k_4ie', 'k_7ie', 'k_10ie']
+    kb83_eo = ko.workbook_kinetic_baselines('A')
+    space83_eo, _ = ko.build_search_space(
+        kb83_eo, include_params=p83_eo['include_params'],
+        exclude_params=p83_eo['exclude_params'],
+        rate_multiplier_bounds=p83_eo['rate_multiplier_bounds'],
+        rate_params=p83_eo['rate_params'],
+        parameter_multiplier_bounds=p83_eo['parameter_multiplier_bounds'],
+        parameter_groups=p83_eo['parameter_groups'],
+        group_multiplier_bounds=p83_eo['group_multiplier_bounds'],
+        spike_delta_bounds=p83_eo['spike_delta_bounds'],
+        stage_1_max_x_bounds=p83_eo['stage_1_max_x_bounds'])
+    assert len(space83_eo) == 8, list(space83_eo)
+    assert list(space83_eo) == ['k_3', 'k_6', 'glycolysis', 'inhib_ethanol', 'inhib_acetate',
+                                'threshold_conc', 'target_delta', 'max_n_spikes']
+else:
+    print('SKIP 83 (preset part): parameter-distribution workbooks not found')
+PASS('metabolic_split_14d preset: 14/8 vars (k_6 + k_17 independent, k_17ie/k_17ia grouped, glycolysis first, stage_1_max_x pinned), name _ib0.75-1.5 (no _s1x), GP/DA tags, typo guard, supervisor agrees')
+
+#%% 84. metabolic_split_12d constants (2026-09-15, spec 2026-09-15-metabolic-
+# split-12d-ehrlich-downstream-group-design.md): the STOICHIOMETRIC weights of
+# the ehrlich_downstream capacity group (k_14 the ANCHOR, weight 1.0, first
+# key; k_15 = 1.015 g DHIV per g acetolactate; k_16 = 1.015 x 0.866 g KIV per
+# g acetolactate), the 12d rate list and its two capacity groups, all exported.
+assert ko.EHRLICH_DOWNSTREAM_WEIGHTS == {'k_14': 1.0, 'k_15': 1.015, 'k_16': 1.015*0.866}
+assert list(ko.EHRLICH_DOWNSTREAM_WEIGHTS) == ['k_14', 'k_15', 'k_16']      # anchor first
+assert ko.EHRLICH_DOWNSTREAM_WEIGHTS['k_14'] == 1.0
+assert ko.METABOLIC_SPLIT_12D_RATES == ('k_3', 'k_6', 'k_13', 'k_17')
+assert ko.METABOLIC_SPLIT_12D_RATE_GROUPS == {
+    'glycolysis': ('k_1l', 'k_1h', 'k_1e'),
+    'ehrlich_downstream': ('k_14', 'k_15', 'k_16')}
+assert list(ko.METABOLIC_SPLIT_12D_RATE_GROUPS) == ['glycolysis', 'ehrlich_downstream']
+assert list(ko.METABOLIC_SPLIT_12D_RATE_GROUPS['ehrlich_downstream']) == list(ko.EHRLICH_DOWNSTREAM_WEIGHTS)
+assert {'EHRLICH_DOWNSTREAM_WEIGHTS', 'METABOLIC_SPLIT_12D_RATES',
+        'METABOLIC_SPLIT_12D_RATE_GROUPS'} <= set(ko.__all__)
+# Drift guard: re-derive the weights from the nskinetics antimony rate laws,
+# read BY FILE PATH next to the role table (never by importing nskinetics):
+#   r14: s_AL + 0.121 $Red => 1.015 s_DHI; ...
+#   r15: s_DHI => 0.866 s_KIV; ...
+# so w_15 = coeff(r14, s_DHI) and w_16 = w_15 x coeff(r15, s_KIV). A future
+# stoichiometry edit fails here instead of silently unbalancing the group.
+import re as _re84
+antimony84 = os.path.join(os.path.dirname(ko.kinetic_parameter_roles_path()),
+                          's_cerevisiae_ferm_fb_inhib_mod_ibo_antimony.txt')
+assert os.path.isfile(antimony84), antimony84
+with open(antimony84, encoding='utf-8') as _fh84:
+    text84 = _fh84.read()
+def _product_coeff84(reaction, product):
+    """The stoichiometric coefficient of `product` on the right-hand side of
+    the antimony reaction line `  <reaction>: <reactants> => <products>; <law>`."""
+    line = _re84.search(rf'^\s*{reaction}:\s*(.*?)\s*=>\s*(.*?);', text84, _re84.M)
+    assert line is not None, reaction
+    term = _re84.search(rf'(?:^|\+)\s*([0-9.]+)\s+{product}\b', line.group(2))
+    assert term is not None, (reaction, product, line.group(2))
+    return float(term.group(1))
+w15_84 = _product_coeff84('r14', 's_DHI')
+w16_84 = w15_84*_product_coeff84('r15', 's_KIV')
+assert abs(w15_84 - ko.EHRLICH_DOWNSTREAM_WEIGHTS['k_15']) < 1e-12, (w15_84, ko.EHRLICH_DOWNSTREAM_WEIGHTS)
+assert abs(w16_84 - ko.EHRLICH_DOWNSTREAM_WEIGHTS['k_16']) < 1e-12, (w16_84, ko.EHRLICH_DOWNSTREAM_WEIGHTS)
+assert w15_84 == 1.015 and abs(w16_84 - 0.878990) < 1e-6
+PASS('metabolic_split_12d constants: EHRLICH_DOWNSTREAM_WEIGHTS (anchor k_14 first, 1.0 / 1.015 / '
+     '1.015x0.866) re-derived from the antimony r14 / r15 product coefficients by file path; '
+     '12d rates and capacity groups exported')
+
+#%% 85. expand_grouped_values(group_references=...) (2026-09-15): a REFERENCED
+# group applies reference x multiplier (its members' live baselines -- zero at
+# the scenario-A start -- are never consulted); an un-referenced group still
+# applies live baseline x multiplier; None / {} reproduce today's output
+# bit-for-bit; a group key is replaced in place by its members (order kept).
+kb85 = {'k_13': 0.0, 'k_14': 0.0, 'k_15': 0.0, 'k_16': 0.0, 'k_1e': 47.1, 'k_1ie': 0.02}
+groups85 = {'ehrlich_downstream': ['k_14', 'k_15', 'k_16'], 'inhib_ethanol': ['k_1ie']}
+refs85 = {'ehrlich_downstream': {'k_14': 4.8, 'k_15': 4.8*1.015, 'k_16': 4.8*1.015*0.866}}
+vals85 = {'k_13': 3.0, 'ehrlich_downstream': 0.5, 'inhib_ethanol': 2.0, 'threshold_conc': 100.0}
+out85 = ko.expand_grouped_values(vals85, groups85, kb85, group_references=refs85)
+assert out85 == {'k_13': 3.0, 'k_14': 0.5*4.8, 'k_15': 0.5*(4.8*1.015),
+                 'k_16': 0.5*(4.8*1.015*0.866), 'k_1ie': 2.0*0.02,
+                 'threshold_conc': 100.0}, out85
+assert list(out85) == ['k_13', 'k_14', 'k_15', 'k_16', 'k_1ie', 'threshold_conc']
+# un-referenced rule preserved: None / {} / omitted are the same call
+kb85b = {**kb85, 'k_14': 4.8, 'k_15': 4.8, 'k_16': 2.82}
+plain85 = ko.expand_grouped_values(vals85, groups85, kb85b)
+assert plain85 == ko.expand_grouped_values(vals85, groups85, kb85b, group_references=None)
+assert plain85 == ko.expand_grouped_values(vals85, groups85, kb85b, group_references={})
+assert plain85['k_16'] == 0.5*2.82 and plain85['k_1ie'] == 2.0*0.02
+# a referenced group ignores a NONZERO live baseline too (the reference is the basis)
+assert ko.expand_grouped_values(vals85, groups85, kb85b, group_references=refs85)['k_16'] == out85['k_16']
+# references for one group leave the other on its live baselines
+assert ko.expand_grouped_values(vals85, groups85, kb85b, group_references=refs85)['k_1ie'] == 2.0*0.02
+# no groups at all -> a plain copy, references ignored
+assert ko.expand_grouped_values(vals85, None, kb85, group_references=refs85) == vals85
+PASS('expand_grouped_values(group_references): reference x m for a referenced group, live '
+     'baseline x m otherwise, None/{} identical to today, order kept')
+
+#%% 86. build_search_space / baseline_decision_point with group_references
+# (2026-09-15): a referenced group builds with ZERO live baselines (the
+# scenario-A Ehrlich rates), on its own band; validation rejects a nonpositive
+# reference, a reference for a non-member, a partial (not all-or-none)
+# reference dict and a referenced group absent from parameter_groups; the
+# un-referenced nonpositive-baseline rejection is preserved. The baseline
+# point of a referenced group is live anchor / reference, clipped (0 -> the
+# floor); an un-referenced group stays at 1.0.
+kb86 = {'k_3': 10.0, 'k_13': 0.0, 'k_14': 0.0, 'k_15': 0.0, 'k_16': 0.0, 'k_1ie': 0.02}
+groups86 = {'ehrlich_downstream': ['k_14', 'k_15', 'k_16'], 'inhib_ethanol': ['k_1ie']}
+refs86 = {'ehrlich_downstream': {'k_14': 4.8, 'k_15': 4.872, 'k_16': 4.219}}
+gmb86 = {'ehrlich_downstream': (1e-3, 4.0)}
+space86, excl86 = ko.build_search_space(
+    kb86, parameter_groups=groups86, group_multiplier_bounds=gmb86,
+    group_references=refs86, param_bounds_override={'k_13': (5.81e-3, 23.24)},
+    spike_delta_bounds=None)
+assert list(space86) == ['k_3', 'k_13', 'ehrlich_downstream', 'inhib_ethanol',
+                         'threshold_conc', 'target_delta', 'max_n_spikes'], list(space86)
+assert space86['ehrlich_downstream'] == dict(low=1e-3, high=4.0, log=True)
+assert space86['inhib_ethanol'] == dict(low=0.75, high=1.5, log=True)   # default group band
+assert space86['k_13'] == dict(low=5.81e-3, high=23.24, log=True)
+assert excl86 == [], excl86
+# Validation ValueErrors, each naming the offender.
+def _raises86(msg, **kw):
+    try:
+        ko.build_search_space(kb86, parameter_groups=groups86,
+                              group_multiplier_bounds=gmb86, **kw)
+    except ValueError as e:
+        assert msg in str(e), (msg, str(e))
+    else:
+        raise AssertionError(f'no ValueError for {kw} (expected {msg!r})')
+_raises86('nonpositive baseline')                                          # no references: k_14 = 0 rejected as today
+_raises86('nonpositive reference',                                          # a zero reference
+          group_references={'ehrlich_downstream': {'k_14': 0.0, 'k_15': 4.872, 'k_16': 4.219}})
+_raises86('nonpositive reference',                                          # a negative reference
+          group_references={'ehrlich_downstream': {'k_14': 4.8, 'k_15': -1.0, 'k_16': 4.219}})
+_raises86('not members',                                                    # a reference for a non-member
+          group_references={'ehrlich_downstream': {**refs86['ehrlich_downstream'], 'k_1ie': 0.02}})
+_raises86('not members',                                                    # ... for a name that is no kinetic parameter at all
+          group_references={'ehrlich_downstream': {**refs86['ehrlich_downstream'], 'k_zz': 1.0}})
+_raises86('all-or-none',                                                    # a partial reference dict
+          group_references={'ehrlich_downstream': {'k_14': 4.8, 'k_15': 4.872}})
+_raises86('not in parameter_groups',                                        # a referenced group that is not a group
+          group_references={'ehrlich_upstream': {'k_13': 5.81}})
+try:                                                                        # references with NO groups at all
+    ko.build_search_space(kb86, group_references={'ehrlich_downstream': refs86['ehrlich_downstream']},
+                          param_bounds_override={'k_13': (5.81e-3, 23.24)})
+except ValueError as e86:
+    assert 'not in parameter_groups' in str(e86), str(e86)
+else:
+    raise AssertionError('group_references without parameter_groups did not raise')
+# baseline_decision_point: live anchor / reference, clipped into the band.
+bmk86 = dict(target_conc=221.25, threshold_conc=217.125, spike_conc=600.0)
+pt86 = ko.baseline_decision_point(space86, kb86, bmk86, 16,
+                                  parameter_groups=groups86, group_references=refs86)
+assert pt86['ehrlich_downstream'] == 1e-3          # live anchor 0 / 4.8 = 0 -> the band floor
+assert pt86['inhib_ethanol'] == 1.0                # un-referenced group: 1.0
+assert pt86['k_13'] == 5.81e-3                     # the individual zero-baseline rate clips up too
+assert pt86['k_3'] == 10.0 and pt86['max_n_spikes'] == 16
+kb86_live = {**kb86, 'k_14': 2.4, 'k_15': 2.4, 'k_16': 1.41}
+pt86b = ko.baseline_decision_point(space86, kb86_live, bmk86, 16,
+                                   parameter_groups=groups86, group_references=refs86)
+assert np.isclose(pt86b['ehrlich_downstream'], 2.4/4.8, rtol=1e-12, atol=0.0)   # the ANCHOR only (k_15 / k_16 not consulted)
+kb86_hi = {**kb86, 'k_14': 48.0, 'k_15': 48.0, 'k_16': 28.2}
+pt86c = ko.baseline_decision_point(space86, kb86_hi, bmk86, 16,
+                                   parameter_groups=groups86, group_references=refs86)
+assert pt86c['ehrlich_downstream'] == 4.0          # 48 / 4.8 = 10 -> the band ceiling
+# without references (positive live baselines) the multiplier is 1.0, as today
+space86d, _ = ko.build_search_space(
+    kb86_live, parameter_groups=groups86, group_multiplier_bounds=gmb86,
+    param_bounds_override={'k_13': (5.81e-3, 23.24)}, spike_delta_bounds=None)
+pt86d = ko.baseline_decision_point(space86d, kb86_live, bmk86, 16, parameter_groups=groups86)
+assert pt86d['ehrlich_downstream'] == 1.0 and pt86d['inhib_ethanol'] == 1.0
+PASS('build_search_space(group_references): zero-live-baseline referenced members admitted, '
+     'nonpositive / non-member / partial / unknown-group references rejected, un-referenced '
+     'nonpositive baseline still rejected; baseline_decision_point: live anchor / reference clipped')
+
+#%% 87. Engine threading of group_references (2026-09-15): the sampler
+# predicate hands the burden model the REFERENCED expansion; the engine
+# (check-44 fake-handle pattern, referenced group with ZERO live baselines)
+# sets reference x multiplier on r_te, records it as applied_<member>, starts
+# trial 0 at the clipped baseline multiplier (the band floor) and restores
+# the ZERO live baselines in its finally; the group multiplier stays the
+# decision column; the set-up print names the references.
+seen87p = []
+bm87 = SimpleNamespace(evaluate=lambda d: (seen87p.append(dict(d)),
+                                           SimpleNamespace(feasible=True))[1])
+p87 = ko.feasibility_predicate(
+    burden_on=True, volume_on=False, burden_model=bm87,
+    parameter_groups=groups86, kinetic_baselines=kb86,
+    baseline_model_kwargs=bmk86, baseline_max_n_spikes=16, volume_cap=20.0,
+    group_references=refs86)
+assert p87({'k_3': 10.0, 'k_13': 1.0, 'ehrlich_downstream': 2.0, 'inhib_ethanol': 1.0,
+            'threshold_conc': 100.0, 'target_delta': 50.0, 'max_n_spikes': 10}) is True
+assert seen87p[-1]['k_14'] == 2.0*4.8 and seen87p[-1]['k_16'] == 2.0*4.219
+assert seen87p[-1]['k_1ie'] == 0.02 and 'ehrlich_downstream' not in seen87p[-1]
+# the kwarg is optional: check 58's calls (no group_references) are unchanged
+p87_plain = ko.feasibility_predicate(
+    burden_on=True, volume_on=False, burden_model=bm87,
+    parameter_groups={}, kinetic_baselines={'k_1e': 47.1},
+    baseline_model_kwargs=bmk86, baseline_max_n_spikes=16, volume_cap=20.0)
+assert p87_plain({'k_1e': 1.0}) is True and seen87p[-1] == {'k_1e': 1.0}
+if _optuna is None:
+    print('SKIP 87 (engine part): optuna not installed')
+else:
+    import io as _io87, contextlib as _ctx87
+    outdir87 = tempfile.mkdtemp()
+    study87 = 'offline_referenced'
+
+    class _FakeTE87:
+        k_3 = 10.0
+        k_13 = 0.0
+        k_14 = 0.0
+        k_15 = 0.0
+        k_16 = 0.0
+        k_1ie = 0.02
+        def getGlobalParameterIds(self):
+            return ['k_3', 'k_13', 'k_14', 'k_15', 'k_16', 'k_1ie']
+    te87 = _FakeTE87()
+    fbs87 = SimpleNamespace(
+        current_specifications=dict(target_conc=221.25,
+                                    threshold_conc=217.125,
+                                    spike_conc=600.0),
+        max_n_spikes=16)
+    seen87 = []   # (k_14, k_15, k_16, k_1ie) on r_te at every model_specification call
+    def _model_specification87(**kw):
+        seen87.append((te87.k_14, te87.k_15, te87.k_16, te87.k_1ie))
+    handles87 = {
+        'r_te': te87, 'fbs_spec': fbs87,
+        'V406': SimpleNamespace(nsk_results_specific_tau_dict=nsk, tau=55.0),
+        'tea': SimpleNamespace(TCI=350e6, NPV=35e6), 'HXN': SimpleNamespace(),
+        'model_specification': _model_specification87,
+        'solve_TEA': lambda stream_IDs=None: {
+            'IRR': 0.2, 'MPSPs': {'ethanol': 0.5, 'isobutanol': 1.0}},
+        'latest_TEA_solution': {'IRR': np.nan,
+                                'MPSPs': {'ethanol': np.nan,
+                                          'isobutanol': np.nan}}}
+    _optuna.logging.set_verbosity(_optuna.logging.WARNING)
+    log87 = _io87.StringIO()
+    with _ctx87.redirect_stdout(log87):
+        # 3 trials: 0 = the baseline (referenced group clipped to its floor), 1-2 sampled.
+        study87_obj, csv87, kb87 = ko.run_kinetic_optimization(
+            enqueue_baseline=True, objective='IRR', scenario_label='X',
+            n_trials=3, seed=1, study_name=study87, results_dir=outdir87,
+            handles=handles87, print_status_every=1, burden_model=None,
+            volume_feasibility=False,
+            param_bounds_override={'k_13': (5.81e-3, 23.24)},
+            parameter_groups=groups86, group_multiplier_bounds=gmb86,
+            group_references=refs86, spike_delta_bounds=None)
+    print(log87.getvalue()[-600:])
+    assert kb87 == {'k_3': 10.0, 'k_13': 0.0, 'k_14': 0.0, 'k_15': 0.0, 'k_16': 0.0, 'k_1ie': 0.02}
+    # the set-up print records the REFERENCE (not the zero live baseline) of every member
+    assert 'Parameter group ehrlich_downstream' in log87.getvalue()
+    assert 'k_14 (ref 4.8' in log87.getvalue() and 'k_16 (ref 4.219' in log87.getvalue()
+    assert 'x REFERENCE' in log87.getvalue()
+    assert 'Parameter group inhib_ethanol' in log87.getvalue() and 'k_1ie (0.02)' in log87.getvalue()
+    df87 = ko.load_trajectory(csv87)
+    assert list(df87.columns) == ['trial_number', 'state', 'k_3', 'k_13', 'ehrlich_downstream',
+                                  'inhib_ethanol', 'threshold_conc', 'target_delta',
+                                  'max_n_spikes', 'objective', *ko.TRACKED_METRICS,
+                                  'applied_k_14', 'applied_k_15', 'applied_k_16',
+                                  'applied_k_1ie', 'error'], list(df87.columns)
+    assert df87['trial_number'].tolist() == [0, 1, 2]
+    assert df87['state'].tolist() == ['COMPLETE']*3
+    assert df87['ehrlich_downstream'][0] == 1e-3 and df87['inhib_ethanol'][0] == 1.0   # trial 0: clipped baseline
+    assert df87['k_13'][0] == 5.81e-3
+    assert len(seen87) == 4, seen87                        # 3 trials + restore_baseline
+    for i87 in range(3):
+        m87 = df87['ehrlich_downstream'][i87]
+        assert 1e-3 <= m87 <= 4.0
+        k14_87, k15_87, k16_87, k1ie_87 = seen87[i87]
+        assert np.isclose(k14_87, 4.8*m87, rtol=1e-12, atol=0.0)
+        assert np.isclose(k15_87, 4.872*m87, rtol=1e-12, atol=0.0)
+        assert np.isclose(k16_87, 4.219*m87, rtol=1e-12, atol=0.0)
+        assert np.isclose(k1ie_87, 0.02*df87['inhib_ethanol'][i87], rtol=1e-12, atol=0.0)
+        assert np.isclose(df87['applied_k_14'][i87], k14_87, rtol=1e-12, atol=0.0)
+        assert np.isclose(df87['applied_k_16'][i87], k16_87, rtol=1e-12, atol=0.0)
+        assert np.isclose(df87['applied_k_1ie'][i87], k1ie_87, rtol=1e-12, atol=0.0)
+    assert seen87[3] == (0.0, 0.0, 0.0, 0.02)              # restore_baseline: the LIVE (zero) baselines
+    assert te87.k_14 == 0.0 and te87.k_16 == 0.0 and te87.k_1ie == 0.02 and te87.k_13 == 0.0
+    # the dual-annealing engine takes the same kwarg (signature only; DA is exercised by checks 65-68)
+    import inspect as _inspect87
+    assert _inspect87.signature(ko.run_kinetic_dual_annealing).parameters['group_references'].default is None
+    assert _inspect87.signature(ko.run_kinetic_optimization).parameters['group_references'].default is None
+    assert 'group_references' in _inspect87.signature(ko._prepare_optimization).parameters
+    assert 'group_references' in {f.name for f in __import__('dataclasses').fields(ko.OptimizationContext)}
+PASS('group_references threaded: predicate expands with the references; engine sets reference x m '
+     'on r_te with zero live baselines, records applied_<member>, trial 0 at the clipped floor, '
+     'restores the zero baselines, set-up print names the references; DA / context / prepare accept it')
+
+#%% 88. metabolic_split_12d preset (2026-09-15): metabolic_split_14d with the
+# three downstream Ehrlich rates k_14 / k_15 / k_16 collapsed into ONE
+# stoichiometrically weighted REFERENCED capacity group, ehrlich_downstream,
+# whose references ARE EHRLICH_DOWNSTREAM_WEIGHTS (since 2026-09-16; until
+# then x the B workbook's k_14 = 4.8) on the ABSOLUTE anchor band
+# IBO_PATHWAY_ZERO_A_RATE_BOUNDS (1e-3-4.0 g/L/h, 14d's individual k_14);
+# 12 variables for ethanol_isobutanol (4 rates + glycolysis +
+# ehrlich_downstream + 3 inhibition groups + 3 feeding), 8 for ethanol_only
+# (the Ehrlich group emptied by the A-workbook intersection, references
+# dropped with it); spike and stage_1_max_x pinned; name untagged for the
+# Ehrlich band (78 characters). Every other preset gains group_references=None.
+assert ko.STUDY_TYPE_ROLES['metabolic_split_12d'] == ()             # no role filter: explicit set
+opt88 = ko.STUDY_TYPE_OPTIONS['metabolic_split_12d']
+assert opt88 == dict(
+    rate_params=ko.METABOLIC_SPLIT_12D_RATES,
+    parameter_groups=ko.METABOLIC_SPLIT_14D_GROUPS,                  # inhibition groups, shared with split_14d
+    rate_parameter_groups=ko.METABOLIC_SPLIT_12D_RATE_GROUPS,
+    rate_group_weights={'ehrlich_downstream': ko.EHRLICH_DOWNSTREAM_WEIGHTS},
+    group_multiplier_bounds={'glycolysis': (0.2, 4.0), 'ehrlich_downstream': (1e-3, 4.0)},
+    exclude_params=(),
+    spike_delta_bounds=None,
+    stage_1_max_x_bounds=None)
+assert 'rate_group_weights' not in ko.STUDY_TYPE_OPTIONS['metabolic_split_14d']   # 14d untouched
+assert ko.study_type_name_defaults('metabolic_split_12d') == dict(
+    inhibition_multiplier_bounds={'glycolysis': (0.2, 4.0), 'ehrlich_downstream': (1e-3, 4.0)},
+    exclude_params=(), stage_1_max_x_bounds=None)
+NAME88 = 'kin_opt_ethanol_isobutanol_metabolic_split_12d_irr_rb0.001-4_ib0.75-1.5_burden'
+assert len(NAME88) == 78
+kw88 = dict(rate_multiplier_bounds=(1e-3, 4.0),
+            inhibition_multiplier_bounds={'glycolysis': (0.2, 4.0), 'ehrlich_downstream': (1e-3, 4.0)},
+            exclude_params=(), stage_1_max_x_bounds=None, burden=True)
+assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_split_12d', **kw88) == NAME88
+assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_split_12d', method='gp',
+                             **kw88) == NAME88.replace('_irr_', '_irr_gp_')
+assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_split_12d', method='dual_annealing',
+                             **kw88) == NAME88.replace('_irr_', '_irr_da_')
+sup88 = _runpy.run_path(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    'optimize_kinetics_BO_supervised.py'))
+# The supervisor preset name carries the `_aA` anchoring tag (mirroring the
+# driver); the three direct ko.default_study_name(..., **kw88) assertions
+# above call the engine WITHOUT the marker, so bare NAME88 is still correct
+# for them.
+NAME88_aA = ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_split_12d',
+                                  ibo_pathway_anchoring='scenario_A', **kw88)
+assert sup88['default_study_name'](None, 'IRR', None,
+                                   study_target_products='ethanol_isobutanol',
+                                   study_type='metabolic_split_12d', burden=True) == NAME88_aA
+assert 'metabolic_split_12d' in ko.STUDY_TYPE_ROLES              # = the supervisor's --study-type choices
+roles88 = ko.kinetic_parameter_roles()
+assert all(roles88[n] == 'capacity' for n in ko.METABOLIC_SPLIT_12D_RATES)
+assert all(roles88[m] == 'capacity'
+           for ms in ko.METABOLIC_SPLIT_12D_RATE_GROUPS.values() for m in ms)
+if os.path.isfile(wb_A) and os.path.isfile(wb_B):
+    p88 = ko.resolve_study_preset('ethanol_isobutanol', 'metabolic_split_12d')
+    assert p88['scenario'] == 'A' and p88['kinetic_bounds_scenario'] == 'B'
+    assert p88['include_params'] == ['k_3', 'k_6', 'k_13', 'k_17']
+    assert list(p88['parameter_groups']) == ['glycolysis', 'ehrlich_downstream', 'inhib_ethanol',
+                                             'inhib_isobutanol', 'inhib_acetate']
+    assert p88['parameter_groups']['glycolysis'] == ['k_1l', 'k_1h', 'k_1e']
+    assert p88['parameter_groups']['ehrlich_downstream'] == ['k_14', 'k_15', 'k_16']
+    assert p88['parameter_groups']['inhib_ethanol'] == ['k_1ie', 'k_4ie', 'k_7ie', 'k_10ie', 'k_17ie']
+    assert p88['group_multiplier_bounds'] == {'glycolysis': (0.2, 4.0), 'ehrlich_downstream': (1e-3, 4.0)}
+    assert list(p88['group_references']) == ['ehrlich_downstream']
+    refs88 = p88['group_references']['ehrlich_downstream']
+    assert list(refs88) == ['k_14', 'k_15', 'k_16']
+    assert refs88['k_14'] == 1.0                                        # the weights THEMSELVES (no B scaling)
+    assert np.isclose(refs88['k_15'], 1.015, rtol=1e-12, atol=0.0)
+    assert np.isclose(refs88['k_16'], 1.015*0.866, rtol=1e-12, atol=0.0)
+    assert refs88 == {m: float(w) for m, w in ko.EHRLICH_DOWNSTREAM_WEIGHTS.items()}
+    assert p88['group_multiplier_bounds']['ehrlich_downstream'] == ko.IBO_PATHWAY_ZERO_A_RATE_BOUNDS
+    assert p88['exclude_params'] == () and p88['spike_delta_bounds'] is None
+    assert p88['stage_1_max_x_bounds'] is None
+    assert p88['rate_multiplier_bounds'] == ko.DEFAULT_RATE_MULTIPLIER_BOUNDS
+    assert p88['multiplier_bounds'] == ko.DEFAULT_GROUP_MULTIPLIER_BOUNDS   # inert: no individual inhibition coefficient
+    # Every preset's dict has the same key set; the existing presets return group_references=None.
+    keys88 = {'scenario', 'kinetic_bounds_scenario', 'include_params', 'multiplier_bounds',
+              'rate_multiplier_bounds', 'rate_params', 'parameter_multiplier_bounds',
+              'exclude_params', 'stage_1_max_x_bounds', 'parameter_groups',
+              'group_multiplier_bounds', 'spike_delta_bounds', 'group_references',
+              'param_bounds_override'}
+    assert set(p88) == keys88, set(p88) ^ keys88
+    for st88 in ('metabolic_protein', 'metabolic_minimal', 'metabolic_minimal_subset',
+                 'metabolic_14d', 'metabolic_split_14d'):
+        p88_other = ko.resolve_study_preset('ethanol_isobutanol', st88)
+        assert set(p88_other) == keys88 and p88_other['group_references'] is None, st88
+    p88_14 = ko.resolve_study_preset('ethanol_isobutanol', 'metabolic_split_14d')
+    assert p88_14['include_params'] == list(ko.METABOLIC_SPLIT_14D_RATES)
+    assert list(p88_14['parameter_groups']) == ['glycolysis', 'inhib_ethanol', 'inhib_isobutanol', 'inhib_acetate']
+    # The search space as the driver builds it: LIVE scenario-A baselines (k_13-k_16 = 0,
+    # k_17 = 44 constitutive) + the B workbook's absolute bounds as param_bounds_override.
+    kb88 = ko.workbook_kinetic_baselines('B')
+    kb88_live = {**kb88, 'k_13': 0.0, 'k_14': 0.0, 'k_15': 0.0, 'k_16': 0.0}
+    override88 = ko.workbook_kinetic_bounds(
+        'B', multiplier_bounds=p88['multiplier_bounds'],
+        rate_multiplier_bounds=p88['rate_multiplier_bounds'],
+        rate_params=p88['rate_params'],
+        parameter_multiplier_bounds=p88['parameter_multiplier_bounds'])
+    space88, excl88 = ko.build_search_space(
+        kb88_live, include_params=p88['include_params'],
+        param_bounds_override=override88,
+        exclude_params=p88['exclude_params'],
+        rate_multiplier_bounds=p88['rate_multiplier_bounds'],
+        rate_params=p88['rate_params'],
+        parameter_multiplier_bounds=p88['parameter_multiplier_bounds'],
+        parameter_groups=p88['parameter_groups'],
+        group_multiplier_bounds=p88['group_multiplier_bounds'],
+        group_references=p88['group_references'],
+        spike_delta_bounds=p88['spike_delta_bounds'],
+        stage_1_max_x_bounds=p88['stage_1_max_x_bounds'])
+    assert len(space88) == 12, list(space88)
+    assert list(space88) == ['k_3', 'k_6', 'k_13', 'k_17', 'glycolysis', 'ehrlich_downstream',
+                             'inhib_ethanol', 'inhib_isobutanol', 'inhib_acetate',
+                             'threshold_conc', 'target_delta', 'max_n_spikes']
+    assert 'stage_1_max_x' not in space88 and 'spike_delta' not in space88
+    assert space88['ehrlich_downstream'] == dict(low=1e-3, high=4.0, log=True)
+    assert space88['glycolysis'] == dict(low=0.2, high=4.0, log=True)
+    assert space88['k_13'] == dict(low=1e-3*5.81, high=4.0*5.81, log=True)   # the B-workbook absolute band
+    assert space88['k_17'] == dict(low=1e-3*44.0, high=4.0*44.0, log=True)
+    for g88 in ('inhib_ethanol', 'inhib_isobutanol', 'inhib_acetate'):
+        assert space88[g88] == dict(low=0.75, high=1.5, log=True)
+    grouped88 = {m for ms in p88['parameter_groups'].values() for m in ms}
+    assert set(excl88) == set(kb88) - set(ko.METABOLIC_SPLIT_12D_RATES) - grouped88
+    assert len(space88) <= ko.GP_MAX_DIMENSIONS
+    # The baseline point in this space: the referenced group and k_13 at their floors.
+    pt88 = ko.baseline_decision_point(space88, kb88_live, bmk86, 16,
+                                      parameter_groups=p88['parameter_groups'],
+                                      group_references=p88['group_references'])
+    assert pt88['ehrlich_downstream'] == 1e-3 and pt88['glycolysis'] == 1.0
+    assert pt88['k_13'] == 1e-3*5.81 and pt88['k_17'] == 44.0
+    # The applied values at multiplier m = the weights x m, so the multiplier IS
+    # k_14 in g/L/h and the group band is the scenario-A ABSOLUTE band 14d gives
+    # k_14 individually (IBO_PATHWAY_ZERO_A_RATE_BOUNDS) -- NOT the B-workbook
+    # band (1e-3*4.8, 4.0*4.8) of override88['k_14'] the group used to ride.
+    exp88 = ko.expand_grouped_values({'ehrlich_downstream': 1.0}, p88['parameter_groups'], kb88_live,
+                                     group_references=p88['group_references'])
+    assert exp88['k_14'] == 1.0 and np.isclose(exp88['k_16'], 1.015*0.866, rtol=1e-12, atol=0.0)
+    exp88_hi = ko.expand_grouped_values({'ehrlich_downstream': 4.0}, p88['parameter_groups'], kb88_live,
+                                        group_references=p88['group_references'])
+    assert exp88_hi['k_14'] == 4.0 and np.isclose(exp88_hi['k_15'], 4.0*1.015, rtol=1e-12, atol=0.0)
+    lo88, hi88 = ko.IBO_PATHWAY_ZERO_A_RATE_BOUNDS
+    assert space88['ehrlich_downstream'] == dict(low=lo88, high=hi88, log=True)
+    assert ko.scenario_A_ibo_pathway_rate_bounds(['k_14'], p88['rate_params'])['k_14'] == (lo88, hi88)
+    assert override88['k_14'] == (1e-3*4.8, 4.0*4.8) != (lo88, hi88)   # the B band is no longer the group's
+    # ethanol_only: no k_13-k_17 in the A workbook -> the Ehrlich group is emptied, its references dropped.
+    p88_eo = ko.resolve_study_preset('ethanol_only', 'metabolic_split_12d')
+    assert p88_eo['include_params'] == ['k_3', 'k_6']
+    assert list(p88_eo['parameter_groups']) == ['glycolysis', 'inhib_ethanol', 'inhib_acetate']
+    assert p88_eo['group_references'] is None
+    kb88_eo = ko.workbook_kinetic_baselines('A')
+    space88_eo, _ = ko.build_search_space(
+        kb88_eo, include_params=p88_eo['include_params'],
+        exclude_params=p88_eo['exclude_params'],
+        rate_multiplier_bounds=p88_eo['rate_multiplier_bounds'],
+        rate_params=p88_eo['rate_params'],
+        parameter_multiplier_bounds=p88_eo['parameter_multiplier_bounds'],
+        parameter_groups=p88_eo['parameter_groups'],
+        group_multiplier_bounds=p88_eo['group_multiplier_bounds'],
+        group_references=p88_eo['group_references'],
+        spike_delta_bounds=p88_eo['spike_delta_bounds'],
+        stage_1_max_x_bounds=p88_eo['stage_1_max_x_bounds'])
+    assert len(space88_eo) == 8, list(space88_eo)
+    assert list(space88_eo) == ['k_3', 'k_6', 'glycolysis', 'inhib_ethanol', 'inhib_acetate',
+                                'threshold_conc', 'target_delta', 'max_n_spikes']
+    # Typo / consistency guards on a weighted group, each via a temporary preset entry.
+    def _bad_preset88(msg, exc, **options):
+        ko.STUDY_TYPE_ROLES['_bad_88'] = ()
+        ko.STUDY_TYPE_OPTIONS['_bad_88'] = dict(
+            rate_params=('k_3',), parameter_groups={}, group_multiplier_bounds={},
+            exclude_params=(), spike_delta_bounds=None, stage_1_max_x_bounds=None,
+            **options)
+        try:
+            try:
+                ko.resolve_study_preset('ethanol_isobutanol', '_bad_88')
+                raise AssertionError(f'guard did not fire for {options}')
+            except exc as e:
+                assert msg in str(e) and '_bad_88' in str(e), (msg, str(e))
+        finally:
+            del ko.STUDY_TYPE_ROLES['_bad_88']
+            del ko.STUDY_TYPE_OPTIONS['_bad_88']
+    _bad_preset88('k_17ie', KeyError,                                  # a non-capacity member of a weighted group
+                  rate_parameter_groups={'g': ('k_14', 'k_17ie')},
+                  rate_group_weights={'g': {'k_14': 1.0, 'k_17ie': 1.0}})
+    _bad_preset88('anchor', ValueError,                                # anchor weight != 1.0
+                  rate_parameter_groups={'g': ('k_14', 'k_15')},
+                  rate_group_weights={'g': {'k_14': 2.0, 'k_15': 1.0}})
+    _bad_preset88('exactly the group members', ValueError,             # weights keys != members (order matters)
+                  rate_parameter_groups={'g': ('k_14', 'k_15')},
+                  rate_group_weights={'g': {'k_15': 1.0, 'k_14': 1.0}})
+    _bad_preset88('exactly the group members', ValueError,             # a missing member
+                  rate_parameter_groups={'g': ('k_14', 'k_15', 'k_16')},
+                  rate_group_weights={'g': {'k_14': 1.0, 'k_15': 1.015}})
+    _bad_preset88('not a rate_parameter_groups', ValueError,           # weights for a group that is no capacity group
+                  rate_parameter_groups={'g': ('k_14', 'k_15')},
+                  rate_group_weights={'h': {'k_14': 1.0, 'k_15': 1.0}})
+    _bad_preset88('nonpositive weight', ValueError,                    # a zero weight
+                  rate_parameter_groups={'g': ('k_14', 'k_15')},
+                  rate_group_weights={'g': {'k_14': 1.0, 'k_15': 0.0}})
+else:
+    print('SKIP 88 (preset part): parameter-distribution workbooks not found')
+PASS('metabolic_split_12d preset: 12/8 vars (k_3, k_6, k_13, k_17 + glycolysis + REFERENCED '
+     'ehrlich_downstream = the weights on the absolute scenario-A band 1e-3-4.0 g/L/h + 3 '
+     'inhibition groups + 3 feeding), '
+     'name _ib0.75-1.5 (78 chars, no Ehrlich tag), GP/DA tags, supervisor agrees, every '
+     'preset returns group_references, weighted-group guards')
+
+#%% 89. Driver + supervisor for metabolic_split_12d (2026-09-15): the driver
+# setdefault()s the preset's group_references like every other preset key (so
+# it reaches run_kinetic_optimization / run_kinetic_dual_annealing through
+# engine_kwargs), reports a referenced group in its groups print, and both
+# docstrings document the new type. Source-level (the driver load()s the
+# model at import); the supervisor's --study-type choices come from
+# ko.STUDY_TYPE_ROLES (check 88 covers its default_study_name).
+drv89 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          'optimize_kinetics_BO.py')).read()
+body89 = drv89[drv89.index('def run('):]
+setdefault89 = body89[body89.index("for key in ('include_params',"):body89.index('engine_kwargs.setdefault(key, preset[key])')]
+assert "'group_references'" in setdefault89, setdefault89
+assert "'spike_delta_bounds'" in setdefault89 and "'parameter_groups'" in setdefault89
+assert "x REFERENCE" in body89                           # the groups print marks a referenced group
+assert "study_type='metabolic_split_12d'" in drv89       # runner example
+assert 'metabolic_split_12d' in drv89[:drv89.index('def run(')]   # module docstring paragraph
+assert 'ehrlich_downstream' in body89[:body89.index('engine_kwargs.setdefault(key, preset[key])')]   # run() docstring
+sup89 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          'optimize_kinetics_BO_supervised.py')).read()
+assert '--study-type metabolic_split_12d' in sup89        # docstring example
+assert 'choices=tuple(ko.STUDY_TYPE_ROLES)' in sup89   # the new type is a valid --study-type automatically
+PASS('driver: group_references setdefault-ed from the preset and forwarded through engine_kwargs, '
+     'referenced groups marked in the groups print, runner example + docstrings; supervisor example')
+
+#%% 90. Scenario-A antimony rate baselines (2026-09-16): read by file path,
+# the ONLY fitted source valid for anchoring (CLAUDE.md anchoring rule). Drift
+# guard on the five isobutanol-pathway capacity rates.
+assert {'antimony_file_path', 'antimony_rate_baselines',
+        'SCENARIO_A_ANCHORED_RATE_MULTIPLIER_BOUNDS',
+        'IBO_PATHWAY_ZERO_A_RATE_BOUNDS'} <= set(ko.__all__)
+anti90 = ko.antimony_rate_baselines()
+assert anti90['k_13'] == 0.0 and anti90['k_14'] == 0.0 and anti90['k_15'] == 0.0
+assert anti90['k_16'] == 0.02115, anti90['k_16']
+assert anti90['k_17'] == 0.1077, anti90['k_17']
+# Natives are present and positive (identical in A, B, antimony -- so anchoring
+# them on A vs B is a no-op; only k_13-k_17 depend on the anchor).
+assert anti90['k_6'] > 0.0 and anti90['k_3'] > 0.0
+# antimony_file_path sits beside the role table and exists.
+assert ko.antimony_file_path() == os.path.join(
+    os.path.dirname(ko.kinetic_parameter_roles_path()),
+    's_cerevisiae_ferm_fb_inhib_mod_ibo_antimony.txt')
+assert os.path.isfile(ko.antimony_file_path())
+# Constants.
+assert ko.SCENARIO_A_ANCHORED_RATE_MULTIPLIER_BOUNDS == {'k_16': (1e-3, 1e2), 'k_17': (1e-3, 20.0)}
+assert ko.IBO_PATHWAY_ZERO_A_RATE_BOUNDS == (1e-3, 4.0)
+# An explicit path is read afresh (not the cache).
+assert ko.antimony_rate_baselines(path=ko.antimony_file_path())['k_16'] == 0.02115
+PASS('antimony_rate_baselines: k_13-k_15 = 0, k_16 = 0.02115, k_17 = 0.1077 by file path; '
+     'constants exported')
+
+#%% 91. scenario_A_ibo_pathway_rate_bounds (2026-09-16): the param_bounds_override
+# for individually-sampled IBO-pathway capacity rates (absent from the A workbook).
+assert 'scenario_A_ibo_pathway_rate_bounds' in ko.__all__
+rate_params91 = ('k_1l', 'k_1h', 'k_3', 'k_6', 'k_13', 'k_14', 'k_15', 'k_16', 'k_17')
+# All five IBO-pathway rates sampled individually + two natives:
+ov91 = ko.scenario_A_ibo_pathway_rate_bounds(
+    ['k_1l', 'k_6', 'k_13', 'k_14', 'k_15', 'k_16', 'k_17'], rate_params91)
+assert set(ov91) == {'k_13', 'k_14', 'k_15', 'k_16', 'k_17'}   # natives untouched
+assert ov91['k_13'] == (1e-3, 4.0) and ov91['k_14'] == (1e-3, 4.0) and ov91['k_15'] == (1e-3, 4.0)
+assert np.isclose(ov91['k_16'][0], 1e-3*0.02115) and np.isclose(ov91['k_16'][1], 1e2*0.02115)
+assert np.isclose(ov91['k_17'][0], 1e-3*0.1077) and np.isclose(ov91['k_17'][1], 20.0*0.1077)
+# Grouped rates (not in include_params, e.g. metabolic_split_12d) are skipped:
+ov91b = ko.scenario_A_ibo_pathway_rate_bounds(['k_3', 'k_6', 'k_13', 'k_17'], rate_params91)
+assert set(ov91b) == {'k_13', 'k_17'}
+# A non-rate (inhibition coefficient) in include_params is ignored:
+ov91c = ko.scenario_A_ibo_pathway_rate_bounds(['k_13', 'k_1ie'], rate_params91)
+assert set(ov91c) == {'k_13'}
+# No IBO-pathway rate individually sampled (ethanol_only-like) -> empty:
+assert ko.scenario_A_ibo_pathway_rate_bounds(['k_1l', 'k_6'], rate_params91) == {}
+# A nonzero-A IBO-pathway rate with no multiplier-table entry is a hard error.
+# k_99 is absent from the (empty) A-workbook rows, is a rate, has a nonzero
+# antimony value and no SCENARIO_A_ANCHORED_RATE_MULTIPLIER_BOUNDS entry:
+try:
+    ko.scenario_A_ibo_pathway_rate_bounds(
+        ['k_99'], ('k_99',), scenario_A_workbook_rows=set(),
+        antimony={'k_99': 5.0})
+    raise AssertionError('missing table entry did not raise')
+except KeyError:
+    pass
+PASS('scenario_A_ibo_pathway_rate_bounds: k_13-k_15 absolute, k_16/k_17 anchored '
+     'multiplier, natives/grouped/non-rate skipped, missing-table error')
+
+#%% 92. resolve_study_preset returns param_bounds_override (2026-09-16): the
+# scenario-A-anchored bands for the individually-sampled IBO-pathway rates.
+if os.path.isfile(wb_A) and os.path.isfile(wb_B):
+    anti92 = ko.antimony_rate_baselines()
+    # metabolic_protein (ethanol_isobutanol) samples k_13-k_17 individually:
+    p92 = ko.resolve_study_preset('ethanol_isobutanol', 'metabolic_protein')
+    ov92 = p92['param_bounds_override']
+    assert set(ov92) == {'k_13', 'k_14', 'k_15', 'k_16', 'k_17'}, set(ov92)
+    assert ov92['k_13'] == (1e-3, 4.0)
+    assert np.isclose(ov92['k_16'][1], 1e2*anti92['k_16'])
+    assert np.isclose(ov92['k_17'][1], 20.0*anti92['k_17'])
+    # ethanol_only has no k_13-k_17 rows -> None/empty.
+    assert not ko.resolve_study_preset('ethanol_only', 'metabolic_protein')['param_bounds_override']
+    # metabolic_split_12d groups k_14/k_15/k_16 -> only k_13/k_17 in the override.
+    ov92_12 = ko.resolve_study_preset('ethanol_isobutanol', 'metabolic_split_12d')['param_bounds_override']
+    assert set(ov92_12) == {'k_13', 'k_17'}, set(ov92_12)
+    # build_search_space places the five rates log-scale on the new bounds
+    # (low > 0 => log). Feed a fake baseline set so the space builds without a sim.
+    kb92 = {'k_13': 0.0, 'k_14': 0.0, 'k_15': 0.0, 'k_16': 0.0, 'k_17': 44.0}
+    ss92, _ = ko.build_search_space(kb92, param_bounds_override=ov92,
+                                    rate_params=('k_13', 'k_14', 'k_15', 'k_16', 'k_17'))
+    for n92 in ('k_13', 'k_14', 'k_15', 'k_16', 'k_17'):
+        assert ss92[n92]['log'] is True and ss92[n92]['low'] == ov92[n92][0]
+    PASS('resolve_study_preset: param_bounds_override anchors k_13-k_17 on scenario A; '
+         'ethanol_only empty; split_12d skips grouped k_14-k_16; log-scale in the space')
+
+#%% 93. default_study_name: ibo_pathway_anchoring tag (2026-09-16). '_aA' after
+# the exclusion tag, before _s1x; default (None) unchanged.
+assert 'ibo_pathway_anchoring' in _inspect.signature(ko.default_study_name).parameters
+base93 = ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_protein',
+                               rate_multiplier_bounds=(1e-3, 4.0),
+                               inhibition_multiplier_bounds=(0.1, 10.0),
+                               exclude_params=('k_10',),
+                               stage_1_max_x_bounds=(1.0, 50.0), burden=True)
+aA93 = ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_protein',
+                             rate_multiplier_bounds=(1e-3, 4.0),
+                             inhibition_multiplier_bounds=(0.1, 10.0),
+                             exclude_params=('k_10',),
+                             stage_1_max_x_bounds=(1.0, 50.0), burden=True,
+                             ibo_pathway_anchoring='scenario_A')
+# The only difference is '_aA' inserted between the exclusion tag and _s1x.
+assert base93.replace('_xk10_', '_xk10_aA_') == aA93, (base93, aA93)
+assert '_xk10_aA_s1x1-50_burden' in aA93
+# None and 'legacy' add nothing.
+assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_protein',
+                             ibo_pathway_anchoring='legacy') \
+    == ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_protein')
+# With stage_1_max_x pinned (no _s1x), _aA sits before _burden.
+aA93b = ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_minimal_subset',
+                              rate_multiplier_bounds=(1e-3, 4.0),
+                              inhibition_multiplier_bounds=(0.2, 2.0), burden=True,
+                              ibo_pathway_anchoring='scenario_A')
+assert aA93b.endswith('_aA_burden'), aA93b
+PASS('default_study_name: _aA anchoring tag after exclusion, before _s1x; None/legacy inert')
+
+#%% 94. Driver forwards the preset's param_bounds_override and tags _aA.
+drv94 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          'optimize_kinetics_BO.py')).read()
+body94 = drv94[drv94.index('def run('):]
+setdefault94 = body94[body94.index("for key in ('include_params',")
+                      :body94.index('engine_kwargs.setdefault(key, preset[key])')]
+assert "'param_bounds_override'" in setdefault94, setdefault94
+# The driver passes the anchoring marker into default_study_name.
+call94 = body94[body94.index('ko.default_study_name('):body94.index('excluded = tuple(')]
+assert "ibo_pathway_anchoring='scenario_A'" in call94, call94
+# The existing merge already prefers the preset/user override over the B bounds.
+assert "derived.update(engine_kwargs.get('param_bounds_override') or {})" in body94
+PASS('driver: param_bounds_override setdefault-ed and merged over the B bounds; _aA tag passed')
+
+#%% 95. Supervisor passes the anchoring marker on the preset path.
+sup95 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          'optimize_kinetics_BO_supervised.py')).read()
+dsn95 = sup95[sup95.index('def default_study_name('):sup95.index('scenario = scenario or')]
+assert "ibo_pathway_anchoring='scenario_A'" in dsn95, dsn95
+# The legacy branch (below) must NOT carry the marker.
+legacy95 = sup95[sup95.index('scenario = scenario or'):sup95.index('def row_count(')]
+assert '_aA' not in legacy95 and 'ibo_pathway_anchoring' not in legacy95
+PASS('supervisor: _aA on the preset path only; legacy path unchanged')
+
+#%% 96. Trial reproduction (spec 2026-09-18-reproduce-split12d-trial): the
+# preset guard checks the BASENAME of study_name for both preset tokens
+# (ValueError naming the missing one), a bare study name resolves to
+# {results_dir}/{study_name}_trajectory.csv (default analyses/results next to
+# the module), a *.csv argument is a path; read_trajectory_row selects by
+# int(float(trial_number)) and a missing number raises KeyError with the
+# available range.
+import csv as _csv96
+NAME96 = 'kin_opt_ethanol_isobutanol_metabolic_split_12d_irr_gp_rb0.001-4_ib0.75-1.5_aA_burden'
+for bad96, token96 in (
+        ('kin_opt_ethanol_isobutanol_metabolic_split_14d_irr_burden', 'metabolic_split_12d'),
+        ('kin_opt_ethanol_only_metabolic_split_12d_irr_burden', 'ethanol_isobutanol'),
+        # tokens in the DIRECTORY do not count: only the basename is checked
+        (os.path.join('ethanol_isobutanol_metabolic_split_12d', 'kin_opt_A_irr_trajectory.csv'),
+         'ethanol_isobutanol')):
+    try:
+        ko.split12d_trajectory_path(bad96)
+    except ValueError as e96:
+        assert f"lacks ['{token96}'" in str(e96), str(e96)   # names the MISSING token (first one)
+    else:
+        raise AssertionError(f'preset guard accepted {bad96!r}')
+assert ko.split12d_trajectory_path(NAME96, results_dir='X') == os.path.join(
+    'X', NAME96 + '_trajectory.csv')
+default96 = ko.split12d_trajectory_path(NAME96)
+assert default96 == os.path.join(os.path.dirname(os.path.abspath(ko.__file__)),
+                                 'analyses', 'results', NAME96 + '_trajectory.csv')
+csv96 = os.path.join(tempfile.mkdtemp(), NAME96 + '_trajectory.csv')
+assert ko.split12d_trajectory_path(csv96, results_dir='ignored') == csv96   # a path passes through
+with open(csv96, 'w', newline='') as f96:
+    w96 = _csv96.writer(f96)
+    w96.writerow(['trial_number', 'state', 'k_3'])
+    w96.writerow(['0', 'COMPLETE', '1.5'])
+    w96.writerow(['1.0', 'FAIL', '2.5'])        # pandas-style float trial number
+    w96.writerow(['5', 'COMPLETE', '3.5'])
+row96 = ko.read_trajectory_row(csv96, 1)
+assert row96 == {'trial_number': '1.0', 'state': 'FAIL', 'k_3': '2.5'}      # raw strings
+assert ko.read_trajectory_row(csv96, '5')['k_3'] == '3.5'
+try:
+    ko.read_trajectory_row(csv96, 3)
+except KeyError as e96:
+    assert '0-5' in str(e96) and '3 rows' in str(e96), str(e96)
+else:
+    raise AssertionError('missing trial_number did not raise')
+PASS('trial reproduction: preset guard on the basename, CSV path resolution, '
+     'row selection by int(float(trial_number)), KeyError with the range')
+
+#%% 97. reconstruct_trial_kinetics on a SYNTHETIC fixture row (a hand-written
+# trajectory CSV with known decision + applied_* columns and a stub
+# group_references): 'rederive' recomputes the members (reference x m for
+# the referenced ehrlich_downstream group, live baseline x m for
+# inhib_ethanol), 'replay' reads the recorded applied_* columns, 'both'
+# agrees and simulates the RE-DERIVED values; a perturbed applied_* column
+# lands in the mismatch list with a RuntimeWarning; replay / both without
+# applied_* columns raise; max_n_spikes is parsed int(float(.)).
+import warnings as _warnings97
+kb97 = {'k_3': 10.0, 'k_13': 0.0, 'k_14': 0.0, 'k_15': 0.0, 'k_16': 0.0, 'k_1ie': 0.02}
+groups97 = {'ehrlich_downstream': ['k_14', 'k_15', 'k_16'], 'inhib_ethanol': ['k_1ie']}
+refs97 = {'ehrlich_downstream': {'k_14': 1.0, 'k_15': 1.015, 'k_16': 1.015*0.866}}
+space97, _ = ko.build_search_space(
+    kb97, param_bounds_override={'k_13': (1e-3, 4.0)},
+    parameter_groups=groups97,
+    group_multiplier_bounds={'ehrlich_downstream': (1e-3, 4.0)},
+    group_references=refs97, spike_delta_bounds=None)
+assert list(space97) == ['k_3', 'k_13', 'ehrlich_downstream', 'inhib_ethanol',
+                         'threshold_conc', 'target_delta', 'max_n_spikes']
+m97, i97 = 0.73, 0.8
+header97 = ['trial_number', 'state', *space97, 'objective',
+            'applied_k_14', 'applied_k_15', 'applied_k_16', 'applied_k_1ie', 'error']
+cells97 = ['7', 'COMPLETE', repr(2.5), repr(2.0), repr(m97), repr(i97),
+           repr(219.4), repr(5.0), '11.0', repr(0.25),
+           repr(1.0*m97), repr(1.015*m97), repr(1.015*0.866*m97), repr(0.02*i97), '']
+dir97 = tempfile.mkdtemp()
+csv97 = os.path.join(dir97, 'fixture_trajectory.csv')
+with open(csv97, 'w', newline='') as f97:
+    w97 = _csv96.writer(f97)
+    w97.writerow(header97)
+    w97.writerow(cells97)
+row97 = ko.read_trajectory_row(csv97, 7)
+expected97 = {'k_3': 2.5, 'k_13': 2.0, 'k_14': 1.0*m97, 'k_15': 1.015*m97,
+              'k_16': 1.015*0.866*m97, 'k_1ie': 0.02*i97,
+              'threshold_conc': 219.4, 'target_delta': 5.0, 'max_n_spikes': 11}
+assert ko.REPRODUCTION_MODES == ('rederive', 'replay', 'both')
+for mode97 in ko.REPRODUCTION_MODES:
+    with _warnings97.catch_warnings():
+        _warnings97.simplefilter('error')                   # a clean row must not warn
+        v97, a97, cc97 = ko.reconstruct_trial_kinetics(
+            row97, space97, groups97, kb97, refs97, mode=mode97)
+    assert list(v97) == list(space97)
+    assert v97['max_n_spikes'] == 11 and isinstance(v97['max_n_spikes'], int)
+    assert v97['ehrlich_downstream'] == m97 and isinstance(v97['k_3'], float)
+    assert set(a97) == set(expected97), (mode97, a97)       # group keys dropped, members present
+    assert all(np.isclose(a97[n], expected97[n], rtol=1e-12, atol=0.0) for n in expected97)
+    assert cc97['mode'] == mode97 and cc97['mismatches'] == []
+    assert cc97['simulated'] == ('replay' if mode97 == 'replay' else 'rederive')
+    assert (cc97['max_rel_delta'] is None) == (mode97 != 'both')
+assert cc97['max_rel_delta'] <= 1e-12                       # last mode = 'both'
+# a deliberately perturbed applied_* column: mismatch + warning; 'both' still
+# simulates the RE-DERIVED value, 'replay' the recorded one
+bad_row97 = dict(row97, applied_k_15=repr(1.015*m97*1.01))
+with _warnings97.catch_warnings(record=True) as caught97:
+    _warnings97.simplefilter('always')
+    _, a97b, cc97b = ko.reconstruct_trial_kinetics(
+        bad_row97, space97, groups97, kb97, refs97, mode='both')
+assert [mm[0] for mm in cc97b['mismatches']] == ['k_15'], cc97b
+assert np.isclose(cc97b['max_rel_delta'], 0.01/1.01, rtol=1e-9, atol=0.0)
+assert len(caught97) == 1 and issubclass(caught97[0].category, RuntimeWarning)
+assert 'k_15' in str(caught97[0].message)
+assert np.isclose(a97b['k_15'], 1.015*m97, rtol=1e-12, atol=0.0)
+_, a97r, _ = ko.reconstruct_trial_kinetics(bad_row97, space97, groups97, kb97, refs97, mode='replay')
+assert np.isclose(a97r['k_15'], 1.015*m97*1.01, rtol=1e-12, atol=0.0)
+# a looser tolerance accepts it
+_, _, cc97c = ko.reconstruct_trial_kinetics(bad_row97, space97, groups97, kb97, refs97,
+                                            mode='both', cross_check_tol=0.05)
+assert cc97c['mismatches'] == []
+# no applied_* columns: replay / both raise, rederive works
+bare97 = {k: v for k, v in row97.items() if not k.startswith('applied_')}
+for mode97 in ('replay', 'both'):
+    try:
+        ko.reconstruct_trial_kinetics(bare97, space97, groups97, kb97, refs97, mode=mode97)
+    except ValueError as e97:
+        assert 'applied_k_14' in str(e97), str(e97)
+    else:
+        raise AssertionError(f'mode={mode97!r} accepted a row without applied_* columns')
+_, a97d, _ = ko.reconstruct_trial_kinetics(bare97, space97, groups97, kb97, refs97, mode='rederive')
+assert np.isclose(a97d['k_16'], 1.015*0.866*m97, rtol=1e-12, atol=0.0)
+# a blank decision cell and an unknown mode raise
+for kw97, needle97 in ((dict(row=dict(row97, k_13=''), mode='rederive'), 'k_13'),
+                       (dict(row=row97, mode='resimulate'), 'resimulate')):
+    try:
+        ko.reconstruct_trial_kinetics(kw97['row'], space97, groups97, kb97, refs97, mode=kw97['mode'])
+    except ValueError as e97:
+        assert needle97 in str(e97), str(e97)
+    else:
+        raise AssertionError(kw97)
+PASS('reconstruct_trial_kinetics: rederive == replay == both on the fixture; perturbed applied_* '
+     '-> mismatch + RuntimeWarning (both simulates the re-derived value); replay without '
+     'applied_* raises; int max_n_spikes; blank decision / unknown mode raise')
+
+#%% 98. compare_tracked_metrics (finite pairs by relative delta; nan<->nan and
+# inf<->inf pass; finite<->non-finite warns; blank CSV cell = NaN; the
+# start-state-dependent convergence diagnostics are reported but never
+# warned on) and _simulate_trial_reproduction with fake handles (check-87
+# pattern): sets ONLY the applied members on r_te + the spike cap, pinned
+# spike from the baseline snapshot, returns MPSPs / IRR / every tracked
+# metric; a raising model_specification is reported as error, not raised.
+assert ko.REPRODUCTION_DIAGNOSTIC_METRICS == ('spike_feed_residual', 'n_sims_run', 'final_drift')
+rep98 = {'IRR': 0.20, 'TCI': 101.0, 'PI': float('-inf'), 'tau': float('nan'),
+         'EtOH titer': 50.0, 'IBO titer': float('nan'), 'n_glu_spikes': 0.0,
+         'final_drift': 5e-4, 'not_a_column': 1.0}
+row98 = {'IRR': '0.2001', 'TCI': '110.0', 'PI': '-inf', 'tau': '',
+         'EtOH titer': 'nan', 'IBO titer': '41.7', 'n_glu_spikes': '0.0',
+         'final_drift': '1e-9'}
+with _warnings97.catch_warnings(record=True) as caught98:
+    _warnings97.simplefilter('always')
+    mc98, mw98 = ko.compare_tracked_metrics(rep98, row98, metric_check_tol=0.02)
+by98 = {name: (rep, rec, rel) for name, rep, rec, rel in mc98}
+assert list(by98) == ['IRR', 'TCI', 'PI', 'tau', 'EtOH titer', 'IBO titer',
+                      'n_glu_spikes', 'final_drift']            # absent column skipped, order kept
+assert np.isclose(by98['IRR'][2], 0.0001/0.2001) and np.isclose(by98['TCI'][2], 9.0/110.0)
+assert by98['n_glu_spikes'][2] == 0.0                            # 0 vs 0
+assert all(np.isnan(by98[n][2]) for n in ('PI', 'tau', 'EtOH titer', 'IBO titer'))
+assert np.isnan(by98['tau'][1])                                   # blank cell -> NaN
+assert mw98 == ['TCI', 'EtOH titer', 'IBO titer'], mw98           # final_drift NOT flagged (diagnostic)
+assert len(caught98) == 3 and all(issubclass(c.category, RuntimeWarning) for c in caught98)
+assert all(isinstance(x, float) for _, rep, rec, rel in mc98 for x in (rep, rec, rel))
+
+class _FakeTE98:
+    k_3 = 10.0
+    k_13 = 0.0
+    k_14 = 0.0
+    k_1ie = 0.02
+    def getGlobalParameterIds(self):
+        return ['k_3', 'k_13', 'k_14', 'k_1ie']
+te98 = _FakeTE98()
+kb98 = ko.discover_kinetic_parameters(te98)
+fbs98 = SimpleNamespace(max_n_spikes=16)
+calls98 = []
+handles98 = {
+    'r_te': te98, 'fbs_spec': fbs98,
+    'V406': SimpleNamespace(nsk_results_specific_tau_dict=nsk, tau=55.0),
+    'tea': SimpleNamespace(TCI=350e6, NPV=35e6), 'HXN': SimpleNamespace(),
+    'model_specification': lambda **kw: calls98.append((kw, te98.k_3, te98.k_13, te98.k_14, te98.k_1ie)),
+    'solve_TEA': lambda stream_IDs=None: {'IRR': 0.2, 'MPSPs': {'ethanol': 0.5, 'isobutanol': 1.0}},
+    'latest_TEA_solution': {'IRR': np.nan, 'MPSPs': {'ethanol': np.nan, 'isobutanol': np.nan}}}
+bmk98 = dict(target_conc=221.25, threshold_conc=217.125, spike_conc=600.0)
+values98 = {'k_13': 2.0, 'ehrlich_downstream': 0.73, 'threshold_conc': 219.4,
+            'target_delta': 5.0, 'max_n_spikes': 11}
+applied98 = {'k_13': 2.0, 'k_14': 0.73, 'threshold_conc': 219.4,
+             'target_delta': 5.0, 'max_n_spikes': 11}
+feed98, out98, err98 = ko._simulate_trial_reproduction(handles98, kb98, values98, applied98, bmk98)
+assert err98 is None
+assert feed98 == dict(threshold=219.4, target=224.4, spike=600.0, max_n_spikes=11)
+assert calls98 == [(dict(target_conc=224.4, threshold_conc=219.4, spike_conc=600.0),
+                    10.0, 2.0, 0.73, 0.02)]                       # k_3 / k_1ie untouched
+assert fbs98.max_n_spikes == 11
+assert out98['IRR'] == 0.2 and out98['MPSPs'] == {'ethanol': 0.5, 'isobutanol': 1.0}
+assert list(out98['metrics']) == list(ko.TRACKED_METRICS)
+assert handles98['latest_TEA_solution']['IRR'] == 0.2
+def _boom98(**kw):
+    raise RuntimeError('SYS14 did not converge')
+feed98b, out98b, err98b = ko._simulate_trial_reproduction(
+    {**handles98, 'model_specification': _boom98}, kb98, values98, applied98, bmk98)
+assert err98b == "RuntimeError('SYS14 did not converge')"
+assert out98b == dict(MPSPs=None, IRR=None, metrics={}) and feed98b == feed98
+PASS('compare_tracked_metrics (rel delta, nan/inf pairing, blank = NaN, diagnostics never flagged) '
+     '+ _simulate_trial_reproduction (applied members only, pinned spike, error reported not raised)')
+
+#%% 99. reproduce_split12d_trial surface (the simulation itself is sim-based,
+# ask-first): signature defaults per the spec (+ restore=True); every
+# input error raises BEFORE the model is touched (no load() in this
+# process, so reaching scenarios.load_scenario would fail differently):
+# unknown mode, preset-guard mismatch, missing CSV, missing trial. The
+# runner load()s, then calls the function, and never runs at import.
+import inspect as _inspect99
+sig99 = _inspect99.signature(ko.reproduce_split12d_trial)
+assert list(sig99.parameters) == ['anchor_scenario', 'study_name', 'trial_number', 'mode', 'burden',
+                                  'results_dir', 'cross_check_tol', 'metric_check_tol', 'restore',
+                                  'verbose']
+assert {n: p.default for n, p in sig99.parameters.items() if p.default is not _inspect99.Parameter.empty} == dict(
+    mode='both', burden=True, results_dir=None, cross_check_tol=1e-6, metric_check_tol=0.02,
+    restore=True, verbose=True)
+assert all(sig99.parameters[n].kind is _inspect99.Parameter.KEYWORD_ONLY
+           for n in ('mode', 'burden', 'results_dir', 'cross_check_tol', 'metric_check_tol',
+                     'restore', 'verbose'))
+empty99 = tempfile.mkdtemp()
+for args99, kw99, exc99, needle99 in (
+        (('A', NAME96, 0), dict(mode='resimulate'), ValueError, 'resimulate'),
+        (('A', 'kin_opt_A_kbB_irr', 0), {}, ValueError, 'metabolic_split_12d'),
+        (('A', NAME96, 0), dict(results_dir=empty99), FileNotFoundError, NAME96),
+        (('A', csv96, 3), {}, KeyError, '0-5')):
+    try:
+        ko.reproduce_split12d_trial(*args99, verbose=False, **kw99)
+    except exc99 as e99:
+        assert needle99 in str(e99), (needle99, str(e99))
+    else:
+        raise AssertionError((args99, kw99))
+run99 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          'reproduce_split12d_trial.py')).read()
+assert run99.startswith('#!/usr/bin/env python3\n# -*- coding: utf-8 -*-\n'
+                        "# Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results")
+assert run99.index('isobutanol.load()') < run99.index('ko.reproduce_split12d_trial(')
+assert "if __name__ == '__main__':" in run99                  # never simulates at import
+compile(run99, 'reproduce_split12d_trial.py', 'exec')         # syntax only; not executed
+PASS('reproduce_split12d_trial: spec signature (+ restore), input errors raise before the model '
+     'is touched; runner has the UIUC header, load()s first, guarded by __main__')
+
+#%% 100. Relay selection (spec 2026-09-23-relay-preload-pi-campaign-design,
+# §3.1 + A4/A5): select_relay_rows on temp donor CSVs of check 86's grouped,
+# REFERENCED 12d-like space -- every per-donor filter (FAIL state, blank /
+# -inf value, quarantined cap hit vs a sub-threshold drift and NaN
+# diagnostics, unparsable / out-of-band / non-integral decision -- DROPPED,
+# never clipped --, repeated trial number), first-occurrence unit-cube
+# dedupe (an exact and a near duplicate with DIFFERENT values; the spread
+# noted), the value read from the relay column (not the donor's own
+# objective), the value-descending keep set + truncation, the maximin fill
+# (== a brute-force re-implementation; identical on a second call and under
+# a permuted donor list), the digest; and the refusals: missing file, other
+# decision columns, missing value column, a full header other than
+# `columns`, a repeated stem, a different group anchor (B-anchored
+# applied_*), an infeasible selected row, no surviving row.
+import csv as _csv100
+import re as _re100
+kb100 = dict(kb86)
+groups100 = {g: list(m) for g, m in groups86.items()}
+refs100 = {g: dict(r) for g, r in refs86.items()}
+space100, _ = ko.build_search_space(
+    kb100, parameter_groups=groups100, group_multiplier_bounds=gmb86,
+    group_references=refs100, param_bounds_override={'k_13': (5.81e-3, 23.24)},
+    spike_delta_bounds=None)
+applied100 = [f'applied_{m}' for ms in groups100.values() for m in ms]
+cols100 = ko.trajectory_columns(space100, extra_columns=applied100)
+outdir100 = tempfile.mkdtemp()
+rng100 = np.random.default_rng(100)
+d100 = len(space100)
+params100 = {}                     # label -> the external decision vector written
+
+def _row100(stem, trial, u=None, value=0.0, state='COMPLETE', refs=None,
+            params=None, **over):
+    """A donor row: decision vector at unit point u (a fresh interior draw
+    when None) or `params`; 'PI (log-tail)' = value while the donor's own
+    'objective' is a DIFFERENT number; applied_* from `refs` (default: this
+    study's anchor); `over` overrides cells after the fact."""
+    if params is None:
+        u = 0.1 + 0.8*rng100.random(d100) if u is None else u
+        params = ko.unit_to_external(u, space100)
+    rec = {'trial_number': trial, 'state': state, **params}
+    applied = ko.expand_grouped_values(params, groups100, kb100,
+                                       refs100 if refs is None else refs)
+    for col in applied100:
+        rec[col] = applied[col[len('applied_'):]]
+    if state == 'COMPLETE':
+        rec.update({'objective': 0.5 + 0.001*trial, 'PI (log-tail)': value,
+                    'PI': value, 'IRR': 0.2, 'IBO titer': 10.0 + trial,
+                    'n_sims_run': 2, 'final_drift': 1e-6})
+    rec.update(over)
+    params100.setdefault(f'{stem}#{trial}', dict(params))
+    return rec
+
+def _write100(stem, rows, columns=cols100, directory=outdir100):
+    path = os.path.join(directory, stem + '_trajectory.csv')
+    for rec in rows:
+        ko.append_trajectory_row(path, columns, rec)
+    return path
+
+uA0 = 0.1 + 0.8*rng100.random(d100)
+uA4 = 0.1 + 0.8*rng100.random(d100)
+pA4 = ko.unit_to_external(uA4, space100)
+k3_hi100 = space100['k_3']['high']
+pathA100 = _write100('donorA100', [
+    _row100('donorA100', 0, uA0, 0.30),                                     # kept: the best
+    _row100('donorA100', 1, state='FAIL', error='boom'),                    # state
+    _row100('donorA100', 2, value=''),                                      # blank value -> non_finite
+    _row100('donorA100', 3, value=0.9, n_sims_run=5, final_drift=1e-3),     # quarantined cap hit (would be the best)
+    _row100('donorA100', 4, uA4, 0.05, n_sims_run=5, final_drift=5e-5),     # cap hit, drift <= 1e-4: kept
+    _row100('donorA100', 5, value=0.8, k_3=k3_hi100*1.01),                  # out of band: dropped, NOT clipped
+    _row100('donorA100', 6, value=0.8, threshold_conc='abc'),               # unparsable decision -> bad_decision
+    _row100('donorA100', 7, value=0.8, max_n_spikes=3.5),                   # non-integral int -> out_of_band
+    _row100('donorA100', 8, value=0.12, n_sims_run='', final_drift=''),     # NaN diagnostics: not quarantined
+    _row100('donorA100', 9, value=float('-inf')),                           # non_finite
+    _row100('donorA100', 10, value=-0.4),
+    _row100('donorA100', 11, value=0.12),                                   # ties A#8 on value
+    _row100('donorA100', 12, value=-0.05)])
+pB1 = dict(pA4, k_3=pA4['k_3']*1.001)            # ~2e-4 in the unit cube from A#4
+pathB100 = _write100('donorB100', [
+    _row100('donorB100', 0, uA0, 0.31),          # exact duplicate of A#0, other value
+    _row100('donorB100', 1, params=pB1, value=0.07),   # near duplicate of A#4, other value
+    _row100('donorB100', 2, value=0.2),
+    _row100('donorB100', 2, value=0.25),         # repeated trial number -> duplicate
+    _row100('donorB100', 3, value=-0.3),
+    _row100('donorB100', 4, value=0.0),
+    _row100('donorB100', 5, value=-1.2),
+    _row100('donorB100', 6, value=0.02)])
+kw100 = dict(columns=cols100, parameter_groups=groups100, kinetic_baselines=kb100,
+             group_references=refs100)
+rows100, notes100 = ko.select_relay_rows([pathA100, pathB100], space100, 'PI (log-tail)',
+                                         max_rows=9, keep_above=0.0, **kw100)
+nA100, nB100 = notes100['donors']['donorA100'], notes100['donors']['donorB100']
+assert {k: nA100[k] for k in ('read', 'candidates', *ko.RELAY_DROP_REASONS)} == dict(
+    read=13, candidates=6, state=1, non_finite=2, quarantine=1, bad_decision=1,
+    out_of_band=2, duplicate=0), nA100
+assert {k: nB100[k] for k in ('read', 'candidates', *ko.RELAY_DROP_REASONS)} == dict(
+    read=8, candidates=7, state=0, non_finite=0, quarantine=0, bad_decision=0,
+    out_of_band=0, duplicate=3), nB100
+assert notes100['n_candidates'] == 13 and notes100['n_unique'] == 11
+# canonical (sorted-stem, trial) order of the unique rows; first occurrence wins
+unique100 = ['donorA100#0', 'donorA100#4', 'donorA100#8', 'donorA100#10', 'donorA100#11',
+             'donorA100#12', 'donorB100#2', 'donorB100#3', 'donorB100#4', 'donorB100#5',
+             'donorB100#6']
+val100 = {'donorA100#0': 0.30, 'donorA100#4': 0.05, 'donorA100#8': 0.12, 'donorA100#10': -0.4,
+          'donorA100#11': 0.12, 'donorA100#12': -0.05, 'donorB100#2': 0.2,
+          'donorB100#3': -0.3, 'donorB100#4': 0.0, 'donorB100#5': -1.2, 'donorB100#6': 0.02}
+assert np.isclose(notes100['max_duplicate_spread'], 0.02, rtol=1e-12, atol=1e-15)
+assert notes100['max_duplicate_spread_label'] == 'donorA100#4'
+# keep set: value >= 0, value-descending, ties (A#8 / A#11) in canonical order
+keep100 = ['donorA100#0', 'donorB100#2', 'donorA100#8', 'donorA100#11', 'donorA100#4',
+           'donorB100#6', 'donorB100#4']
+X100 = np.array([ko.external_to_unit(params100[l], space100) for l in unique100])
+
+def _maximin100(start, n_total):
+    """Brute-force greedy maximin (squared Euclidean, first index wins ties)."""
+    sel = [unique100.index(l) for l in start]
+    while len(sel) < min(n_total, len(unique100)):
+        best_i, best_d = None, -1.0
+        for i in range(len(unique100)):
+            if i in sel:
+                continue
+            dist = min(float(((X100[i] - X100[s])**2).sum()) for s in sel)
+            if dist > best_d:
+                best_i, best_d = i, dist
+        sel.append(best_i)
+    return [unique100[i] for i in sel]
+assert [r['label'] for r in rows100] == _maximin100(keep100, 9), [r['label'] for r in rows100]
+assert [r['label'] for r in rows100][:7] == keep100
+assert notes100['n_keep'] == notes100['n_keep_above'] == 7 and notes100['n_fill'] == 2
+assert notes100['keep_truncated'] is False and notes100['n_selected'] == 9
+for r100 in rows100:
+    assert r100['value'] == val100[r100['label']]             # the relay column, not 'objective'
+    assert float(r100['record']['objective']) != r100['value']
+    assert r100['params'] == params100[r100['label']]           # round-trip exact (stdlib csv)
+    assert isinstance(r100['params']['max_n_spikes'], int)
+    assert set(r100['params']) == set(space100)
+assert notes100['best_value'] == 0.30 and notes100['best_label'] == 'donorA100#0'
+assert notes100['rows_sha1'] == ko.relay_rows_sha1(rows100)
+assert _re100.fullmatch(r'[0-9a-f]{40}', notes100['rows_sha1'])
+assert notes100['elapsed_s'] >= 0.0 and any('OUT-OF-BAND rows dropped: 2' in l for l in notes100['lines'])
+# deterministic; permutation of the donor list -> identical selection
+rows100b, notes100b = ko.select_relay_rows([pathB100, pathA100], space100, 'PI (log-tail)',
+                                           max_rows=9, keep_above=0.0, **kw100)
+assert [(r['label'], r['value']) for r in rows100b] == [(r['label'], r['value']) for r in rows100]
+assert notes100b['rows_sha1'] == notes100['rows_sha1']
+rows100c, _ = ko.select_relay_rows([pathA100, pathB100], space100, 'PI (log-tail)',
+                                   max_rows=9, keep_above=0.0, **kw100)
+assert [r['label'] for r in rows100c] == [r['label'] for r in rows100]
+# truncation: the keep set exceeds max_rows -> its top max_rows, no fill
+rows100t, notes100t = ko.select_relay_rows([pathA100, pathB100], space100, 'PI (log-tail)',
+                                           max_rows=3, keep_above=0.0, **kw100)
+assert [r['label'] for r in rows100t] == keep100[:3]
+assert notes100t['keep_truncated'] is True and notes100t['n_keep_above'] == 7
+assert notes100t['n_keep'] == 3 and notes100t['n_fill'] == 0
+assert any('TRUNCATED' in l for l in notes100t['lines'])
+# no keep set: the best row seeds the fill and counts toward max_rows
+rows100n, notes100n = ko.select_relay_rows([pathA100, pathB100], space100, 'PI (log-tail)',
+                                           max_rows=4, **kw100)
+assert [r['label'] for r in rows100n] == _maximin100(['donorA100#0'], 4)
+assert notes100n['n_keep'] == 0 and notes100n['n_fill'] == 4
+# max_rows above the unique count: every unique row, keep set first
+rows100a, _ = ko.select_relay_rows([pathA100, pathB100], space100, 'PI (log-tail)',
+                                   max_rows=100, keep_above=0.0, **kw100)
+assert [r['label'] for r in rows100a] == _maximin100(keep100, 100)
+assert sorted(r['label'] for r in rows100a) == sorted(unique100)
+# dedupe_tol 0: only the repeated trial number is dropped
+_, notes100z = ko.select_relay_rows([pathA100, pathB100], space100, 'PI (log-tail)',
+                                    max_rows=100, dedupe_tol=0, **kw100)
+assert notes100z['n_unique'] == 13 and notes100z['donors']['donorB100']['duplicate'] == 1
+# drop_quarantined=False keeps the cap hit A#3 (then the best)
+_, notes100q = ko.select_relay_rows([pathA100], space100, 'PI (log-tail)', max_rows=2,
+                                    drop_quarantined=False, **kw100)
+assert notes100q['donors']['donorA100']['quarantine'] == 0
+assert notes100q['best_label'] == 'donorA100#3' and notes100q['best_value'] == 0.9
+# blank / unparsable cells parse to NaN (stdlib float, no pandas)
+assert np.isnan(ko._relay_float('')) and np.isnan(ko._relay_float('abc'))
+assert np.isnan(ko._relay_float(None)) and ko._relay_float('-inf') == -np.inf
+assert ko._relay_float('0.1') == 0.1
+
+def _raises100(needles, *args, **kwargs):
+    try:
+        ko.select_relay_rows(*args, **kwargs)
+    except ValueError as e:
+        for needle in needles:
+            assert needle in str(e), (needle, str(e))
+    else:
+        raise AssertionError(f'select_relay_rows accepted {args!r} {kwargs!r}')
+_raises100(['donorZ100', 'no trajectory CSV'],
+           [pathA100, os.path.join(outdir100, 'donorZ100_trajectory.csv')], space100,
+           'PI (log-tail)', **kw100)                                           # missing file
+_raises100(['donorA100', 'more than once'], [pathA100, pathA100], space100, 'PI (log-tail)')
+otherdir100 = tempfile.mkdtemp()
+_raises100(['donorA100', 'more than once'],                                   # same stem, other path
+           [pathA100, _write100('donorA100', [_row100('x', 0)], directory=otherdir100)],
+           space100, 'PI (log-tail)')
+space100e = {k: v for k, v in space100.items() if k != 'k_13'}
+pathE100 = os.path.join(outdir100, 'donorE100_trajectory.csv')
+ko.append_trajectory_row(pathE100, ko.trajectory_columns(space100e, extra_columns=applied100),
+                         {'trial_number': 0, 'state': 'COMPLETE'})
+_raises100(['donorE100', 'decision columns'], [pathE100], space100, 'PI (log-tail)')
+cols100f = [c for c in cols100 if c != 'PI (log-tail)']
+pathF100 = _write100('donorF100', [_row100('donorF100', 0, value=0.1)], columns=cols100f)
+_raises100(['donorF100', "'PI (log-tail)'"], [pathF100], space100, 'PI (log-tail)')
+cols100g = [*cols100[:-1], 'extra_column', 'error']
+pathG100 = _write100('donorG100', [_row100('donorG100', 0, value=0.1)], columns=cols100g)
+_raises100(['donorG100', 'header differs', 'extra_column'], [pathG100], space100,
+           'PI (log-tail)', **kw100)
+ko.select_relay_rows([pathG100], space100, 'PI (log-tail)', max_rows=1)   # no `columns`: accepted
+# another anchor on the same columns: check 86's space references the
+# B-scaled 4.8 / 4.872 / 4.219, this donor row the A-anchored weights
+refsX100 = {'ehrlich_downstream': dict(ko.EHRLICH_DOWNSTREAM_WEIGHTS)}
+pathH100 = _write100('donorH100', [_row100('donorH100', 0, value=0.1),
+                                   _row100('donorH100', 1, value=0.2, refs=refsX100)])
+_raises100(['donorH100', 'trial 1', 'applied_k_14', 'anchor'], [pathH100], space100,
+           'PI (log-tail)', **kw100)
+ko.select_relay_rows([pathH100], space100, 'PI (log-tail)', max_rows=2)    # no anchor given: not checked
+_raises100(['INFEASIBLE', 'donorA100#0'], [pathA100], space100, 'PI (log-tail)',
+           is_feasible=lambda v: v['k_3'] != params100['donorA100#0']['k_3'], **kw100)
+seen100 = []
+ko.select_relay_rows([pathA100], space100, 'PI (log-tail)', max_rows=3,
+                     is_feasible=lambda v: seen100.append(dict(v)) or True, **kw100)
+assert len(seen100) == 3 and all(isinstance(v['max_n_spikes'], int) for v in seen100)
+pathI100 = _write100('donorI100', [_row100('donorI100', 0, state='FAIL')])
+_raises100(['no donor row survived'], [pathI100], space100, 'PI (log-tail)')
+PASS('relay selection: per-donor filters (state / non-finite / quarantine / bad decision / '
+     'out-of-band dropped not clipped / repeated trial), first-occurrence unit-cube dedupe with '
+     'the spread noted, keep set + truncation, brute-force-identical maximin fill, permutation '
+     'invariant, relay column not objective, digest; bad donor / header / anchor / feasibility '
+     'refusals')
+
+#%% 101. Relay frozen trials + study tag + guards (spec A1/A4/A6/A13):
+# relay_frozen_trials validates against search_space_distributions (int cast,
+# COMPLETE, relay markers, tracked metrics as floats with blanks omitted and
+# -inf kept); n_relay_trials / best_simulated_trial in a study; the '_rl'
+# tag is deterministic, argument-only (no file access), order-insensitive in
+# the donors, path/name-form-insensitive, equal for 1000 vs 1000.0, sensitive
+# to every kwarg, '' when off, the sha1-8 of relay_spec_json; its place in
+# default_study_name (after _seed{n}, before _burden); check_method_kwargs
+# refuses relay_from under 'tpe' and 'dual_annealing'; resolve_relay_kwargs
+# coerces / refuses; relay_donor_path resolves names and passes paths.
+import hashlib as _hashlib101
+D101 = ['kin_opt_a101', 'kin_opt_b101']
+KW101 = {'max_rows': 1000, 'keep_above': -0.12953}
+spec101 = ko.relay_spec_json(D101, KW101)
+assert spec101 == ('{"donors":["kin_opt_a101","kin_opt_b101"],"kwargs":{"dedupe_tol":0.001,'
+                   '"drop_quarantined":true,"keep_above":-0.12953,"max_rows":1000}}'), spec101
+tag101 = ko.relay_study_tag(D101, KW101)
+assert tag101 == '_rl' + _hashlib101.sha1(spec101.encode('utf-8')).hexdigest()[:8]
+assert _re100.fullmatch(r'_rl[0-9a-f]{8}', tag101) and len(tag101) == 11
+assert ko.relay_study_tag(D101, KW101) == tag101                                   # deterministic
+assert ko.relay_study_tag(list(reversed(D101)), KW101) == tag101                   # order-insensitive
+assert ko.relay_study_tag(tuple(D101), dict(KW101, max_rows=1000.0,
+                                            dedupe_tol=None)) == tag101           # 1000.0 / None -> default
+assert ko.relay_study_tag([os.path.join('Z:', os.sep, 'nowhere', 'kin_opt_a101_trajectory.csv'),
+                           'kin_opt_b101'], KW101) == tag101                        # arg-only, path form
+for change101 in ({'max_rows': 999}, {'keep_above': -0.12}, {'keep_above': None},
+                  {'dedupe_tol': 2e-3}, {'drop_quarantined': False}):
+    assert ko.relay_study_tag(D101, dict(KW101, **change101)) != tag101, change101
+assert ko.relay_study_tag(D101[:1], KW101) != tag101
+assert ko.relay_study_tag(None) == ko.relay_study_tag([]) == ko.relay_study_tag(()) == ''
+assert ko.relay_study_tag(None, {'max_rows': 5}) == ''
+assert ko.relay_study_tag('kin_opt_a101', KW101) == ko.relay_study_tag(['kin_opt_a101'], KW101)
+for bad101 in (['kin_opt_a101', 'kin_opt_a101'],
+               ['kin_opt_a101', os.path.join('elsewhere', 'kin_opt_a101_trajectory.csv')]):
+    try:
+        ko.relay_study_tag(bad101, KW101)
+    except ValueError as e101:
+        assert 'kin_opt_a101' in str(e101) and 'more than once' in str(e101)
+    else:
+        raise AssertionError(f'repeated donor accepted: {bad101}')
+# default_study_name: after the seed tag, before _burden; '' leaves the name unchanged
+NAME101 = ko.default_study_name('PI (log-tail)', 'ethanol_isobutanol', 'metabolic_split_12d',
+                                burden=True, rate_multiplier_bounds=(1e-3, 4.0),
+                                inhibition_multiplier_bounds={}, exclude_params=(),
+                                method='gp', ibo_pathway_anchoring='scenario_A')
+assert NAME101 == ('kin_opt_ethanol_isobutanol_metabolic_split_12d_pi_log-tail_gp_rb0.001-4'
+                   '_ib0.75-1.5_aA_burden'), NAME101
+NAME101r = ko.default_study_name('PI (log-tail)', 'ethanol_isobutanol', 'metabolic_split_12d',
+                                 burden=True, rate_multiplier_bounds=(1e-3, 4.0),
+                                 inhibition_multiplier_bounds={}, exclude_params=(),
+                                 method='gp', ibo_pathway_anchoring='scenario_A',
+                                 relay_tag=tag101)
+assert NAME101r == NAME101[:-len('_burden')] + tag101 + '_burden'
+assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic', n_seeds=2,
+                             relay_tag=tag101, burden=True).endswith(f'_seed2{tag101}_burden')
+assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic', relay_tag='') == \
+    ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic')
+assert _inspect.signature(ko.default_study_name).parameters['relay_tag'].default == ''
+# check_method_kwargs: relay is GP-only
+assert ko.check_method_kwargs('gp', relay_from=D101) == ''
+for method101 in ('tpe', 'dual_annealing'):
+    try:
+        ko.check_method_kwargs(method101, relay_from=D101)
+    except ValueError as e101:
+        assert 'GP-only' in str(e101) and method101 in str(e101), str(e101)
+    else:
+        raise AssertionError(f'relay_from accepted under {method101}')
+assert ko.check_method_kwargs('tpe', relay_from=None) == ''
+assert ko.check_method_kwargs('tpe', relay_from=[]) == ''
+assert _inspect.signature(ko.check_method_kwargs).parameters['relay_from'].default is None
+# resolve_relay_kwargs: defaults (a copy), coercion, refusals
+assert ko.RELAY_KWARGS_DEFAULTS == {'max_rows': 1000, 'keep_above': None,
+                                    'dedupe_tol': 1e-3, 'drop_quarantined': True}
+res101 = ko.resolve_relay_kwargs({'max_rows': np.float64(50.0), 'keep_above': np.int64(0),
+                                  'dedupe_tol': 0, 'drop_quarantined': 0})
+assert res101 == {'max_rows': 50, 'keep_above': 0.0, 'dedupe_tol': 0.0,
+                  'drop_quarantined': False}
+assert type(res101['max_rows']) is int and type(res101['keep_above']) is float
+assert type(res101['dedupe_tol']) is float and type(res101['drop_quarantined']) is bool
+assert ko.resolve_relay_kwargs(None) == ko.resolve_relay_kwargs({}) == ko.RELAY_KWARGS_DEFAULTS
+assert ko.resolve_relay_kwargs({'max_rows': None}) == ko.RELAY_KWARGS_DEFAULTS
+assert ko.resolve_relay_kwargs(None) is not ko.RELAY_KWARGS_DEFAULTS
+for bad101 in ({'bogus': 1}, {'max_rows': True}, {'max_rows': 0}, {'max_rows': 2.5},
+               {'max_rows': '10'}, {'max_rows': float('inf')}, {'keep_above': float('nan')},
+               {'keep_above': 'x'}, {'dedupe_tol': -1e-3}, {'dedupe_tol': True},
+               {'drop_quarantined': 'yes'}, {'drop_quarantined': 2}):
+    try:
+        ko.resolve_relay_kwargs(bad101)
+    except ValueError as e101:
+        assert list(bad101)[0] in str(e101), (bad101, str(e101))
+    else:
+        raise AssertionError(f'resolve_relay_kwargs accepted {bad101}')
+# relay_donor_path: a study name resolves in results_dir; a CSV path passes
+dir101 = tempfile.mkdtemp()
+assert ko.relay_donor_path('kin_opt_a101', dir101) == os.path.join(dir101, 'kin_opt_a101_trajectory.csv')
+assert ko.relay_donor_path(pathA100, dir101) == pathA100
+assert ko.relay_donor_path('other_dir/some.csv', dir101) == 'other_dir/some.csv'
+if _optuna is None:
+    print('SKIP 101 (frozen-trial part): optuna not installed')
+else:
+    TS101 = _optuna.trial.TrialState
+    dist101 = ko.search_space_distributions(space100)
+    rows101 = [dict(r, record=dict(r['record'])) for r in rows100]
+    rows101[0]['record']['IRR'] = '-inf'          # kept as -inf (a simulated trial records it too)
+    rows101[1]['record']['IRR'] = ''              # blank -> omitted
+    frozen101 = ko.relay_frozen_trials(rows101, space100)
+    assert len(frozen101) == len(rows101) == 9
+    for fr101, r101 in zip(frozen101, rows101):
+        assert fr101.state == TS101.COMPLETE and fr101.value == r101['value']
+        assert fr101.distributions == dist101
+        assert fr101.params == r101['params'] and type(fr101.params['max_n_spikes']) is int
+        assert fr101.system_attrs == {ko.RELAY_TRIAL_SYSTEM_ATTR: True} == {'relay': True}
+        assert fr101.user_attrs['relay_donor'] == r101['label']
+        assert fr101.user_attrs['PI (log-tail)'] == r101['value']
+        assert fr101.user_attrs['IBO titer'] == float(r101['record']['IBO titer'])
+        assert 'EtOH titer' not in fr101.user_attrs and 'tau' not in fr101.user_attrs   # blank cells
+        assert 'constraints' not in fr101.system_attrs and 'fixed_params' not in fr101.system_attrs
+        assert set(fr101.user_attrs) - {'relay_donor'} <= set(ko.TRACKED_METRICS)
+    assert frozen101[0].user_attrs['IRR'] == -np.inf and 'IRR' not in frozen101[1].user_attrs
+    try:                                           # optuna validates: out-of-band refused
+        ko.relay_frozen_trials([dict(rows101[0], params=dict(rows101[0]['params'],
+                                                             k_3=k3_hi100*2))], space100)
+    except ValueError as e101:
+        assert 'k_3' in str(e101)
+    else:
+        raise AssertionError('out-of-band relay trial accepted')
+    st101 = _optuna.create_study(direction='maximize')
+    assert ko.best_simulated_trial(st101) is None and ko.n_relay_trials(st101) == 0
+    st101.add_trials(frozen101)
+    assert [t.number for t in st101.trials] == list(range(9)) and ko.n_relay_trials(st101) == 9
+    assert ko.best_simulated_trial(st101) is None and st101.best_value == 0.30
+    t101 = st101.ask({n: dist101[n] for n in dist101})
+    st101.tell(t101, 0.1)
+    assert ko.n_relay_trials(st101) == 9 and ko.best_simulated_trial(st101).number == 9
+    assert ko.best_simulated_trial(st101).value == 0.1
+    assert ko._n_startup_finished(st101) == 10 and ko._n_sampler_drawn_finished(st101) == 1
+    assert ko._n_sampler_drawn_consumed(st101) == 1
+PASS('relay frozen trials validate against the engine distributions (int cast, markers, tracked '
+     'metrics, no constraints); _rl tag deterministic / argument-only / order- and form-insensitive '
+     '/ kwarg-sensitive / sha1-8 of relay_spec_json; default_study_name placement; GP-only '
+     'check_method_kwargs; resolve_relay_kwargs coercion + refusals; relay_donor_path')
+
+#%% 102. Relay engine (spec A2/A3/A7-A10/A13) with method='gp' on check 30's
+# fake handles (every simulated trial scores PI (log-tail) 0.1; the donor
+# values straddle it): a fresh preload stores N relay trials 0..N-1 then
+# simulates exactly n_trials (CSV rows from trial N; manifest of N rows;
+# model_specification = n_trials + restore; store markers + digest; no LHS
+# design when N >= n_startup; start-up print names the preload; the status
+# line's best excludes the relay values; a preloaded trial's distributions
+# == a simulated one's); a resume with the same args inserts nothing and
+# simulates the remainder; a resume WITHOUT args keeps the budget (a missing
+# manifest is warned about, then rewritten by a with-args launch); a
+# different relay spec / relay args on a non-relay store raise; a kill
+# mid-preload (Study.add_trial monkeypatched) leaves a partial store, a
+# no-args relaunch raises and a with-args relaunch completes it
+# idempotently (a non-relay trial in a partial store is refused); with
+# N < n_startup the LHS design is sized n_startup - N and its rows 0.. feed
+# the remaining start-up; refusals BEFORE any .db / CSV: TPE, learned
+# constraints (an orphan sidecar is left alone -- no LOST row), a
+# minimized / untracked / callable objective, a missing donor, knobs
+# without donors; learned constraints on a relay store without args; a
+# non-relay GP store gets no relay_* attr and no manifest.
+# 2026-09-23 review fixes: the fresh-study enqueue print names trial N (0 for a
+# plain study, verbatim); a kill between the two fresh-preload attr writes
+# (digest alone; or an old-order 'relay_spec' alone / + a stale digest, no
+# relay trial stored) completes like a fresh launch, while a stale digest with
+# relay trials stored still refuses; the ENGINE-built feasibility predicate
+# with the caps on (volume cap; a stub burden on burden-column donors) refuses
+# an infeasible selected row before any .db / CSV and preloads a feasible one.
+if _optuna is None:
+    print('SKIP 102: optuna not installed')
+else:
+    _optuna.logging.set_verbosity(_optuna.logging.WARNING)
+    TS102 = _optuna.trial.TrialState
+    space102, _ = ko.build_search_space({'k_1e': 47.1, 'k_7': 1.203, 'K_1e': 0.12})
+    cols102 = ko.trajectory_columns(space102)
+    donordir102 = tempfile.mkdtemp()
+    rng102 = np.random.default_rng(102)
+    vals102 = {'donorP102': [0.35, -0.2, 0.05, 0.2], 'donorQ102': [-0.5, 0.15, 0.0, 0.12]}
+    paths102 = []
+    for stem102, v102s in vals102.items():
+        path102 = os.path.join(donordir102, stem102 + '_trajectory.csv')
+        for t102, v102 in enumerate(v102s):
+            p102 = ko.unit_to_external(0.05 + 0.9*rng102.random(len(space102)), space102)
+            ko.append_trajectory_row(path102, cols102, {
+                'trial_number': t102, 'state': 'COMPLETE', **p102, 'objective': 7.0 + t102,
+                'PI (log-tail)': v102, 'PI': v102, 'IRR': 0.1})
+        paths102.append(path102)
+    n_calls102 = [0]
+    def _ms102(**kw):
+        n_calls102[0] += 1
+    handles102 = dict(handles30, model_specification=_ms102)
+    common102 = dict(objective='PI (log-tail)', scenario_label='X', seed=1,
+                     handles=handles102, print_status_every=1, burden_model=None,
+                     enqueue_knockouts=False, volume_feasibility=False, method='gp')
+
+    def _run102(outdir, name, **kw):
+        buf = _io.StringIO()
+        with _contextlib.redirect_stdout(buf):
+            st, csv_path, _ = ko.run_kinetic_optimization(
+                study_name=name, results_dir=outdir, **dict(common102, **kw))
+        return st, csv_path, buf.getvalue()
+
+    def _store102(outdir, name):
+        return _optuna.load_study(study_name=name, storage='sqlite:///' + os.path.join(
+            outdir, name + '.db').replace('\\', '/'))
+
+    def _attrs102(st):
+        return st._storage.get_study_system_attrs(st._study_id)
+
+    def _manifest102(outdir, name):
+        with open(ko.relay_manifest_path(outdir, name), newline='') as fh:
+            return list(_csv100.reader(fh))
+
+    def _refused102(needles, outdir, name, **kw):
+        try:
+            _run102(outdir, name, **kw)
+        except ValueError as e:
+            for needle in needles:
+                assert needle in str(e), (needle, str(e))
+        else:
+            raise AssertionError(f'relay run accepted: {kw}')
+
+    # --- case A: N = 6 >= n_startup = 4 ---
+    relayA102 = dict(relay_from=paths102, relay_kwargs={'max_rows': 6, 'keep_above': 0.1})
+    rowsA102, notesA102 = ko.select_relay_rows(paths102, space102, 'PI (log-tail)',
+                                               max_rows=6, keep_above=0.1, columns=cols102)
+    labelsA102 = [r['label'] for r in rowsA102]
+    assert labelsA102[:4] == ['donorP102#0', 'donorP102#3', 'donorQ102#1', 'donorQ102#3']
+    assert min(r['value'] for r in rowsA102) < 0.1 < max(r['value'] for r in rowsA102)
+    outA102 = tempfile.mkdtemp()
+    n_calls102[0] = 0
+    stA102, csvA102, txtA102 = _run102(outA102, 'relay102a', n_trials=3, n_startup_trials=4,
+                                       **relayA102)
+    assert len(stA102.trials) == 9 and ko.n_relay_trials(stA102) == 6
+    assert [t.number for t in stA102.trials if ko._is_relay_trial(t)] == list(range(6))
+    assert [t.user_attrs['relay_donor'] for t in stA102.trials[:6]] == labelsA102
+    assert [t.value for t in stA102.trials[:6]] == [r['value'] for r in rowsA102]
+    assert all(t.state == TS102.COMPLETE for t in stA102.trials)
+    assert stA102.trials[0].distributions == stA102.trials[6].distributions
+    dfA102 = ko.load_trajectory(csvA102)
+    assert dfA102['trial_number'].tolist() == [6, 7, 8]
+    assert dfA102['state'].tolist() == ['COMPLETE']*3 and np.allclose(dfA102['objective'], 0.1)
+    assert n_calls102[0] == 3 + 1                                   # 3 trials + restore_baseline
+    attrsA102 = _attrs102(stA102)
+    assert attrsA102['relay_spec'] == ko.relay_spec_json(paths102, relayA102['relay_kwargs'])
+    assert attrsA102['relay_rows_sha1'] == notesA102['rows_sha1'] == ko.relay_rows_sha1(rowsA102)
+    assert attrsA102['relay_n_preloaded'] == 6 and attrsA102['relay_preload_complete'] is True
+    assert 'lhs_seed' not in attrsA102 and stA102.sampler._lhs_design is None
+    assert stA102.sampler._n_startup_trials == 4
+    assert 'Start-up sampling: none needed' in txtA102
+    assert '0 trials already stored + 6 preloaded relay trials' in txtA102
+    assert 'guidance begins now' in txtA102
+    best102 = _re100.findall(r'best simulated so far ([-+0-9.e]+|nan)\)', txtA102)
+    assert best102 == ['0.1']*3, best102                            # never a donor value (0.35)
+    assert '\nTrial 6 (simulated 1/3)' in txtA102 and '\nTrial 8 (simulated 3/3)' in txtA102
+    assert 'Relay preload done: 6 donor trials stored as trials 0-5' in txtA102
+    assert 'best preloaded PI (log-tail) = 0.35 (donorP102#0)' in txtA102
+    # the enqueue print offsets its trial by the preload too (A8; 2026-09-23 fix)
+    assert ('Baseline NOT enqueued (enqueue_baseline=False): no trial is pre-seeded; the '
+            'sampler draws every trial from trial 6 (trials 0-5 are the preloaded relay '
+            'rows).') in txtA102, txtA102
+    mfA102 = _manifest102(outA102, 'relay102a')
+    assert mfA102[0] == ['relay_trial_number', 'donor', 'donor_objective', *cols102]
+    assert [int(r[0]) for r in mfA102[1:]] == list(range(6))
+    i_tn102, i_obj102 = mfA102[0].index('trial_number'), mfA102[0].index('objective')
+    assert [f'{r[1]}#{r[i_tn102]}' for r in mfA102[1:]] == labelsA102
+    assert [float(r[i_obj102]) for r in mfA102[1:]] == [r['value'] for r in rowsA102]
+    assert [float(r[2]) for r in mfA102[1:]] == [7.0 + int(r[i_tn102]) for r in mfA102[1:]]
+    assert not os.path.isfile(ko.relay_manifest_path(outA102, 'relay102a') + '.tmp')
+    assert ko.best_simulated_trial(stA102).value == 0.1 and stA102.best_value == 0.35
+    # resume with the SAME args: nothing inserted, the remainder simulated
+    n_calls102[0] = 0
+    stA102b, _, txtA102b = _run102(outA102, 'relay102a', n_trials=5, n_startup_trials=4,
+                                   **relayA102)
+    assert len(stA102b.trials) == 11 and ko.n_relay_trials(stA102b) == 6
+    assert ko.load_trajectory(csvA102)['trial_number'].tolist() == [6, 7, 8, 9, 10]
+    assert n_calls102[0] == 2 + 1
+    assert ('Resuming study relay102a: 3 trials stored (plus 6 preloaded relay trials, '
+            'not budgeted); running 2 more (budget 5).') in txtA102b
+    with open(ko.seed_sidecar_path(csvA102), encoding='utf-8') as f102:
+        seeds102 = f102.read().splitlines()
+    assert ['n_stored_at_launch=0' in seeds102[0], 'n_stored_at_launch=3' in seeds102[1]] == [True]*2
+    # resume WITHOUT relay args: the stored spec is authoritative, budget kept;
+    # a missing manifest is warned about (not rewritten without the donors)
+    os.remove(ko.relay_manifest_path(outA102, 'relay102a'))
+    n_calls102[0] = 0
+    stA102c, _, txtA102c = _run102(outA102, 'relay102a', n_trials=6, n_startup_trials=4)
+    assert len(stA102c.trials) == 12 and n_calls102[0] == 1 + 1
+    assert 'WARNING: relay manifest' in txtA102c
+    assert not os.path.isfile(ko.relay_manifest_path(outA102, 'relay102a'))
+    # ... rewritten by a with-args launch (budget spent: nothing simulated)
+    n_calls102[0] = 0
+    stA102d, _, txtA102d = _run102(outA102, 'relay102a', n_trials=6, n_startup_trials=4,
+                                   **relayA102)
+    assert len(stA102d.trials) == 12 and n_calls102[0] == 1
+    assert 'Rewrote the missing relay manifest (6 rows)' in txtA102d
+    assert _manifest102(outA102, 'relay102a') == mfA102
+    # a different relay spec -> refused, store untouched
+    _refused102(['relay spec'], outA102, 'relay102a', n_trials=7, n_startup_trials=4,
+                relay_from=paths102, relay_kwargs={'max_rows': 5, 'keep_above': 0.1})
+    assert len(_store102(outA102, 'relay102a').trials) == 12
+    # learned constraints on a relay store, without relay args -> refused
+    _refused102(['preloaded relay trials', 'learned_constraints'], outA102, 'relay102a',
+                n_trials=7, n_startup_trials=4, gp_kwargs={'learned_constraints': True})
+    assert len(_store102(outA102, 'relay102a').trials) == 12
+    # --- case B: N = 2 < n_startup = 5: LHS design of 5 - 2 = 3 rows ---
+    outB102 = tempfile.mkdtemp()
+    stB102, csvB102, txtB102 = _run102(outB102, 'relay102b', n_trials=4, n_startup_trials=5,
+                                       relay_from=paths102, relay_kwargs={'max_rows': 2})
+    assert len(stB102.trials) == 6 and ko.n_relay_trials(stB102) == 2
+    assert stB102.trials[0].user_attrs['relay_donor'] == 'donorP102#0'   # best seeds the fill
+    designB102 = ko.LHSDesign(space102, 3, 1)
+    assert [stB102.trials[k].params for k in (2, 3, 4)] == [designB102.external_point(j)
+                                                            for j in range(3)]
+    assert _attrs102(stB102)['lhs_seed'] == 1 and stB102.sampler._lhs_design.size == 3
+    assert ('Latin hypercube (3-row design, lhs_seed 1); the 2 preloaded relay trials fill '
+            'the rest of the 5-trial start-up') in txtB102
+    assert 'guidance begins after trial 4' in txtB102
+    assert ko._n_startup_finished(stB102) == 6
+    assert ko._n_sampler_drawn_consumed(stB102) == ko._n_sampler_drawn_finished(stB102) == 4
+    assert ko.load_trajectory(csvB102)['trial_number'].tolist() == [2, 3, 4, 5]
+    assert stB102.sampler.n_lhs_infeasible_fallbacks == 0
+    # --- a kill mid-preload, then completion ---
+    outC102 = tempfile.mkdtemp()
+    orig_add102 = _optuna.study.Study.add_trial
+    count102 = [0]
+    def _flaky_add102(self, trial):
+        count102[0] += 1
+        if count102[0] > 3:
+            raise RuntimeError('killed mid-preload')
+        return orig_add102(self, trial)
+    _optuna.study.Study.add_trial = _flaky_add102
+    try:
+        _run102(outC102, 'relay102c', n_trials=1, n_startup_trials=4, **relayA102)
+    except RuntimeError as e102:
+        assert 'killed mid-preload' in str(e102)
+    else:
+        raise AssertionError('the monkeypatched add_trial did not interrupt the preload')
+    finally:
+        _optuna.study.Study.add_trial = orig_add102
+    stC102 = _store102(outC102, 'relay102c')
+    assert len(stC102.trials) == 3 and ko.n_relay_trials(stC102) == 3
+    attrsC102 = _attrs102(stC102)
+    assert 'relay_spec' in attrsC102 and 'relay_rows_sha1' in attrsC102
+    assert 'relay_preload_complete' not in attrsC102 and 'relay_n_preloaded' not in attrsC102
+    assert not os.path.isfile(ko.relay_manifest_path(outC102, 'relay102c'))
+    assert not os.path.isfile(os.path.join(outC102, 'relay102c_trajectory.csv'))
+    _refused102(['relay preload incomplete', 'same relay_from'], outC102, 'relay102c',
+                n_trials=1, n_startup_trials=4)
+    n_calls102[0] = 0
+    stC102b, csvC102, txtC102 = _run102(outC102, 'relay102c', n_trials=1, n_startup_trials=4,
+                                        **relayA102)
+    assert 'Relay preload was interrupted: 3 of 6 donor trials stored; inserting the 3 missing' in txtC102
+    assert len(stC102b.trials) == 7 and ko.n_relay_trials(stC102b) == 6
+    assert [t.user_attrs['relay_donor'] for t in stC102b.trials[:6]] == labelsA102
+    assert _attrs102(stC102b)['relay_preload_complete'] is True
+    assert _attrs102(stC102b)['relay_n_preloaded'] == 6
+    assert _manifest102(outC102, 'relay102c') == mfA102
+    assert ko.load_trajectory(csvC102)['trial_number'].tolist() == [6] and n_calls102[0] == 2
+    # a partial store holding a NON-relay trial cannot be completed
+    outD102 = tempfile.mkdtemp()
+    count102[0] = 0
+    _optuna.study.Study.add_trial = _flaky_add102
+    try:
+        _run102(outD102, 'relay102d', n_trials=1, n_startup_trials=4, **relayA102)
+    except RuntimeError:
+        pass
+    finally:
+        _optuna.study.Study.add_trial = orig_add102
+    stD102 = _store102(outD102, 'relay102d')
+    stD102.add_trial(_optuna.trial.create_trial(
+        value=0.0, params=stD102.trials[0].params,
+        distributions=stD102.trials[0].distributions))
+    _refused102(['non-relay trials'], outD102, 'relay102d', n_trials=1, n_startup_trials=4,
+                **relayA102)
+    # --- a kill BETWEEN the two attr writes of a fresh preload (2026-09-23 review
+    # fix). The digest is written first, so such a kill leaves (k1) the digest
+    # alone -> the next launch is simply fresh (and rewrites it); a store left
+    # by the old spec-first order -- (k2) 'relay_spec' alone, (k3) 'relay_spec'
+    # + a stale digest -- holds NO relay trial, so the re-selection's digest is
+    # recorded and every row preloaded instead of refusing the name forever as
+    # "the donor CSVs changed". Each ends exactly like a clean fresh launch. ---
+    spec102 = ko.relay_spec_json(paths102, relayA102['relay_kwargs'])
+    for nameK102, plantK102, msgK102 in (
+            ('relay102k1', {'relay_rows_sha1': 'stale102'},
+             'Relay preload done: 6 donor trials stored as trials 0-5'),
+            ('relay102k2', {'relay_spec': spec102},
+             'Relay preload was interrupted: 0 of 6 donor trials stored; inserting the 6 missing'),
+            ('relay102k3', {'relay_spec': spec102, 'relay_rows_sha1': 'stale102'},
+             'Relay preload was interrupted: 0 of 6 donor trials stored; inserting the 6 missing')):
+        outK102 = tempfile.mkdtemp()
+        stK102 = _optuna.create_study(study_name=nameK102, direction='maximize',
+                                      storage='sqlite:///' + os.path.join(
+                                          outK102, nameK102 + '.db').replace('\\', '/'))
+        for keyK102, valK102 in plantK102.items():
+            stK102._storage.set_study_system_attr(stK102._study_id, keyK102, valK102)
+        n_calls102[0] = 0
+        stK102b, csvK102, txtK102 = _run102(outK102, nameK102, n_trials=1, n_startup_trials=4,
+                                            **relayA102)
+        assert msgK102 in txtK102, (nameK102, txtK102)
+        assert len(stK102b.trials) == 7 and ko.n_relay_trials(stK102b) == 6, nameK102
+        assert [t.user_attrs['relay_donor'] for t in stK102b.trials[:6]] == labelsA102
+        attrsK102 = _attrs102(stK102b)
+        assert attrsK102['relay_spec'] == spec102
+        assert attrsK102['relay_rows_sha1'] == notesA102['rows_sha1'], (nameK102, attrsK102)
+        assert attrsK102['relay_preload_complete'] is True and attrsK102['relay_n_preloaded'] == 6
+        assert _manifest102(outK102, nameK102) == mfA102
+        assert ko.load_trajectory(csvK102)['trial_number'].tolist() == [6] and n_calls102[0] == 2
+    # ... but once relay trials ARE stored, a digest mismatch still refuses (the
+    # interrupted selection is partly in the store): kill after 3 inserts, then
+    # corrupt the stored digest
+    outS102 = tempfile.mkdtemp()
+    count102[0] = 0
+    _optuna.study.Study.add_trial = _flaky_add102
+    try:
+        _run102(outS102, 'relay102s', n_trials=1, n_startup_trials=4, **relayA102)
+    except RuntimeError:
+        pass
+    finally:
+        _optuna.study.Study.add_trial = orig_add102
+    stS102 = _store102(outS102, 'relay102s')
+    assert ko.n_relay_trials(stS102) == 3
+    stS102._storage.set_study_system_attr(stS102._study_id, 'relay_rows_sha1', 'stale102')
+    _refused102(['differs from the interrupted one', 'stale102'], outS102, 'relay102s',
+                n_trials=1, n_startup_trials=4, **relayA102)
+    assert len(_store102(outS102, 'relay102s').trials) == 3
+    assert not os.path.isfile(ko.relay_manifest_path(outS102, 'relay102s'))
+    # --- burden-column donors (the same rows re-written under the burden study's
+    # columns, same stems) + a stub burden model (check 44's _FakeBurden44 shape)
+    # that rejects exactly one donor row's k_1e: exercises the ENGINE-built
+    # feasibility predicate of _prepare_optimization with the burden cap on ---
+    colsB102 = ko.trajectory_columns(space102, extra_columns=list(eb.BURDEN_COLUMNS))
+    donordirB102 = tempfile.mkdtemp()
+    pathsB102, rejectB102 = [], None
+    for path102 in paths102:
+        pathB102 = os.path.join(donordirB102, os.path.basename(path102))
+        with open(path102, newline='') as fh102:
+            for rec102 in _csv100.DictReader(fh102):
+                ko.append_trajectory_row(pathB102, colsB102, rec102)
+                if (os.path.basename(path102) == 'donorQ102_trajectory.csv'
+                        and rec102['trial_number'] == '1'):
+                    rejectB102 = float(rec102['k_1e'])
+        pathsB102.append(pathB102)
+    assert rejectB102 is not None and 'donorQ102#1' in labelsA102
+
+    class _FakeBurden102:
+        F_flex = 0.245
+        Phi_M_wt = 0.05
+        phi_T_wt = 0.05
+        reference = {}                      # never stale (check 44)
+        def __init__(self, reject_k_1e=None):
+            self.reject_k_1e = reject_k_1e
+            self.seen = []
+        def evaluate(self, values):
+            self.seen.append(dict(values))
+            bad = values.get('k_1e') == self.reject_k_1e
+            record = {col: 0.0 for col in eb.BURDEN_COLUMNS}
+            return SimpleNamespace(feasible=not bad, violation=1.0 if bad else -1.0,
+                                   Phi_M=0.01, F_flex=self.F_flex, k_7_eff=0.0,
+                                   k_8_eff=0.0, as_record=lambda: record)
+        def apply(self, values):
+            return dict(values)
+    relayB102 = dict(relay_from=pathsB102, relay_kwargs=relayA102['relay_kwargs'])
+    # --- refusals before any .db / CSV (an orphan sidecar is left alone) ---
+    outE102 = tempfile.mkdtemp()
+    side102 = ko.inflight_path_for(outE102, 'relay102e')
+    ko.write_inflight(side102, cols102, {'trial_number': 99, **ko.unit_to_external(
+        [0.5]*len(space102), space102)})
+    for needles102, kw102 in (
+            (['learned_constraints'], dict(gp_kwargs={'learned_constraints': True}, **relayA102)),
+            (['GP-only', "'tpe'"], dict(relayA102, method='tpe')),
+            (['maximized'], dict(relayA102, objective='TCI')),
+            (['trajectory column'], dict(relayA102, objective='NPV')),
+            (['REGISTRY objective'], dict(relayA102, objective=lambda h: 0.0,
+                                          direction='maximize', objective_name='custom102')),
+            (['no trajectory CSV'], dict(relay_from=[*paths102, os.path.join(
+                donordir102, 'donorZ102_trajectory.csv')])),
+            (['without relay_from'], dict(relay_kwargs={'max_rows': 3})),
+            # the engine-built feasibility predicate (A4) with the caps ON: the
+            # volume cap (5 of the 6 selected rows exceed 20x; donorP102#0 by
+            # ~2e10) and the stub burden rejecting donorQ102#1
+            (['INFEASIBLE', 'donorP102#0'], dict(relayA102, volume_feasibility=True,
+                                                 volume_cap=20.0)),
+            (['INFEASIBLE', 'donorQ102#1'], dict(relayB102,
+                                                 burden_model=_FakeBurden102(rejectB102)))):
+        _refused102(needles102, outE102, 'relay102e', n_trials=1, n_startup_trials=4, **kw102)
+        assert not os.path.isfile(os.path.join(outE102, 'relay102e.db')), kw102
+        assert not os.path.isfile(os.path.join(outE102, 'relay102e_trajectory.csv')), kw102
+        assert os.path.isfile(side102), kw102                       # no LOST row recovered
+    # --- positive counterparts with the caps ON: the same selection preloads when
+    # every row is feasible (volume cap 1e12x; a stub burden rejecting nothing),
+    # and the burden predicate saw every selected row's k_1e ---
+    outV102 = tempfile.mkdtemp()
+    stV102, csvV102, txtV102 = _run102(outV102, 'relay102v', n_trials=2, n_startup_trials=4,
+                                       volume_feasibility=True, volume_cap=1e12, **relayA102)
+    assert 'Fed-batch volume-ratio check ON' in txtV102 and 'cap 1e+12x' in txtV102
+    assert ko.n_relay_trials(stV102) == 6
+    assert [t.user_attrs['relay_donor'] for t in stV102.trials[:6]] == labelsA102
+    assert ko.load_trajectory(csvV102)['trial_number'].tolist() == [6, 7]
+    burdenOK102 = _FakeBurden102()
+    outBB102 = tempfile.mkdtemp()
+    stBB102, csvBB102, txtBB102 = _run102(outBB102, 'relay102bb', n_trials=1, n_startup_trials=4,
+                                          burden_model=burdenOK102, **relayB102)
+    assert 'Enzyme burden ON' in txtBB102
+    assert ko.n_relay_trials(stBB102) == 6
+    assert [t.user_attrs['relay_donor'] for t in stBB102.trials[:6]] == labelsA102
+    assert {r['params']['k_1e'] for r in rowsA102} <= {s['k_1e'] for s in burdenOK102.seen}
+    assert list(ko.load_trajectory(csvBB102).columns) == colsB102
+    assert ko.load_trajectory(csvBB102)['trial_number'].tolist() == [6]
+    # --- a non-relay GP study: no relay_* attr, no manifest; relay args on it refused ---
+    outN102 = tempfile.mkdtemp()
+    stN102, csvN102, txtN102 = _run102(outN102, 'plain102', n_trials=2)
+    assert [k for k in _attrs102(stN102) if k.startswith('relay')] == []
+    assert not os.path.isfile(ko.relay_manifest_path(outN102, 'plain102'))
+    assert ko.n_relay_trials(stN102) == 0
+    assert 'Relay' not in txtN102 and 'preloaded' not in txtN102
+    assert ('Baseline NOT enqueued (enqueue_baseline=False): no trial is pre-seeded; the '
+            'sampler draws every trial from trial 0.\n') in txtN102    # the pre-relay line, verbatim
+    assert ko.load_trajectory(csvN102)['trial_number'].tolist() == [0, 1]
+    _refused102(['not a relay study'], outN102, 'plain102', n_trials=3, **relayA102)
+    assert len(_store102(outN102, 'plain102').trials) == 2
+    # the engine / context / prepare accept the new kwargs
+    sig102 = _inspect.signature(ko.run_kinetic_optimization).parameters
+    assert sig102['relay_from'].default is None and sig102['relay_kwargs'].default is None
+    assert {'relay_from', 'relay_kwargs'} <= set(_inspect.signature(ko._prepare_optimization).parameters)
+    assert {'relay_rows', 'relay_notes', 'relay_spec', 'relay_rows_sha1'} <= {
+        f.name for f in __import__('dataclasses').fields(ko.OptimizationContext)}
+PASS('relay engine (gp): fresh preload of N relay trials then exactly n_trials simulated (CSV '
+     'from trial N, manifest, markers + digest, start-up print, best excludes relay values), '
+     'resume with / without args, spec mismatch, crash mid-preload completed idempotently, '
+     'kill between the attr writes recoverable, N < n_startup LHS sizing, refusals before any '
+     '.db / CSV (incl. the engine-built burden / volume predicate), caps-on preload, non-relay '
+     'store untouched')
+
+#%% 103. Relay driver + supervisor plumbing (spec 2026-09-23-relay-preload-pi-
+# campaign-design §3.2 / §3.3 + A1 / A6 / A8 / A12 / A13). Supervisor: its
+# default_study_name threads ko.relay_study_tag (production name pinned,
+# donor-order / kwarg-form insensitive, legacy + relay refused);
+# child_code emits relay_from= / relay_kwargs= ONLY when set, appended after
+# every other kwarg (a non-relay program is unchanged; the relay program
+# compiles and carries the resolved knobs); supervise() refuses relay misuse
+# BEFORE the name / log / child (a nonexistent child python, so a regression
+# cannot launch anything); the real CLI block is exec'd with a STUB
+# supervise() (so nothing can ever launch) for a two-flag --relay-from
+# parse, the knobs, and every parser.error; no optuna / package import.
+# Driver: its real run() (and kinetic_bounds_from_scenario) is exec'd from
+# source -- never the module, which load()s -- against the real ko with the
+# engine and scenarios.load_scenario stubbed: the production relay name ==
+# the supervisor's CLI-derived name, relay_from / resolved relay_kwargs
+# forwarded, the one-line summary printed, every refusal raised BEFORE the
+# scenario load, a non-relay run forwards None / None under the untagged
+# name, and the end-of-run PCA marks the enqueued baseline at the
+# trajectory's FIRST trial_number with the best SIMULATED trial printed.
+# Path budget (spec §3.1; 2026-09-23 review fix): ko.longest_output_paths of
+# the production name (254 / 239 characters in this checkout), its suffix
+# lists pinned to every writer and to the driver's savefig names; the driver
+# prints it on its own line and supervise() appends it to a relay settings
+# line (a non-relay line unchanged); both refuse an over-MAX_PATH run-data
+# path before the scenario load / the log.
+import ast as _ast103
+import textwrap as _textwrap103
+from datetime import datetime as _datetime103
+HERE103 = os.path.dirname(os.path.abspath(__file__))
+DRV103_PATH = os.path.join(HERE103, 'optimize_kinetics_BO.py')
+SUP103_PATH = os.path.join(HERE103, 'optimize_kinetics_BO_supervised.py')
+drv103 = open(DRV103_PATH, encoding='utf-8').read()
+supsrc103 = open(SUP103_PATH, encoding='utf-8').read()
+sup103 = _runpy.run_path(SUP103_PATH)
+# The production relay panel (spec §4): the seven process-level split_12d _aA
+# campaigns; names only -- nothing here reads a donor file.
+DONORS103 = [f'kin_opt_ethanol_isobutanol_metabolic_split_12d_{d}_gp_rb0.001-4_ib0.75-1.5_aA_burden'
+             for d in ('ibo_yield', 'ibo_titer', 'ibo_productivity', 'etoh_yield',
+                       'etoh_titer', 'etoh_productivity', 'price-weighted_yield')]
+KW103 = {'max_rows': 1000, 'keep_above': -0.12953}
+KWR103 = ko.resolve_relay_kwargs(KW103)
+TAG103 = ko.relay_study_tag(DONORS103, KW103)
+assert TAG103 == '_rlba1b2315', TAG103          # pinned: a changed scheme forks the study
+PLAIN103 = 'kin_opt_ethanol_isobutanol_metabolic_split_12d_pi_log-tail_gp_rb0.001-4_ib0.75-1.5_aA_burden'
+NAME103 = PLAIN103[:-len('_burden')] + TAG103 + '_burden'
+assert len(NAME103) == 103, len(NAME103)
+# --- output-path budget (spec §3.1, 2026-09-23 review fix; ko.longest_output_paths):
+# Windows' MAX_PATH is 260 INCLUDING the NUL (long paths disabled here), so the
+# longest file a relay campaign writes must stay SHORTER than 260. The longest
+# is the driver's end-of-run <name>_param_trajectory_ / _best_vs_baseline_
+# <%Y.%m.%d-%H.%M>.png: 254 in this checkout's 112-character results dir (5 to
+# spare); the longest run-data file, _relay_manifest.csv.tmp, is 239. ---
+RD103 = os.path.abspath(os.path.join(HERE103, 'results'))
+assert RD103 == os.path.abspath(ko.default_results_dir()) == os.path.abspath(sup103['RESULTS_DIR'])
+data103, plot103 = ko.longest_output_paths(RD103, NAME103)
+assert ko.longest_output_paths(None, NAME103) == (data103, plot103)       # None = the engine default
+assert (len(ko.PLOT_STAMP_PLACEHOLDER)
+        == len(_datetime103(2026, 9, 23, 12, 0).strftime('%Y.%m.%d-%H.%M')) == 16)
+assert len(NAME103) + max(map(len, ko.STUDY_PLOT_SUFFIXES)) == 103 + 38 == 141
+assert len(plot103) == len(RD103) + 1 + 103 + 38, (len(plot103), plot103)
+assert plot103.endswith(('_param_trajectory_YYYY.MM.DD-HH.MM.png',
+                         '_best_vs_baseline_YYYY.MM.DD-HH.MM.png')), plot103
+assert len(data103) == len(RD103) + 1 + 103 + len('_relay_manifest.csv.tmp'), data103
+assert data103.endswith('_relay_manifest.csv.tmp'), data103
+if len(RD103) == 112:                                                   # this checkout
+    assert (len(plot103), len(data103)) == (254, 239), (len(plot103), len(data103))
+assert len(plot103) < ko.WINDOWS_MAX_PATH == 260 and len(data103) < 260, (len(plot103), plot103)
+# the suffix lists cover every writer (engine CSV / sidecar tmp / seed log /
+# store journal / manifest tmp, the supervisor's run log) ...
+csvp103 = os.path.join(RD103, NAME103 + '_trajectory.csv')
+for p103 in (csvp103, ko.inflight_path_for(RD103, NAME103) + '.tmp',
+             ko.seed_sidecar_path(csvp103), os.path.join(RD103, NAME103 + '.db') + '-journal',
+             ko.relay_manifest_path(RD103, NAME103) + '.tmp',
+             os.path.join(RD103, NAME103 + '_run.log')):
+    assert p103[len(RD103) + 1 + len(NAME103):] in ko.STUDY_OUTPUT_SUFFIXES, p103
+    assert len(p103) <= len(data103), p103
+assert "study_name + '_run.log'" in supsrc103
+# ... and the plot suffixes ARE the driver's savefig names (a renamed / longer
+# suffix breaks this check instead of silently overflowing at the end of a run)
+drvplots103 = set(_re100.findall(r"base \+ f'(_[a-z_]+_\{stamp\}\.png)'", drv103))
+assert drvplots103 == {s.replace(ko.PLOT_STAMP_PLACEHOLDER, '{stamp}')
+                       for s in ko.STUDY_PLOT_SUFFIXES}, drvplots103
+assert "stamp = datetime.now().strftime('%Y.%m.%d-%H.%M')" in drv103
+assert 'ko.longest_output_paths(' in drv103 and 'ko.longest_output_paths(' in supsrc103
+# --- supervisor default_study_name: the relay tag, parity with ko ---
+def _sup_name103(**kw):
+    return sup103['default_study_name'](None, 'PI (log-tail)', None,
+                                        study_target_products='ethanol_isobutanol',
+                                        study_type='metabolic_split_12d', burden=True,
+                                        method='gp', **kw)
+nd103 = ko.study_type_name_defaults('metabolic_split_12d')
+assert _sup_name103(relay_from=DONORS103, relay_kwargs=KW103) == NAME103 == ko.default_study_name(
+    'PI (log-tail)', 'ethanol_isobutanol', 'metabolic_split_12d', burden=True,
+    rate_multiplier_bounds=ko.DEFAULT_RATE_MULTIPLIER_BOUNDS,
+    inhibition_multiplier_bounds=nd103['inhibition_multiplier_bounds'],
+    exclude_params=nd103['exclude_params'], stage_1_max_x_bounds=nd103['stage_1_max_x_bounds'],
+    n_seeds=0, method='gp', ibo_pathway_anchoring='scenario_A', relay_tag=TAG103)
+assert _sup_name103(relay_from=list(reversed(DONORS103)),
+                    relay_kwargs=dict(KWR103, max_rows=1000.0)) == NAME103
+assert _sup_name103(relay_from=[os.path.join(HERE103, 'results', d + '_trajectory.csv')
+                                for d in DONORS103], relay_kwargs=KW103) == NAME103
+assert _sup_name103() == _sup_name103(relay_from=None) == _sup_name103(relay_from=[]) == PLAIN103
+assert _sup_name103(relay_from=DONORS103) != NAME103                  # knobs are hashed too
+for kw103 in ({'relay_from': ['a103']}, {'relay_from': 'a103'}):
+    try:
+        sup103['default_study_name']('A', 'IRR', 'B', burden=True, **kw103)
+    except ValueError as e103:
+        assert 'preset' in str(e103), e103
+    else:
+        raise AssertionError(f'legacy default_study_name accepted {kw103}')
+_n103 = _inspect.signature(sup103['default_study_name']).parameters
+assert _n103['relay_from'].default is None and _n103['relay_kwargs'].default is None
+# --- child_code: relay kwargs only when set, appended last, program compiles ---
+args103 = (None, 'PI (log-tail)', 2000, None, True, NAME103)
+ckw103 = dict(study_target_products='ethanol_isobutanol', study_type='metabolic_split_12d',
+              method='gp', gp_kwargs={'deterministic_objective': True}, seed=20260923)
+code103_plain = sup103['child_code'](*args103, **ckw103)
+assert 'relay' not in code103_plain
+assert (sup103['child_code'](*args103, relay_from=None, relay_kwargs=None, **ckw103)
+        == sup103['child_code'](*args103, relay_from=[], relay_kwargs={}, **ckw103)
+        == code103_plain)
+code103 = sup103['child_code'](*args103, relay_from=DONORS103, relay_kwargs=KWR103, **ckw103)
+compile(code103, '<child103>', 'exec')
+lines103 = code103.splitlines(keepends=True)
+assert lines103[-3] == f'          relay_from={DONORS103!r},\n', lines103[-3]
+assert lines103[-2] == f'          relay_kwargs={KWR103!r},\n', lines103[-2]
+assert ''.join(lines103[:-3] + lines103[-1:]) == code103_plain      # purely appended
+call103 = _ast103.parse(code103).body[-1].value
+kwv103 = {k.arg: _ast103.literal_eval(k.value) for k in call103.keywords
+          if k.arg in ('relay_from', 'relay_kwargs', 'method', 'study_name')}
+assert kwv103 == {'relay_from': DONORS103, 'relay_kwargs': KWR103, 'method': 'gp',
+                  'study_name': NAME103}, kwv103
+assert ko.resolve_relay_kwargs(kwv103['relay_kwargs']) == KWR103     # the child re-resolves identically
+assert "relay_from=['a103']," in sup103['child_code'](*args103, relay_from='a103', **ckw103)
+try:
+    sup103['child_code'](*args103, relay_kwargs={'max_rows': 3}, **ckw103)
+except ValueError as e103:
+    assert 'without relay_from' in str(e103), e103
+else:
+    raise AssertionError('child_code accepted relay_kwargs without relay_from')
+_c103 = _inspect.signature(sup103['child_code']).parameters
+_s103 = _inspect.signature(sup103['supervise']).parameters
+assert _c103['relay_from'].default is None and _c103['relay_kwargs'].default is None
+assert _s103['relay_from'].default is None and _s103['relay_kwargs'].default is None
+# --- supervise(): refusals before the name / log / child. A nonexistent
+# child python and a temp log path: were a refusal ever to regress, Popen
+# would raise FileNotFoundError instead of launching a simulation. ---
+outdir103 = tempfile.mkdtemp()
+log103 = os.path.join(outdir103, 'sup103_run.log')
+for needle103, kw103 in (
+        ('GP-only', dict(relay_from=['a103'], method='tpe')),
+        ('GP-only', dict(relay_from=['a103'], method='dual_annealing')),
+        ('preset', dict(relay_from=['a103'], method='gp', study_target_products=None)),
+        ('learned_constraints', dict(relay_from=['a103'], method='gp',
+                                     gp_kwargs={'learned_constraints': True})),
+        ('without relay_from', dict(relay_kwargs={'max_rows': 3}, method='gp')),
+        ('max_rows', dict(relay_from=['a103'], method='gp', relay_kwargs={'max_rows': 0})),
+        ('unknown relay_kwargs', dict(relay_from=['a103'], method='gp',
+                                      relay_kwargs={'bogus': 1})),
+        ('more than once', dict(relay_from=['a103', 'a103'], method='gp'))):
+    try:
+        sup103['supervise'](objective='PI (log-tail)', study_name='sup103_never',
+                            python=os.path.join(outdir103, 'no_such_python.exe'),
+                            log_path=log103, poll_s=0.01, settle_s=0.0, **kw103)
+    except ValueError as e103:
+        assert needle103 in str(e103), (needle103, str(e103))
+    else:
+        raise AssertionError(f'supervise() accepted {kw103}')
+    assert not os.path.exists(log103), kw103                      # refused before any event
+assert not os.path.isfile(os.path.join(sup103['RESULTS_DIR'], 'sup103_never_trajectory.csv'))
+# supervise() path budget (2026-09-23 review fix): a relay run-data path at or
+# over MAX_PATH is refused before the log; a relay study's settings line ends
+# with its longest output path, a non-relay line is unchanged. The nonexistent
+# child python makes the first Popen raise, so nothing can ever launch.
+logm103 = os.path.join(outdir103, 'sup103_long_run.log')
+try:
+    sup103['supervise'](objective='PI (log-tail)', study_name='x103' * 50, method='gp',
+                        relay_from=['a103'], python=os.path.join(outdir103, 'no_such_python.exe'),
+                        log_path=logm103, poll_s=0.01, settle_s=0.0)
+except ValueError as e103:
+    n103m = len(os.path.abspath(sup103['RESULTS_DIR'])) + 1 + 200 + len('_relay_manifest.csv.tmp')
+    assert 'MAX_PATH' in str(e103) and f'{n103m} characters' in str(e103), str(e103)
+else:
+    raise AssertionError('supervise() accepted a relay study whose run-data path overflows')
+assert not os.path.exists(logm103)
+for name103s, relay103s in (('sup103_path', ['a103']), ('sup103_plainpath', None)):
+    logp103 = os.path.join(outdir103, name103s + '_run.log')
+    try:
+        with _contextlib.redirect_stdout(_io.StringIO()):     # the events go to logp103 too
+            sup103['supervise'](objective='PI (log-tail)', study_name=name103s, method='gp',
+                                relay_from=relay103s,
+                                python=os.path.join(outdir103, 'no_such_python.exe'),
+                                log_path=logp103, poll_s=0.01, settle_s=0.0)
+    except OSError:
+        pass                                     # FileNotFoundError at the first Popen
+    else:
+        raise AssertionError('supervise() returned with a nonexistent child python')
+    with open(logp103) as fh103:
+        set103 = [l for l in fh103.read().splitlines() if 'settings: study' in l]
+    assert len(set103) == 1, set103
+    d103s, p103s = ko.longest_output_paths(sup103['RESULTS_DIR'], name103s)
+    if relay103s:
+        assert set103[0].endswith(
+            f', longest output path {len(p103s)} characters (run data {len(d103s)}; '
+            'Windows MAX_PATH 260)'), set103[0]
+    else:
+        assert set103[0].endswith(
+            f"max_empty_attempts={_s103['max_empty_attempts'].default!r}"), set103[0]
+        assert 'longest output path' not in set103[0]
+    assert not os.path.isfile(os.path.join(sup103['RESULTS_DIR'], name103s + '_trajectory.csv'))
+src103_sup = _inspect.getsource(sup103['supervise'])
+assert 'relay_from=relay_from' in src103_sup and 'relay_kwargs=relay_kwargs' in src103_sup
+assert src103_sup.count('relay_from=relay_from') == 3   # check_method_kwargs + default_study_name + child_code
+assert 'relay_from={relay_from!r}' in src103_sup and 'relay_kwargs={relay_kwargs!r}' in src103_sup
+assert src103_sup.index('ko.resolve_relay_kwargs(') < src103_sup.index('default_study_name(scenario')
+assert 'import biorefineries' not in supsrc103 and 'import optuna' not in supsrc103
+assert "'--relay-from', nargs='+', action='extend'" in supsrc103
+for flag103 in ("'--relay-max-rows', type=int", "'--relay-keep-above', type=float",
+                "'--relay-dedupe-tol', type=float",
+                "'--relay-keep-quarantined', action='store_true'"):
+    assert flag103 in supsrc103, flag103
+assert '--relay-from <donor study> <other donor>' in supsrc103       # module-docstring example
+# --- the REAL CLI block, exec'd with a stub supervise() (never launches) ---
+main103 = supsrc103[supsrc103.index("if __name__ == '__main__':"):].split('\n', 1)[1]
+main103 = compile(_textwrap103.dedent(main103), SUP103_PATH, 'exec')
+def _cli103(*argv):
+    calls = []
+    def _stub_supervise103(**kw):
+        calls.append(kw)
+        return 'complete'
+    ns = dict(sup103, supervise=_stub_supervise103)
+    argv_saved = _sys.argv
+    _sys.argv = ['optimize_kinetics_BO_supervised.py', *argv]
+    err = _io.StringIO()
+    try:
+        with _contextlib.redirect_stderr(err):
+            exec(main103, ns)
+    except SystemExit as e:
+        status = e.code
+    else:
+        raise AssertionError(f'CLI {argv} did not exit')
+    finally:
+        _sys.argv = argv_saved
+    return status, calls, err.getvalue()
+st103, calls103, err103 = _cli103(
+    '--objective', 'PI (log-tail)', '--study-type', 'metabolic_split_12d',
+    '--method', 'gp', '--gp-deterministic', '--n-trials', '2000', '--seed', '20260923',
+    '--stall-timeout-min', '10', '--relay-from', *DONORS103[:3], '--relay-max-rows', '1000',
+    '--relay-from', *DONORS103[3:], '--relay-keep-above', '-0.12953')
+assert st103 == 0 and len(calls103) == 1, (st103, err103)
+k103 = calls103[0]
+assert k103['relay_from'] == DONORS103                             # two groups extended, in order
+assert k103['relay_kwargs'] == KWR103
+assert k103['method'] == 'gp' and k103['gp_kwargs'] == {'deterministic_objective': True}
+assert k103['study_name'] is None and k103['n_trials'] == 2000 and k103['seed'] == 20260923
+cli_name103 = sup103['default_study_name'](
+    k103['scenario'], k103['objective'], k103['kinetic_bounds_scenario'],
+    study_target_products=k103['study_target_products'], study_type=k103['study_type'],
+    burden=k103['burden'], rate_multiplier_bounds=k103['rate_multiplier_bounds'],
+    exclude_params=k103['exclude_params'], stage_1_max_x_bounds=k103['stage_1_max_x_bounds'],
+    seed_from=k103['seed_from'], method=k103['method'],
+    group_multiplier_bounds=k103['group_multiplier_bounds'],
+    relay_from=k103['relay_from'], relay_kwargs=k103['relay_kwargs'])
+assert cli_name103 == NAME103, cli_name103
+st103, calls103, _ = _cli103('--method', 'gp', '--relay-from', 'a103',
+                             '--relay-keep-quarantined', '--relay-dedupe-tol', '0.002')
+assert st103 == 0 and calls103[0]['relay_kwargs'] == ko.resolve_relay_kwargs(
+    {'drop_quarantined': False, 'dedupe_tol': 0.002}), calls103
+assert calls103[0]['relay_kwargs']['drop_quarantined'] is False
+st103, calls103, _ = _cli103('--method', 'gp')                    # no relay flag at all
+assert st103 == 0 and calls103[0]['relay_from'] is None and calls103[0]['relay_kwargs'] is None
+for needle103, argv103 in (
+        ('require --relay-from', ('--method', 'gp', '--relay-max-rows', '5')),
+        ('require --relay-from', ('--method', 'gp', '--relay-keep-quarantined')),
+        ('require --relay-from', ('--method', 'gp', '--relay-keep-above', '0.1')),
+        ('GP-only', ('--relay-from', 'a103')),                             # default method tpe
+        ('GP-only', ('--relay-from', 'a103', '--method', 'dual_annealing')),
+        ('--legacy-flags', ('--relay-from', 'a103', '--method', 'gp', '--legacy-flags')),
+        ('more than once', ('--relay-from', 'a103', 'a103', '--method', 'gp')),
+        ('max_rows', ('--relay-from', 'a103', '--method', 'gp', '--relay-max-rows', '0')),
+        ('dedupe_tol', ('--relay-from', 'a103', '--method', 'gp', '--relay-dedupe-tol', '-1')),
+        ('--relay-from', ('--method', 'gp', '--relay-from'))):             # nargs='+'
+    st103, calls103, err103 = _cli103(*argv103)
+    assert st103 == 2 and calls103 == [], (argv103, st103, calls103)
+    assert needle103 in err103, (needle103, err103)
+# --- driver: source plumbing ---
+body103 = drv103[drv103.index('def run('):]
+assert 'relay_from=None,' in body103 and 'relay_kwargs=None,' in body103
+assert 'relay_from=relay_from,' in body103 and 'relay_kwargs=relay_kwargs,' in body103
+assert 'startup_sampling=startup_sampling, relay_from=relay_from)' in body103   # check_method_kwargs
+call103d = body103[body103.index('ko.default_study_name('):body103.index('excluded = tuple(')]
+assert 'relay_tag=relay_tag)' in call103d, call103d
+assert (body103.index('ko.check_method_kwargs(') < body103.index('ko.resolve_relay_kwargs(')
+        < body103.index('relay_tag = ko.relay_study_tag(') < body103.index('ko.resolve_study_preset(')
+        < body103.index('scenarios.load_scenario('))
+assert 'baseline_trial=(0 if' not in drv103 and 'first_trial_number' in body103
+assert 'ko.best_simulated_trial(' in body103 and 'ko.n_relay_trials(' in body103
+assert 'study.best_trial' not in drv103
+assert "relay_from=['<donor study name>', '<other donor>']" in drv103     # runner example
+# --- driver: the REAL run() exec'd from source against stubs (never load()s) ---
+if os.path.isfile(wb_A) and os.path.isfile(wb_B):
+    defs103 = {node.name: _ast103.get_source_segment(drv103, node)
+               for node in _ast103.parse(drv103).body
+               if isinstance(node, _ast103.FunctionDef)}
+    class _Captured103(Exception):
+        pass
+    eng103, loads103, plots103 = [], [], {}
+    mode103 = {'return': None}
+    def _engine103(**kw):
+        eng103.append(kw)
+        if mode103['return'] is None:
+            raise _Captured103()
+        return mode103['return']
+    def _load103(scenario, burden=True):
+        loads103.append((scenario, burden))
+        return {'burden_model': SimpleNamespace(
+            reference={}, describe_point=lambda point, label='': f'<burden report: {label}>')}
+    def _plot103(name):
+        def _plot(df, *args, **kw):
+            plots103[name] = kw
+        return _plot
+    ko103 = SimpleNamespace(**{k: getattr(ko, k) for k in dir(ko) if not k.startswith('__')})
+    ko103.run_kinetic_optimization = _engine103
+    ko103.run_kinetic_dual_annealing = _engine103
+    for name103 in ('plot_optimization_trajectories', 'plot_parameter_trajectory',
+                    'plot_best_vs_baseline', 'plot_pca_projection'):
+        setattr(ko103, name103, _plot103(name103))
+    drvns103 = {'ko': ko103, 'scenarios': SimpleNamespace(load_scenario=_load103),
+                'os': os, 'datetime': _datetime103, '__name__': 'driver103'}
+    for fn103 in ('kinetic_bounds_from_scenario', 'run'):
+        exec(compile(defs103[fn103], DRV103_PATH, 'exec'), drvns103)
+    run103 = drvns103['run']
+    base103 = dict(objective='PI (log-tail)', study_target_products='ethanol_isobutanol',
+                   study_type='metabolic_split_12d', method='gp', n_trials=2000,
+                   seed=20260923, gp_kwargs={'deterministic_objective': True})
+    def _drive103(**kw):
+        buf = _io.StringIO()
+        with _contextlib.redirect_stdout(buf):
+            try:
+                out = run103(**{**base103, **kw})
+            except _Captured103:
+                out = None
+        return out, buf.getvalue()
+    # production relay: name parity with the supervisor, forwarded + resolved, summary line
+    _, out103 = _drive103(make_plots=False, relay_from=DONORS103, relay_kwargs=KW103)
+    e103 = eng103[-1]
+    assert e103['study_name'] == NAME103 == cli_name103, e103['study_name']
+    assert e103['relay_from'] == tuple(DONORS103) and e103['relay_kwargs'] == KWR103
+    assert e103['method'] == 'gp' and e103['gp_kwargs'] == {'deterministic_objective': True}
+    assert loads103 == [('A', True)], loads103
+    sum103 = [l for l in out103.splitlines() if l.startswith('Relay campaign')]
+    assert len(sum103) == 1, out103
+    assert f'(tag {TAG103})' in sum103[0] and sum103[0].endswith(ko.relay_spec_json(DONORS103, KW103))
+    # the path budget on its OWN line (2026-09-23 review fix), no warning here
+    assert (f'Longest output path: {len(plot103)} characters (run data {len(data103)}; '
+            f'Windows MAX_PATH 260 incl. the NUL): {plot103}') in out103, out103
+    assert 'exceed Windows MAX_PATH' not in out103
+    # a single donor string is one donor; knob forms resolve identically
+    _drive103(make_plots=False, relay_from=DONORS103[0], relay_kwargs={'max_rows': 1000.0})
+    assert eng103[-1]['relay_from'] == (DONORS103[0],)
+    assert eng103[-1]['relay_kwargs'] == ko.resolve_relay_kwargs(None)
+    assert eng103[-1]['study_name'] == _sup_name103(relay_from=DONORS103[0])
+    # non-relay: None / None forwarded under the untagged name, no relay print
+    _, out103n = _drive103(make_plots=False)
+    assert eng103[-1]['relay_from'] is None and eng103[-1]['relay_kwargs'] is None
+    assert eng103[-1]['study_name'] == PLAIN103 == _sup_name103()
+    assert 'Relay' not in out103n and 'Longest output path' not in out103n
+    # refusals: raised BEFORE the scenario load and the engine
+    n_loads103, n_eng103 = len(loads103), len(eng103)
+    for needle103, kw103 in (
+            ('GP-only', dict(relay_from=DONORS103, method='tpe', gp_kwargs=None)),
+            ('GP-only', dict(relay_from=DONORS103, method='dual_annealing', gp_kwargs=None)),
+            ('preset', dict(relay_from=DONORS103, study_target_products=None)),
+            ('REGISTRY objective', dict(relay_from=DONORS103, objective='TCI')),      # minimized
+            ('REGISTRY objective', dict(relay_from=DONORS103, objective='NPV')),      # untracked
+            ('REGISTRY objective', dict(relay_from=DONORS103, objective=lambda h: 0.0,
+                                        objective_name='custom103', direction='maximize')),
+            ('REGISTRY objective', dict(relay_from=DONORS103, direction='minimize')),
+            ('learned_constraints', dict(relay_from=DONORS103,
+                                         gp_kwargs={'learned_constraints': True})),
+            ('without relay_from', dict(relay_kwargs={'max_rows': 3})),
+            ('unknown relay_kwargs', dict(relay_from=DONORS103, relay_kwargs={'bogus': 1})),
+            ('more than once', dict(relay_from=[DONORS103[0], DONORS103[0]])),
+            # a run-data path over Windows MAX_PATH (2026-09-23 review fix)
+            ('MAX_PATH', dict(relay_from=DONORS103, relay_kwargs=KW103,
+                              study_name='x103' * 50))):
+        try:
+            _drive103(make_plots=False, **kw103)
+        except ValueError as err:
+            assert needle103 in str(err), (needle103, str(err))
+        else:
+            raise AssertionError(f'driver run() accepted {kw103}')
+        assert (len(loads103), len(eng103)) == (n_loads103, n_eng103), kw103
+    # end of run (A8): the PCA baseline marker is the trajectory's FIRST
+    # trial_number (N = 5 preloaded here), the best SIMULATED trial is printed
+    plotdir103 = tempfile.mkdtemp()
+    csv103 = os.path.join(plotdir103, 'relay103_trajectory.csv')
+    pd.DataFrame({'trial_number': [5, 6, 7], 'state': ['COMPLETE']*3,
+                  'k_3': [1.0, 2.0, 3.0], 'objective': [0.1, 0.3, 0.2]}).to_csv(csv103, index=False)
+    ko103.n_relay_trials = lambda study: 5
+    ko103.best_simulated_trial = lambda study: SimpleNamespace(number=6, value=0.3)
+    mode103['return'] = (SimpleNamespace(), csv103, {})
+    _, out103p = _drive103(make_plots=True, enqueue_baseline=True,
+                           relay_from=DONORS103, relay_kwargs=KW103)
+    assert plots103['plot_pca_projection']['baseline_trial'] == 5, plots103
+    assert 'Relay campaign: 5 preloaded trials; best SIMULATED trial #6 = 0.3' in out103p, out103p
+    assert 'Plots saved next to' in out103p
+    plots103.clear()
+    _drive103(make_plots=True, enqueue_baseline=False, relay_from=DONORS103, relay_kwargs=KW103)
+    assert plots103['plot_pca_projection']['baseline_trial'] is None
+    plots103.clear()
+    ko103.n_relay_trials = lambda study: 0                        # a plain GP study: no relay line
+    _, out103q = _drive103(make_plots=True, enqueue_baseline=True)
+    assert plots103['plot_pca_projection']['baseline_trial'] == 5    # first row, not a literal 0
+    assert 'preloaded' not in out103q
+else:
+    print("SKIP 103 (driver run() part): parameter-distribution workbooks not found")
+PASS('relay plumbing: supervisor name / child_code (relay kwargs only when set, appended) / '
+     'supervise() refusals / real CLI block with a stub supervise (two-flag --relay-from, '
+     'knobs, parser.error); driver run() exec\'d with stubs: production name == supervisor CLI '
+     'name, forwarding + summary, refusals before the scenario load, PCA marker at the first '
+     'trajectory trial, best SIMULATED trial printed; longest output path of the production '
+     f'relay name {len(plot103)} of {ko.WINDOWS_MAX_PATH} characters (run data {len(data103)}), '
+     'reported by the driver / supervisor, over-MAX_PATH refused')
 
 print(f'\nALL {n_pass} CHECKS PASSED')

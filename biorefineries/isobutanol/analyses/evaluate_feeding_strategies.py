@@ -198,7 +198,20 @@ results = {i: [] for i in metrics.keys()}
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (25, 25, 1)
+# Grid size (threshold steps, target steps, spike-conc steps); override the
+# 2-D grid resolution with IBO_SWEEP_STEPS=<n> (square) or <nx>x<ny>.
+_steps_env = os.environ.get('IBO_SWEEP_STEPS', '')
+if _steps_env:
+    _steps_parts = [int(p) for p in _steps_env.lower().split('x')]
+    if len(_steps_parts) == 1:
+        steps = (_steps_parts[0], _steps_parts[0], 1)
+    elif len(_steps_parts) == 2:
+        steps = (_steps_parts[0], _steps_parts[1], 1)
+    else:
+        raise ValueError(f'IBO_SWEEP_STEPS={_steps_env!r} not understood; '
+                         'use <n> or <nx>x<ny>.')
+else:
+    steps = (25, 25, 1)
 
 spec_1 = threshold_conces = np.linspace(1., 400., steps[0])
 

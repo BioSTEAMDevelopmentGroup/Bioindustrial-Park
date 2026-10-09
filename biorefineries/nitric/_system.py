@@ -1,9 +1,15 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Created on Tue Sep 30 13:47:43 2025
+# Nitric acid biorefineries.
+# Copyright (C) 2024-, Wenjun Guo <wenjung2@illinois.edu>
+# 
+# This module is under the UIUC open-source license. See 
+# github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
+# for license details.
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
-@author: IGB
-"""
+
 
 import biosteam as bst
 import biorefineries.nitric._units as _units

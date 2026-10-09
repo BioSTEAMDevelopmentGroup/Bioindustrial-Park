@@ -57,8 +57,15 @@ check('metabolic value == sum of four categories',
       < 1e-12)
 check('metabolic value == record Phi_M',
       abs(metabolic['value'] - float(rec['Phi_M'])) < 1e-4)
-check('baseline isobutanol category == 0 (Ehrlich branch off at A)',
-      abs(mkids['cat_isobutanol']['value']) < 1e-9)
+# The Ehrlich isobutanol enzymes (r13-r16) are off in scenario A, but since
+# the 2026-09-15 r16/r17 split the isobutanol category also carries the NATIVE
+# Adh6 step r17 (constitutively expressed, so nonzero at baseline A): the
+# category equals the native r17 pool, not zero.
+check('baseline isobutanol category == native Adh6 pool r17 '
+      '(Ehrlich r13-r16 off at A)',
+      abs(mkids['cat_isobutanol']['value'] - float(rec['pool_r17'])) < 1e-9)
+check('baseline r17 native pool > 0 (Adh6 constitutive)',
+      float(rec['pool_r17']) > 1e-9)
 
 slack = kids['slack']['value']
 check('slack == F_flex - Phi_M - phi_T',

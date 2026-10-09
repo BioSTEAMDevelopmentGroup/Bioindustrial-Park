@@ -124,7 +124,7 @@ def create_sucrose_fermentation_system(ins, outs,
                                            thermo=dilution_water.thermo.ideal(),
                                            flash=False,
                                            V=0.3) # fraction evaporated
-        P306 = bst.Pump('P306', F301-0)
+        P306 = bst.Pump('P306', F301-0, P=101325)
         # Note: value of steam ~ 6.86 for the following 
         # (101325, 73580.467, 50891.17, 32777.406, 19999.925, 11331.5),
         
@@ -206,7 +206,8 @@ def create_sucrose_fermentation_system(ins, outs,
         fermentation_reaction=fermentation_reaction,
         cell_growth_reaction=cell_growth_reaction,
         **fermentation_kwargs,
-    ) 
+    )
+    R301.register_alias('bioreactor')
     if fed_batch: R301.ins.append(MT1.outs[0])
     T301 = bst.StorageTank('T301', R301-1, tau=4, vessel_material='Carbon steel')
     T301.line = 'Beer tank'
@@ -258,17 +259,17 @@ def create_sucrose_fermentation_system(ins, outs,
         return (1./target - 1./current) * (R301.outs[1].imass[product_group] - ignored_product) * rho
     
     if scrubber:
-        stripping_water = bst.Stream('stripping_water',
-                                     Water=26836,
-                                     units='kg/hr')
-        stripping_water_over_vent = stripping_water.mol / 21202.490455845436
+        stripping_water = bst.Stream('stripping_water')
+        D301 = bst.VentScrubber('D301', ins=(stripping_water, R301-0), 
+                                outs=(vent, ''), gas=('CO2', 'O2'))
+        D301.register_alias('vent_scrubber')
+        D301.stripping_water_over_vent = 0.07
+        
+        @D301.add_specification(run=True)
         def update_stripping_water():
             stripping_water, vent = D301.ins
-            stripping_water.mol[:] = stripping_water_over_vent * vent.F_mass
+            stripping_water.imol['Water'] = D301.stripping_water_over_vent * vent.F_mass
         
-        D301 = bst.VentScrubber('D301', ins=(stripping_water, R301-0), 
-                                  outs=(vent, ''),
-                                  gas=('CO2', 'O2'))
         bst.Mixer('M302', ins=(C301-1, D301-1), outs=beer)
     
     if add_urea or (add_urea is None and nutrient_kwargs):

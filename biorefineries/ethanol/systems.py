@@ -99,6 +99,7 @@ def create_ethanol_purification_system_after_beer_column(ins, outs, IDs={}):
                              vessel_type='Floating roof',
                              vessel_material='Carbon steel',
                              tau=6.5*24, outs=ethanol)
+    T304.register_alias('ethanol_storage')
     
     ### Ethanol system set-up ###
     (distilled_beer, U301-0)-M303-0-D303-0-H303-U301

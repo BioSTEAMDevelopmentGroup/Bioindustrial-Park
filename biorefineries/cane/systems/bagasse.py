@@ -41,7 +41,7 @@ def create_bagasse_drying_system(ins, outs, utility_agent='Steam'):
     U402 = bst.DrumDryer('U402', 
         (ins[0], 'dryer_air', 'dryer_natural_gas'), 
         ('', 'dryer_outlet_air', 'dryer_emissions'),
-        moisture_content=0.40, split=0.,
+        moisture_content=0.20, split=0.,
         utility_agent=utility_agent,
     )
     bst.ConveyingBelt('U403', U402-0, outs)

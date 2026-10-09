@@ -11,23 +11,40 @@
 ``k_13`` (x-axis) vs the grouped ``inhib_isobutanol`` family MULTIPLIER
 (y-axis), on the ``opt_IRR`` baseline, WITH the enzyme burden turned ON.
 
-Structurally parallel to ``evaluate_EtOH_k1e_inhib_ethanol.py`` (which sweeps
-``k_1e`` x ``inhib_ethanol`` on scenario A); only the baseline scenario and the
-two swept dimensions differ.
+It is the isobutanol-inhibition analog of the sibling ``k_3`` / ``k_6`` x
+``inhib_ethanol`` sweeps (individual rate on x, grouped inhibition multiplier
+on y, same wider USER-SPECIFIED multiplier bands), swapping in the Ehrlich-entry
+rate ``k_13`` and the ``inhib_isobutanol`` family, and running on the
+isobutanol-producing ``opt_IRR`` baseline (scenario A makes no isobutanol, so
+its isobutanol-inhibition coefficients are inert):
 
-The y-axis multiplier is the same grouped decision variable the kinetic
-optimizer's ``metabolic_minimal_subset`` study uses
-(``kinetic_optimization.METABOLIC_MINIMAL_SUBSET_GROUPS['inhib_isobutanol']`` =
-k_1ii, k_4ii, k_6ii, k_7ii, k_10ii): every member is set to its ``opt_IRR``
-baseline x the multiplier, so intra-family ratios are preserved (exactly
-``kinetic_optimization.expand_grouped_values`` for a single group). At
-``(k_13 = opt_IRR baseline, multiplier = 1.0)`` the grid reproduces the
-``opt_IRR`` baseline point.
+* **k_13 (x-axis):** swept over its ``opt_IRR`` baseline x **[1e-3, 4.0]**. The
+  span matches the split-preset rate band (``kinetic_optimization`` assigns
+  ``capacity``-role rate constants a [1e-3x, 4x] band in the split presets), so
+  the axis reaches an effective knock-out at the low end (near-zero isobutanol)
+  and 4x the fitted rate at the high end.
+* **inhib_isobutanol multiplier (y-axis):** the grouped decision variable
+  (``kinetic_optimization.METABOLIC_MINIMAL_SUBSET_GROUPS['inhib_isobutanol']``
+  = k_1ii, k_4ii, k_6ii, k_7ii, k_10ii), swept over **[0.75, 1.5]** x each
+  member's ``opt_IRR`` baseline -- the ``metabolic_14d`` default group band
+  (0.75x baseline at the floor, its ceiling at the top). Every member is set to
+  its ``opt_IRR`` baseline x the multiplier, so intra-family ratios are
+  preserved (exactly ``kinetic_optimization.expand_grouped_values`` for a
+  single group).
 
-Baseline: ``opt_IRR`` reproduces the best-IRR trial of the 2026-09-07
-``metabolic_minimal_subset`` IRR study (a high-isobutanol optimum, ~70 g/L IBO;
-IRR ~0.235). Its baseline kinetics + feeding strategy (18 spikes / 286.77 /
-300.0) come from ``scenarios.SCENARIOS['opt_IRR']``.
+Both axes are linear grids over these bounds (a contour sweep spaces them
+evenly, matching the sibling ``evaluate_*`` scripts). ``(k_13 = opt_IRR
+baseline, inhib_isobutanol multiplier = 1.0)`` lies on the grid interior and
+reproduces the ``opt_IRR`` baseline point.
+
+Baseline: ``opt_IRR`` was RELOCATED 2026-09-20 to trial 1602 of the
+2026-09-16 scenario-A-anchored ``metabolic_split_12d`` PI (log-tail) GP study
+(the campaign's highest-IRR point, a co-production optimum: IBO 41.7 + EtOH
+29.2 g/L, tau 28.35 h, IRR ~0.273). Its baseline kinetics + feeding strategy
+(50-spike cap / 170.91 / 175.91, 1 actual spike) come from
+``scenarios.SCENARIOS['opt_IRR']`` -- this script reads them live, so it tracks
+the relocation automatically. Its baseline ``k_13`` is 4.0 (top of the
+split-preset rate band), so the x-axis spans [0.004, 16.0] g/L/h.
 
 Enzyme burden: installed A-referenced via ``scenarios.load_scenario('opt_IRR',
 burden=True)`` (the ``BurdenModel`` is ALWAYS built from scenario A's kinetics,
@@ -35,17 +52,20 @@ never from ``opt_IRR``'s own baseline; ``system.set_active_burden``), so the
 ``load_simulate`` choke point derates ``k_7``/``k_8`` for every simulated point.
 ``k_13`` keys the Ehrlich step ``r13`` in ``enzyme_burden.EHRLICH_STEPS``, so it
 IS a proteome pool: raising ``k_13`` raises the modeled pool ``Phi_M``, which
-derates growth (``k_7``/``k_8``); the ``inhib_isobutanol`` coefficients are
-product-inhibition / lethality terms, not pools, so they do not enter the
-burden.
+derates growth (``k_7``/``k_8``) and, at the high end, can push a point past the
+flexible-sector cap (``EnzymeBurdenInfeasibleError`` -> caught -> NaN); the
+``inhib_isobutanol`` coefficients are product-inhibition / lethality terms, not
+pools, so they do not enter the burden.
 
-Empirical result (2026-09-10 20x20 run): across ``k_13`` in [0, 6.5] (~10x the
-opt_IRR baseline 0.642) the r13 pool never pushed ``Phi_M`` over ``F_flex``, so
-NO point was burden-INFEASIBLE (0 exceptions) -- the anticipated vertical
-infeasible (NaN) band did NOT appear. Instead the high-``k_13`` /
-high-multiplier corner is uneconomic: 137/400 cells have an unsolvable,
-money-losing IRR (reported -inf) and 155/400 are profitable (IRR > 0). The
-``k_13 = 0`` column makes no isobutanol, so its IBO MPSP is NaN (20 cells).
+Re-run this script to (re)generate the CSVs / figures under analyses/results/;
+a prior 40x40 run used an absolute k_13 axis in [0, 8.0], not this multiplier
+band, so those artifacts are superseded.
+
+Crash resilience: the grid is checkpointed per point and resumes on relaunch
+(a native CVODE segfault killed the first run of this grid at ~point 764 of
+1600); see the 'Checkpoint + resume' cell. Launch through
+``supervise_sweep.py evaluate_EtOH_k13_inhib_isobutanol.py`` to have a crashed
+or hung process relaunched automatically.
 """
 
 import numpy as np
@@ -75,6 +95,8 @@ from datetime import datetime
 from math import log
 
 import os
+import csv
+import json
 
 
 import biosteam as bst
@@ -124,8 +146,8 @@ isobutanol_results_filepath = isobutanol_filepath + '\\analyses\\results\\'
 
 #%% opt_IRR baseline + enzyme burden ON
 # load_scenario('opt_IRR', burden=True) loads opt_IRR's workbook (baseline
-# kinetics + distributions), sets opt_IRR's feeding strategy (18 spikes /
-# 286.77 / 300.0) from scenarios.SCENARIOS, installs the A-referenced
+# kinetics + distributions), sets opt_IRR's feeding strategy (50-spike cap /
+# 170.91 / 175.91, 1 actual spike) from scenarios.SCENARIOS, installs the A-referenced
 # active enzyme burden (system.set_active_burden), and runs one baseline
 # model_specification. After it returns, r holds opt_IRR's baseline kinetics.
 # (opt_IRR's burden_default is already True, so burden=True is explicit but
@@ -244,15 +266,23 @@ metrics = {'MPSP': {'f': get_product_MPSP, 'units': '$/kg'}, # ethanol MPSP
 # results = {i: [] for i in range(len(metrics.values()))}
 results = {i: [] for i in metrics.keys()}
 
-steps = (20, 20, 1)
+steps = (40, 40, 1)
 
-# x-axis: k_13, the Ehrlich-entry rate capacity. opt_IRR baseline ~0.642
-# g/L/h; the range 0 -> 6.5 spans a full knockout (k_13 = 0, no isobutanol)
-# up to ~10x the baseline (the metabolic_minimal_subset preset's upper rate
-# band). The high-k_13 end is where the burden pushes Phi_M over F_flex.
-spec_1 = nsk_k_13es = np.linspace(0.0, 6.5, steps[0])
+# USER-SPECIFIED band: k_13 x [1e-3, 4.0] its opt_IRR baseline (the
+# split-preset capacity-rate band; effective knock-out / near-zero isobutanol
+# at the low end). opt_IRR baseline k_13 = 4.0, so the axis spans [0.004, 16.0]
+# g/L/h. The high-k_13 end is where the burden pushes Phi_M toward F_flex.
+K_13_MULTIPLIER_BOUNDS = (1e-3, 4.0)
+spec_1 = nsk_k_13es = np.linspace(K_13_MULTIPLIER_BOUNDS[0]*baseline_k_13,
+                                  K_13_MULTIPLIER_BOUNDS[1]*baseline_k_13,
+                                  steps[0])
 
-spec_2 = inhib_isobutanol_multipliers = np.linspace(0.2, 2.0, steps[1])
+# USER-SPECIFIED band: inhib_isobutanol multiplier x [0.75, 1.5] (metabolic_14d
+# default group band: 0.75x baseline at the low end, ceiling at the top).
+INHIB_ISOBUTANOL_MULTIPLIER_BOUNDS = (0.75, 1.5)
+spec_2 = inhib_isobutanol_multipliers = np.linspace(INHIB_ISOBUTANOL_MULTIPLIER_BOUNDS[0],
+                                                    INHIB_ISOBUTANOL_MULTIPLIER_BOUNDS[1],
+                                                    steps[1])
 
 
 spec_3 = spike_concs =\
@@ -267,11 +297,12 @@ spec_3 = spike_concs =\
 
 x_label = "k_13" # title of the x axis
 x_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
-x_ticks = [0, 1, 2, 3, 4, 5, 6]
+# k_13 range is baseline-dependent (1e-3x-4x baseline); derive round ticks.
+x_ticks = [float(np.round(t, 1)) for t in np.linspace(spec_1[0], spec_1[-1], 5)]
 
 y_label = "inhib_isobutanol multiplier" # title of the y axis
 y_units = r"" # dimensionless (x opt_IRR baseline of each member)
-y_ticks = [0.2, 0.6, 1.0, 1.4, 1.8, 2.0]
+y_ticks = [0.75, 1.0, 1.25, 1.5]
 
 z_label = "Spike feed glucose concentration" # title of the x axis
 z_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
@@ -365,12 +396,100 @@ file_to_save = f'ibo_{steps}_{x_label[:5]}_{y_label[:5]}_{z_label[:5]}_opt={perf
 # saved under analyses/results/. Only the plot styling below then matters.
 replot_from_csv = os.environ.get('IBO_SWEEP_REPLOT_FROM_CSV', '') == '1'
 
+#%% Checkpoint + resume (crash resilience)
+# A native integrator crash (CVODE segfault; exit code 5, no traceback) kills
+# the process and cannot be caught by the sweep loop's try/except, so the grid
+# is checkpointed PER POINT and a relaunch resumes it:
+# - <script stem>_checkpoint.csv: one flushed row per evaluated grid point
+#   (grid indices, axis values, state OK / ERROR / LOST, every metric). Points
+#   already in it are not re-simulated.
+# - <script stem>_inflight.json: written right before each point's simulation
+#   and removed once its row is logged. One found at start-up marks the point
+#   the previous process died in: it is logged as a LOST (all-NaN) row and
+#   skipped, so a deterministic crash is stepped past (the kinetic-BO
+#   supervisor's sidecar pattern).
+# Paths depend only on the script name, so analyses/supervise_sweep.py (the
+# auto-relaunching wrapper) can find them without loading the model. The
+# checkpoint is deleted when the script finishes (plots included); set
+# IBO_SWEEP_FRESH=1 to discard a leftover one and start over. Its axis values
+# are verified against this grid, so a checkpoint of other bounds raises.
+_script_stem = os.path.splitext(os.path.basename(__file__))[0]
+checkpoint_filepath = isobutanol_results_filepath + _script_stem + '_checkpoint.csv'
+inflight_filepath = isobutanol_results_filepath + _script_stem + '_inflight.json'
+checkpoint_fieldnames = ['i_row', 'i_col', 'k_13', 'inhib_isobutanol_multiplier',
+                         'state'] + list(metrics.keys())
+
+def append_checkpoint_row(i2, i1, state, metric_values):
+    is_new = not os.path.exists(checkpoint_filepath)
+    with open(checkpoint_filepath, 'a', newline='') as fh:
+        writer = csv.DictWriter(fh, fieldnames=checkpoint_fieldnames)
+        if is_new: writer.writeheader()
+        writer.writerow({'i_row': i2, 'i_col': i1,
+                         'k_13': repr(float(spec_1[i1])),
+                         'inhib_isobutanol_multiplier': repr(float(spec_2[i2])),
+                         'state': state,
+                         **{k: repr(float(v)) for k, v in metric_values.items()}})
+        fh.flush()
+        os.fsync(fh.fileno())
+
+def load_checkpoint():
+    points = {}
+    if not os.path.exists(checkpoint_filepath): return points
+    with open(checkpoint_filepath, newline='') as fh:
+        reader = csv.DictReader(fh)
+        if reader.fieldnames != checkpoint_fieldnames:
+            raise RuntimeError(f'Checkpoint columns do not match this sweep: {checkpoint_filepath} '
+                               '(delete it or set IBO_SWEEP_FRESH=1).')
+        for row in reader:
+            if None in row.values() or '' in row.values(): continue # truncated last line
+            i2, i1 = int(row['i_row']), int(row['i_col'])
+            if not (i2 < len(spec_2) and i1 < len(spec_1)
+                    and np.isclose(float(row['k_13']), spec_1[i1])
+                    and np.isclose(float(row['inhib_isobutanol_multiplier']), spec_2[i2])):
+                raise RuntimeError(f'Checkpoint is of a different grid: {checkpoint_filepath} '
+                                   '(delete it or set IBO_SWEEP_FRESH=1).')
+            points[(i2, i1)] = {k: float(row[k]) for k in metrics.keys()}
+    return points
+
+def write_inflight(i2, i1):
+    with open(inflight_filepath, 'w') as fh:
+        json.dump({'i_row': i2, 'i_col': i1,
+                   'k_13': float(spec_1[i1]),
+                   'inhib_isobutanol_multiplier': float(spec_2[i2])}, fh)
+        fh.flush()
+        os.fsync(fh.fileno())
+
+def clear_inflight():
+    if os.path.exists(inflight_filepath): os.remove(inflight_filepath)
+
+checkpointed_points = {}
+if not replot_from_csv:
+    assert len(spec_3)==1, 'the checkpoint assumes a single spike concentration'
+    if os.environ.get('IBO_SWEEP_FRESH', '') == '1':
+        for _path in (checkpoint_filepath, inflight_filepath):
+            if os.path.exists(_path): os.remove(_path)
+    checkpointed_points = load_checkpoint()
+    if os.path.exists(inflight_filepath):
+        with open(inflight_filepath) as fh: _lost = json.load(fh)
+        _lost_point = (_lost['i_row'], _lost['i_col'])
+        if _lost_point not in checkpointed_points:
+            print(f'\nThe previous process died at grid point {_lost_point} '
+                  f'(k_13 = {_lost["k_13"]}, inhib_isobutanol multiplier = '
+                  f'{_lost["inhib_isobutanol_multiplier"]}); logging it as LOST (NaN).')
+            checkpointed_points[_lost_point] = {k: np.nan for k in metrics.keys()}
+            append_checkpoint_row(*_lost_point, 'LOST', checkpointed_points[_lost_point])
+        clear_inflight()
+    if checkpointed_points:
+        print(f'\nRESUMING from {checkpoint_filepath}: {len(checkpointed_points)} of '
+              f'{len(spec_1)*len(spec_2)} grid points already evaluated '
+              '(set IBO_SWEEP_FRESH=1 for a fresh sweep).')
+
 #%% Initial simulation
 
 if not replot_from_csv:
     print('\n\nSimulating the initial point to avoid bugs ...')
     curr_spec = fbs_spec.current_specifications
-    r.k_13 = nsk_k_13es[1]
+    r.k_13 = baseline_k_13  # baseline k_13 (known-good; low grid points are near-knockouts)
     apply_inhib_isobutanol_multiplier(1.0)  # baseline inhib_isobutanol (known-good)
     model_specification(**curr_spec,
         n_sims=3,
@@ -412,11 +531,17 @@ else:
 for s3 in spec_3_to_run:
     for v in list(results.values()): v.append([])
 
-    for s2 in spec_2:
+    for i2, s2 in enumerate(spec_2):
         for v in list(results.values()): v[-1].append([])
-        for s1 in spec_1:
+        for i1, s1 in enumerate(spec_1):
             curr_no +=1
+            if (i2, i1) in checkpointed_points:
+                # evaluated by a previous process (or LOST in its crash)
+                for k, v in list(results.items()):
+                    v[-1][-1].append(checkpointed_points[(i2, i1)][k])
+                continue
             error_message = None
+            write_inflight(i2, i1)
             try:
                 # if round(s1,2)==round(spec_1[1],2) and round(s2,2)==round(spec_2[4],2):
                 #     breakpoint()
@@ -454,6 +579,10 @@ for s3 in spec_3_to_run:
                     errors_dict[(s1, s2, s3)] = str_e
                     # breakpoint()
                     # raise e
+
+            append_checkpoint_row(i2, i1, 'ERROR' if error_message else 'OK',
+                                  {k: v[-1][-1][-1] for k, v in results.items()})
+            clear_inflight()
 
             if curr_no%print_status_every_n_simulations==0 or error_message:
                 print_status(curr_no, total_no,
@@ -605,8 +734,8 @@ if plot:
     #%% All metrics
     # (Unlike the k_1e x inhib_ethanol reference, this script does NOT
     # hardcode the MPSP / IRR contour bounds -- those were fitted to a
-    # scenario-B grid and would clip opt_IRR's ranges (EtOH MPSP ~0.40,
-    # IBO MPSP ~1.28, IRR ~0.235). Every metric's levels/ticks are derived
+    # scenario-B grid and would clip opt_IRR's ranges (EtOH MPSP ~0.36,
+    # IBO MPSP ~1.16, IRR ~0.273). Every metric's levels/ticks are derived
     # from its own finite grid data below; IRR keeps the under-color /
     # -inf handling for money-losing corners.)
     for curr_metric, val in metrics.items():
@@ -664,20 +793,23 @@ if plot:
         scale_percent = False
 
         if 'irr' in lccm:
-            # IRR is shown as a PERCENTAGE (x100) on a HARD 0-25% colour scale:
+            # IRR is shown as a PERCENTAGE (x100) on a HARD 0-30% colour scale
+            #  (raised from 0-25% for the 2026-09-20 opt_IRR relocation, whose
+            #  baseline IRR ~27.3% -- the campaign's highest-IRR point and so
+            #  effectively this grid's max -- exceeded the old 25% top):
             #  - gray UNDER-colour for money-losing cells (< 0%, incl. the
             #    -inf unsolvable corners), extend_cmap='min';
-            #  - NO over-colour: the grid max (~23%) is below 25%, so nothing
+            #  - NO over-colour: the grid max (~27%) is below 30%, so nothing
             #    extends past the top of the bar;
             #  - break-even (0%) drawn as a WHITE labeled contour line via
-            #    comparison_lines; black labeled lines mark 5/10/15/20%;
+            #    comparison_lines; black labeled lines mark 5/10/15/20/25%;
             #  - every contour label carries the % symbol.
             scale_percent = True
             curr_w_units = '%'
             curr_fmt_clabel = lambda cvalue: f'{cvalue:.0f}%'
-            curr_metric_w_levels = np.arange(0.0, 25.0001, 25.0/80)
-            curr_metric_cbar_ticks = np.arange(0.0, 25.0001, 5.0)
-            curr_metric_w_ticks = [5.0, 10.0, 15.0, 20.0]
+            curr_metric_w_levels = np.arange(0.0, 30.0001, 30.0/80)
+            curr_metric_cbar_ticks = np.arange(0.0, 30.0001, 5.0)
+            curr_metric_w_ticks = [5.0, 10.0, 15.0, 20.0, 25.0]
             extend_cmap = 'min'
             cmap_under_color = colors.grey_dark.shade(40).RGBn
             cmap_over_color = None
@@ -743,3 +875,8 @@ if plot:
                                         units_opening_brackets = [" (",] * 4,
                                         units_closing_brackets = [")",] * 4,
                                         )
+
+#%% Sweep complete (per-metric CSVs + plots saved): drop the checkpoint
+if not replot_from_csv:
+    for _path in (checkpoint_filepath, inflight_filepath):
+        if os.path.exists(_path): os.remove(_path)
