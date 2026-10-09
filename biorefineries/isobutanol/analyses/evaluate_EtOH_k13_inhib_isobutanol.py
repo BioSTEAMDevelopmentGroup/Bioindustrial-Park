@@ -9,16 +9,18 @@
 """
 2-D kinetic sweep: the Ehrlich-entry (pyruvate-to-acetolactate) rate capacity
 ``k_13`` (x-axis) vs the grouped ``inhib_isobutanol`` family MULTIPLIER
-(y-axis), on the ``opt_IRR`` baseline, WITH the enzyme burden turned ON.
+(y-axis), on the ``opt_PI_TRY_informed`` baseline, WITH the enzyme burden
+turned ON.
 
 It is the isobutanol-inhibition analog of the sibling ``k_3`` / ``k_6`` x
 ``inhib_ethanol`` sweeps (individual rate on x, grouped inhibition multiplier
 on y, same wider USER-SPECIFIED multiplier bands), swapping in the Ehrlich-entry
 rate ``k_13`` and the ``inhib_isobutanol`` family, and running on the
-isobutanol-producing ``opt_IRR`` baseline (scenario A makes no isobutanol, so
-its isobutanol-inhibition coefficients are inert):
+isobutanol-producing ``opt_PI_TRY_informed`` baseline (scenario A makes no
+isobutanol, so its isobutanol-inhibition coefficients are inert):
 
-* **k_13 (x-axis):** swept over its ``opt_IRR`` baseline x **[1e-3, 4.0]**. The
+* **k_13 (x-axis):** swept over its ``opt_PI_TRY_informed`` baseline x
+  **[1e-3, 4.0]**. The
   span matches the split-preset rate band (``kinetic_optimization`` assigns
   ``capacity``-role rate constants a [1e-3x, 4x] band in the split presets), so
   the axis reaches an effective knock-out at the low end (near-zero isobutanol)
@@ -26,29 +28,42 @@ its isobutanol-inhibition coefficients are inert):
 * **inhib_isobutanol multiplier (y-axis):** the grouped decision variable
   (``kinetic_optimization.METABOLIC_MINIMAL_SUBSET_GROUPS['inhib_isobutanol']``
   = k_1ii, k_4ii, k_6ii, k_7ii, k_10ii), swept over **[0.75, 1.5]** x each
-  member's ``opt_IRR`` baseline -- the ``metabolic_14d`` default group band
-  (0.75x baseline at the floor, its ceiling at the top). Every member is set to
-  its ``opt_IRR`` baseline x the multiplier, so intra-family ratios are
-  preserved (exactly ``kinetic_optimization.expand_grouped_values`` for a
-  single group).
+  member's ``opt_PI_TRY_informed`` baseline -- the ``metabolic_14d`` default
+  group band (0.75x baseline at the floor, its ceiling at the top). Every
+  member is set to its ``opt_PI_TRY_informed`` baseline x the multiplier, so
+  intra-family ratios are preserved (exactly
+  ``kinetic_optimization.expand_grouped_values`` for a single group).
 
 Both axes are linear grids over these bounds (a contour sweep spaces them
-evenly, matching the sibling ``evaluate_*`` scripts). ``(k_13 = opt_IRR
-baseline, inhib_isobutanol multiplier = 1.0)`` lies on the grid interior and
-reproduces the ``opt_IRR`` baseline point.
+evenly, matching the sibling ``evaluate_*`` scripts). ``(k_13 =
+opt_PI_TRY_informed baseline, inhib_isobutanol multiplier = 1.0)`` lies on the
+grid interior and reproduces the ``opt_PI_TRY_informed`` baseline point.
 
-Baseline: ``opt_IRR`` was RELOCATED 2026-09-20 to trial 1602 of the
-2026-09-16 scenario-A-anchored ``metabolic_split_12d`` PI (log-tail) GP study
-(the campaign's highest-IRR point, a co-production optimum: IBO 41.7 + EtOH
-29.2 g/L, tau 28.35 h, IRR ~0.273). Its baseline kinetics + feeding strategy
-(50-spike cap / 170.91 / 175.91, 1 actual spike) come from
-``scenarios.SCENARIOS['opt_IRR']`` -- this script reads them live, so it tracks
-the relocation automatically. Its baseline ``k_13`` is 4.0 (top of the
-split-preset rate band), so the x-axis spans [0.004, 16.0] g/L/h.
+Baseline: ``opt_PI_TRY_informed`` (since 2026-10-08; it succeeds the removed
+``opt_IRR`` scenario) is trial #1912 of the 2026-09-24 TRY-informed PI
+(log-tail) relay campaign
+``kin_opt_ethanol_isobutanol_metabolic_split_12d_pi_log-tail_gp_rb0.001-4_ib0.75-1.5_aA_rl15c111dc_burden``
+(preloaded with rows of the six process-level ``_rs350`` seed-350 campaigns):
+a co-production point, IBO 39.6 + EtOH 40.6 g/L, tau 40.84 h, live-model IRR
+0.2792, PI 0.8559, ethanol / isobutanol MPSP 0.4607 / 1.1123 $/kg,
+burden-feasible (Phi_M 0.130). Its baseline kinetics + feeding strategy
+(1-spike cap / 189.19 / 194.19, 1 actual spike, spike 600) come from
+``scenarios.SCENARIOS['opt_PI_TRY_informed']`` (workbook
+``parameter-distributions_corn_IBO_EtOH_opt_PI_TRY_informed.xlsx``) -- this
+script reads them live. Its baseline ``k_13`` is 4.0 (top of the split-preset
+rate band, as was opt_IRR's), so the x-axis still spans [0.004, 16.0] g/L/h.
 
-Enzyme burden: installed A-referenced via ``scenarios.load_scenario('opt_IRR',
-burden=True)`` (the ``BurdenModel`` is ALWAYS built from scenario A's kinetics,
-never from ``opt_IRR``'s own baseline; ``system.set_active_burden``), so the
+STALE RESULTS: result CSVs / figures of this sweep produced before 2026-10-08
+are of the OLD ``opt_IRR`` point (split_12d trial 1602: IBO 41.7 + EtOH 29.2
+g/L, tau 28.35 h, IRR ~0.273, 50-spike cap / 170.91 / 175.91). Re-run this
+script to regenerate them for the ``opt_PI_TRY_informed`` baseline. (The
+``file_to_save`` prefix encodes ``max_n``, which is now 1, not opt_IRR's 50, so
+the new CSVs do not overwrite the old ones.)
+
+Enzyme burden: installed A-referenced via
+``scenarios.load_scenario('opt_PI_TRY_informed', burden=True)`` (the
+``BurdenModel`` is ALWAYS built from scenario A's kinetics, never from
+``opt_PI_TRY_informed``'s own baseline; ``system.set_active_burden``), so the
 ``load_simulate`` choke point derates ``k_7``/``k_8`` for every simulated point.
 ``k_13`` keys the Ehrlich step ``r13`` in ``enzyme_burden.EHRLICH_STEPS``, so it
 IS a proteome pool: raising ``k_13`` raises the modeled pool ``Phi_M``, which
@@ -144,33 +159,33 @@ isobutanol_filepath = isobutanol.__file__.replace('\\__init__.py', '')
 isobutanol_results_filepath = isobutanol_filepath + '\\analyses\\results\\'
 
 
-#%% opt_IRR baseline + enzyme burden ON
-# load_scenario('opt_IRR', burden=True) loads opt_IRR's workbook (baseline
-# kinetics + distributions), sets opt_IRR's feeding strategy (50-spike cap /
-# 170.91 / 175.91, 1 actual spike) from scenarios.SCENARIOS, installs the A-referenced
-# active enzyme burden (system.set_active_burden), and runs one baseline
-# model_specification. After it returns, r holds opt_IRR's baseline kinetics.
-# (opt_IRR's burden_default is already True, so burden=True is explicit but
-# matches the scenario default.)
-scenario = 'opt_IRR'
+#%% opt_PI_TRY_informed baseline + enzyme burden ON
+# load_scenario('opt_PI_TRY_informed', burden=True) loads the scenario's
+# workbook (baseline kinetics + distributions), sets its feeding strategy
+# (1-spike cap / 189.19 / 194.19, 1 actual spike) from scenarios.SCENARIOS,
+# installs the A-referenced active enzyme burden (system.set_active_burden),
+# and runs one baseline model_specification. After it returns, r holds
+# opt_PI_TRY_informed's baseline kinetics. (Its burden_default is already
+# True, so burden=True is explicit but matches the scenario default.)
+scenario = 'opt_PI_TRY_informed'
 
 bundle = scenarios.load_scenario(scenario, burden=True)
 feeding_kwargs = bundle['feeding_kwargs']
 
-# Snapshot each inhib_isobutanol member's opt_IRR baseline off the live
-# model (member list sourced from kinetic_optimization -- no hardcoding; a
+# Snapshot each inhib_isobutanol member's opt_PI_TRY_informed baseline off the
+# live model (member list sourced from kinetic_optimization -- no hardcoding; a
 # member absent from the model is dropped, mirroring expand_grouped_values).
 _available = ko.discover_kinetic_parameters(r)
 INHIB_ISOBUTANOL_MEMBERS = [m for m in ko.METABOLIC_MINIMAL_SUBSET_GROUPS['inhib_isobutanol']
                             if m in _available]
 baseline_inhib_isobutanol = {m: _available[m] for m in INHIB_ISOBUTANOL_MEMBERS}
 baseline_k_13 = _available.get('k_13', getattr(r, 'k_13'))
-print('\nopt_IRR baseline k_13 = %s' % baseline_k_13)
-print('opt_IRR inhib_isobutanol baselines: %s' % baseline_inhib_isobutanol)
+print('\n%s baseline k_13 = %s' % (scenario, baseline_k_13))
+print('%s inhib_isobutanol baselines: %s' % (scenario, baseline_inhib_isobutanol))
 
 
 def apply_inhib_isobutanol_multiplier(multiplier):
-    """Set every inhib_isobutanol member to its opt_IRR baseline x
+    """Set every inhib_isobutanol member to its opt_PI_TRY_informed baseline x
     `multiplier` (intra-family ratios preserved; == expand_grouped_values
     for the single inhib_isobutanol group)."""
     for member, base in baseline_inhib_isobutanol.items():
@@ -268,10 +283,11 @@ results = {i: [] for i in metrics.keys()}
 
 steps = (40, 40, 1)
 
-# USER-SPECIFIED band: k_13 x [1e-3, 4.0] its opt_IRR baseline (the
-# split-preset capacity-rate band; effective knock-out / near-zero isobutanol
-# at the low end). opt_IRR baseline k_13 = 4.0, so the axis spans [0.004, 16.0]
-# g/L/h. The high-k_13 end is where the burden pushes Phi_M toward F_flex.
+# USER-SPECIFIED band: k_13 x [1e-3, 4.0] its opt_PI_TRY_informed baseline
+# (the split-preset capacity-rate band; effective knock-out / near-zero
+# isobutanol at the low end). opt_PI_TRY_informed baseline k_13 = 4.0 (as was
+# opt_IRR's), so the axis spans [0.004, 16.0] g/L/h. The high-k_13 end is where
+# the burden pushes Phi_M toward F_flex.
 K_13_MULTIPLIER_BOUNDS = (1e-3, 4.0)
 spec_1 = nsk_k_13es = np.linspace(K_13_MULTIPLIER_BOUNDS[0]*baseline_k_13,
                                   K_13_MULTIPLIER_BOUNDS[1]*baseline_k_13,
@@ -301,7 +317,7 @@ x_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
 x_ticks = [float(np.round(t, 1)) for t in np.linspace(spec_1[0], spec_1[-1], 5)]
 
 y_label = "inhib_isobutanol multiplier" # title of the y axis
-y_units = r"" # dimensionless (x opt_IRR baseline of each member)
+y_units = r"" # dimensionless (x opt_PI_TRY_informed baseline of each member)
 y_ticks = [0.75, 1.0, 1.25, 1.5]
 
 z_label = "Spike feed glucose concentration" # title of the x axis
@@ -734,10 +750,11 @@ if plot:
     #%% All metrics
     # (Unlike the k_1e x inhib_ethanol reference, this script does NOT
     # hardcode the MPSP / IRR contour bounds -- those were fitted to a
-    # scenario-B grid and would clip opt_IRR's ranges (EtOH MPSP ~0.36,
-    # IBO MPSP ~1.16, IRR ~0.273). Every metric's levels/ticks are derived
-    # from its own finite grid data below; IRR keeps the under-color /
-    # -inf handling for money-losing corners.)
+    # scenario-B grid and would clip this baseline's ranges (e.g.
+    # opt_PI_TRY_informed's EtOH MPSP 0.4607, IBO MPSP 1.1123, IRR 0.2792).
+    # Every metric's levels/ticks except IRR's are derived from its own
+    # finite grid data below; IRR keeps a hard 0-30% scale plus the
+    # under-color / -inf handling for money-losing corners.)
     for curr_metric, val in metrics.items():
         extend_cmap = 'max'
         cmap_under_color = None
@@ -795,12 +812,14 @@ if plot:
         if 'irr' in lccm:
             # IRR is shown as a PERCENTAGE (x100) on a HARD 0-30% colour scale
             #  (raised from 0-25% for the 2026-09-20 opt_IRR relocation, whose
-            #  baseline IRR ~27.3% -- the campaign's highest-IRR point and so
-            #  effectively this grid's max -- exceeded the old 25% top):
+            #  baseline IRR ~27.3% exceeded the old 25% top). These bounds
+            #  were set for the OLD opt_IRR point and may need revisiting
+            #  after a re-run on opt_PI_TRY_informed (baseline IRR 0.2792,
+            #  i.e. ~27.9%; the new grid's max is not yet known):
             #  - gray UNDER-colour for money-losing cells (< 0%, incl. the
             #    -inf unsolvable corners), extend_cmap='min';
-            #  - NO over-colour: the grid max (~27%) is below 30%, so nothing
-            #    extends past the top of the bar;
+            #  - NO over-colour: the old opt_IRR grid max (~27%) was below
+            #    30%, so nothing extended past the top of the bar;
             #  - break-even (0%) drawn as a WHITE labeled contour line via
             #    comparison_lines; black labeled lines mark 5/10/15/20/25%;
             #  - every contour label carries the % symbol.

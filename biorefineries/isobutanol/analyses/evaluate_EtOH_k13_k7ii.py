@@ -6,6 +6,26 @@
 # This module is under the UIUC open-source license. See 
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
+"""
+2-D kinetic sweep: the Ehrlich-entry rate ``k_13`` (x-axis, absolute
+[0, 6.0] g/L/h) vs ``k_7ii`` (y-axis, absolute [0.0001, 0.12] g/L/h) on the
+``opt_PI_TRY_informed`` baseline (``scenarios.load_scenario`` defaults, so
+the enzyme burden follows the scenario's ``burden_default`` = True; no
+feeding-strategy optimization).
+
+Baseline: ``opt_PI_TRY_informed`` (since 2026-10-08; it succeeds the removed
+``opt_IRR`` scenario) is trial #1912 of the 2026-09-24 TRY-informed PI
+(log-tail) relay campaign
+``kin_opt_ethanol_isobutanol_metabolic_split_12d_pi_log-tail_gp_rb0.001-4_ib0.75-1.5_aA_rl15c111dc_burden``:
+co-production IBO 39.6 + EtOH 40.6 g/L, tau 40.84 h, live-model IRR 0.2792,
+ethanol / isobutanol MPSP 0.4607 / 1.1123 $/kg, feeding 1-spike cap / 189.19
+/ 194.19 (1 actual spike), baseline k_13 = 4.0.
+
+STALE RESULTS: result CSVs / figures of this sweep produced before 2026-10-08
+are of the OLD ``opt_IRR`` point (split_12d trial 1602: IBO 41.7 + EtOH 29.2
+g/L, tau 28.35 h, IRR ~0.273, 50-spike cap / 170.91 / 175.91). Re-run this
+script to regenerate them for the ``opt_PI_TRY_informed`` baseline.
+"""
 
 import numpy as np
 from biorefineries import isobutanol
@@ -79,17 +99,17 @@ isobutanol_results_filepath = isobutanol_filepath + '\\analyses\\results\\'
 
 
 #%% Load scenario (kinetics workbook + baseline feeding strategy)
-# This sweep defaults to the opt_IRR scenario in full: its kinetics workbook
-# sets the baseline for every kinetic parameter NOT swept here (k_13, k_7ii),
-# and its feeding strategy is applied too. scenarios.load_scenario is the
-# single source of truth (scenarios.SCENARIOS['opt_IRR']) -- it loads the
-# workbook, sets the kinetics via metrics_at_baseline(), sets
-# fbs_spec.max_n_spikes, and runs one baseline model_specification with the
-# scenario's threshold/target. Change the `scenario` string below to re-point
-# BOTH kinetics and feeding.
+# This sweep defaults to the opt_PI_TRY_informed scenario in full (the
+# successor of the removed opt_IRR): its kinetics workbook sets the baseline
+# for every kinetic parameter NOT swept here (k_13, k_7ii), and its feeding
+# strategy is applied too. scenarios.load_scenario is the single source of
+# truth (scenarios.SCENARIOS['opt_PI_TRY_informed']) -- it loads the workbook,
+# sets the kinetics via metrics_at_baseline(), sets fbs_spec.max_n_spikes, and
+# runs one baseline model_specification with the scenario's threshold/target.
+# Change the `scenario` string below to re-point BOTH kinetics and feeding.
 from biorefineries.isobutanol import scenarios
 
-scenario = 'opt_IRR'
+scenario = 'opt_PI_TRY_informed'
 _scenario_bundle = scenarios.load_scenario(scenario)
 
 # Capture the scenario baseline's (k_13, k_7ii) -- the swept axes -- right here,
@@ -110,13 +130,13 @@ V406 = f.V406
 # when the broth carries no isobutanol.
 
 # The scenario's kinetics workbook AND feeding strategy were both applied by
-# scenarios.load_scenario(scenario) above (opt_IRR -> workbook +
-# max_n_spikes=18, threshold_conc=286.767..., target_conc=300.0), which also
+# scenarios.load_scenario(scenario) above (opt_PI_TRY_informed -> workbook +
+# max_n_spikes=1, threshold_conc=189.19..., target_conc=194.19...), which also
 # ran one baseline model_specification. No manual per-scenario feeding block is
 # needed here anymore -- edit the `scenario` string above to switch scenarios.
-# `file_to_save` picks up max_n=18 (from fbs_spec.max_n_spikes), keeping this
-# run's outputs distinct from the earlier scenario-A (max_n=16) / scenario-B
-# (max_n=0) runs.
+# `file_to_save` picks up max_n from fbs_spec.max_n_spikes (1 here), keeping
+# this run's outputs distinct from those of scenario A (max_n=16), scenario B
+# (max_n=0) and the old opt_IRR point (50-spike cap, max_n=50).
     
 # !!!
 # fbs_spec.max_n_spikes = 0
@@ -555,10 +575,12 @@ if plot:
     #%% MPSP
     
     # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-    # opt_IRR: ethanol is a trace co-product across this k_13 x k_7ii grid
-    # (EtOH titer median ~0.1 g/L), so its purity-adjusted MPSP is astronomically
-    # high (median ~365, max ~8552 $/kg) almost everywhere; focus the color scale
-    # on the EtOH-producing low corner (min ~0.55) and let the rest over-color.
+    # These bounds were set for an OLD (pre-2026-09-20) opt_IRR grid, where
+    # ethanol was a trace co-product (EtOH titer median ~0.1 g/L; purity-
+    # adjusted MPSP median ~365, max ~8552 $/kg) almost everywhere: the color
+    # scale focuses on the EtOH-producing low corner (min ~0.55) and lets the
+    # rest over-color. They may need revisiting after a re-run on
+    # opt_PI_TRY_informed (baseline EtOH MPSP 0.4607 $/kg, below this 0.5 floor).
     MPSP_w_levels = np.arange(0.5, 3.0001, 0.05)
     MPSP_cbar_ticks = np.arange(0.5, 3.0001, 0.5)
     MPSP_w_ticks = [0.75, 1.0, 1.5, 2.0, 2.5]
@@ -818,12 +840,14 @@ if plot:
         
         if 'mpsp' in lccm:
             # STALE BOUNDS (from the OLD opt_IRR 20x20 k_13 x k_7ii grid, IBO
-            # MPSP 1.41-2.92, EtOH 0.55-8552): the 2026-09-20 relocation moved
-            # opt_IRR's baseline (IBO MPSP ~1.16, EtOH ~0.36 $/kg), so the floors
-            # were lowered (IBO 1.4 -> 1.0, EtOH 0.5 -> 0.3) to keep the new
-            # baseline from clipping below the scale. Re-derive these spans from
-            # the regenerated grid data (as evaluate_EtOH_k13_inhib_isobutanol.py
-            # does) before quoting them.
+            # MPSP 1.41-2.92, EtOH 0.55-8552): the 2026-09-20 opt_IRR
+            # relocation (baseline IBO MPSP ~1.16, EtOH ~0.36 $/kg) lowered the
+            # floors (IBO 1.4 -> 1.0, EtOH 0.5 -> 0.3) to keep that baseline
+            # from clipping below the scale. They were set for the old opt_IRR
+            # point and may need revisiting after a re-run on
+            # opt_PI_TRY_informed (baseline IBO MPSP 1.1123, EtOH 0.4607 $/kg).
+            # Re-derive these spans from the regenerated grid data (as
+            # evaluate_EtOH_k13_inhib_isobutanol.py does) before quoting them.
             if 'ibo' in lccm:
                 curr_metric_w_levels = np.arange(1.0, 3.0001, 0.02)
                 curr_metric_cbar_ticks = np.arange(1.0, 3.0001, 0.2)
@@ -834,11 +858,13 @@ if plot:
                 curr_metric_w_ticks = [0.5, 1.0, 1.5, 2.0, 2.5]
             cbar_n_minor_ticks = 4
         elif 'irr' in lccm:
-            # opt_IRR grid: plot IRR as a PERCENTAGE (e.g. 20%, not 0.20) --
-            # scale the fractional data + all levels/ticks by 100, label the
-            # colorbar in % and give the contour labels a % sign. Color bar
-            # 0-30% (raised from 0-25% for the 2026-09-20 relocation, baseline
-            # IRR ~27.3%, which exceeded the old 25% top). Everything below 0%
+            # Plot IRR as a PERCENTAGE (e.g. 20%, not 0.20) -- scale the
+            # fractional data + all levels/ticks by 100, label the colorbar in
+            # % and give the contour labels a % sign. Color bar 0-30% (raised
+            # from 0-25% for the 2026-09-20 opt_IRR relocation, baseline IRR
+            # ~27.3%, which exceeded the old 25% top); set for the old opt_IRR
+            # point, it may need revisiting after a re-run on
+            # opt_PI_TRY_informed (baseline IRR 0.2792). Everything below 0%
             # (money-losing finite IRRs AND the unsolvable -inf cells) collapses
             # into the gray under-color; capped at 30% (no over-color).
             w_scale = 100.0
