@@ -86,8 +86,12 @@ def create_model():
 
     # Mass flow rate of the (denatured) ethanol product stream
     get_yield = lambda: product_stream.F_mass*get_annual_factor()/1e6
-    # Purity (%) of ethanol in the final product
-    get_purity = lambda: product_stream.imass['Ethanol']/product_stream.F_mass
+    # Purity (%) of ethanol in the final product; NaN for an empty product
+    # stream (an all-isobutanol strain, e.g. opt_IBO_yield, can leave it
+    # exactly empty, and 0/0 raises under flexsolve's np.seterr).
+    def get_purity():
+        F_mass = product_stream.F_mass
+        return product_stream.imass['Ethanol']/F_mass if F_mass else np.nan
     # Adjust for purity
     get_adjusted_yield = lambda: get_yield() * get_purity()
     # Recovery (%) = recovered/amount leaving the fermentor (broth + vent).
