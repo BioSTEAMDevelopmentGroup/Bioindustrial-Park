@@ -93,7 +93,15 @@ fermentation:
   # mass yield below.
   substrates:
     Glucose:
-      hp_conversion: 0.49
+      # hp_conversion updated 2026-10-03 from the generic HP-pathway default
+      # (0.49) to a value informed by Tan et al. 2026 (Nat. Commun. 17:899,
+      # "High yield production of 3-hydroxypropionic acid using
+      # Issatchenkia orientalis", DOI 10.1038/s41467-025-67621-8) -- see
+      # glucose_conversion source below. biomass_conversion/
+      # biomass_yield_kg_per_kg_consumed are NOT from that paper (it
+      # doesn't separately report a cell-mass yield for this strain) and
+      # are left at their prior placeholder values.
+      hp_conversion: 0.665
       hp_yield_kg_per_kg_consumed: 1.0
       biomass_conversion: 0.05
       biomass_yield_kg_per_kg_consumed: 0.8270910524818841
@@ -130,7 +138,41 @@ fermentation:
   sources:
     conversions_and_titer:
       key: user_specified
-      note: "Assumptions; biorefineries.HP itself uses 0.49 for its own Glucose/Xylose -> HP conversions and 0.76 g/L/hr as its default BatchCoFermentation.productivity, confirming these are shared literature/flowsheet values, not novel to this feedstock."
+      note: "Mannitol/AlginateMonomer hp_conversion (0.40) and productivity_g_per_L_per_h (0.76) are still the generic HP-pathway defaults biorefineries.HP itself uses for its own Glucose/Xylose -> HP conversions, not derived from literature for Sargassum-derived substrates or this organism specifically -- see glucose_conversion below for the one substrate that HAS been updated."
+    glucose_conversion:
+      key: Tan_2026_Issatchenkia_orientalis
+      note: >
+        Glucose hp_conversion updated 2026-10-03 to 0.665, derived from Tan
+        et al. 2026 (Nat. Commun. 17:899, "High yield production of
+        3-hydroxypropionic acid using Issatchenkia orientalis", DOI
+        10.1038/s41467-025-67621-8), who report a fed-batch strain
+        (engineered I. orientalis, beta-alanine pathway) achieving 92 g/L
+        titer, 0.70 g 3HP/g glucose CONSUMED, and 0.55 g/L/h productivity on
+        dextrose/corn-steep-liquor medium (DASbox fed-batch, pH 4, DO 5%).
+        0.70 g/g is ~71% of the pathway's own GSM-computed theoretical max
+        (0.986 g 3HP/g glucose) -- sabre's existing
+        hp_yield_kg_per_kg_consumed=1.0 already approximates that
+        theoretical ceiling via exact mass-balance stoichiometry, so it was
+        left unchanged. What actually needed correcting was hp_conversion:
+        it previously left ~47% of available Glucose completely
+        unconverted (0.49 conversion + 0.05 to biomass), unlike the paper's
+        fed-batch process, which is pulse-fed to near-complete glucose
+        consumption each cycle. 0.665 = 0.70 (yield on consumed) x 0.95
+        (assumed near-complete consumption fraction, informed by the
+        paper's own pulse-feed-to-near-zero-residual-glucose protocol, not
+        separately reported as a single number in the paper). Verified by
+        simulation to raise Ca3HP2 output ~18% and lower the baseline MSP
+        ~14% (the higher consumption fraction outweighs the lower
+        per-consumed yield). Caveats: (1) measured on dextrose/CSL medium,
+        not on Sargassum-derived sugars, so transferability to this
+        feedstock's actual hydrolysate (mixed Glucose/Mannitol/
+        AlginateMonomer, residual ash/salts) is unverified; (2) the 95%
+        consumption fraction is this model's own assumption, not read
+        directly off the paper; (3) titer (92 g/L) and productivity
+        (0.55 g/L/h) from the same paper were NOT incorporated here --
+        titer is not a sabre fermentation input (it's an evaporator-target
+        output) and productivity's effect on MSP was separately verified
+        to be small (<1%).
     biomass_yield:
       key: analogous_to_HP
       note: "Analogous to HP's 'Glucose -> 6 FermMicrobe + 2.4 H2O' (X=0.05). Coefficient here (6 mol CellMass per mol substrate) is scaled to sabre's own CellMass MW (24.8342 g/mol); no independent literature source for Sargassum-derived substrates specifically."
