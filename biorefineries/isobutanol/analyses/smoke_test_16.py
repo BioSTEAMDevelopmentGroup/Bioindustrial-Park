@@ -7,11 +7,9 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 """
-Smoke test 10 -- scenario opt_PI_TRY_informed (trial #1912 of the
-2026-09-24 TRY-informed PI (log-tail) relay campaign (`_rl15c111dc`,
-preloaded with rows of the six process-level `_rs350` campaigns) -- a
-co-production optimum (IBO 39.6 + EtOH 40.6 g/L, 1 spike)) with ONLY the
-IBO/EtOH separation train:
+Smoke test 16 -- scenario opt_EtOH_productivity (trial #365 of the
+2026-09-23 seed-350 EtOH-productivity GP campaign (`_rs350`; 6.90
+g/L/h)) with ONLY the IBO/EtOH separation train:
 ``isobutanol.load(separation_processes=('IBO_EtOH',))``.
 
 Reproduces that trial: the workbook's Baseline column carries the
@@ -27,15 +25,15 @@ exactly.
 
 Loads once (at import) and simulates n_sims (default 3) times, verifying
 after EACH simulation: MPSPs pinned (1%) + stable vs the first sim
-(5e-3), the V406 spike-feed residual, and the campaign objective (PI)
-reproduced within the registry tolerance. Exit 0 = pass. Must run in a
-FRESH kernel.
+(5e-3), the V406 spike-feed residual, and the campaign objective (EtOH
+productivity) reproduced within the registry tolerance. Exit 0 = pass.
+Must run in a FRESH kernel.
 """
 from biorefineries import isobutanol
 isobutanol.load(separation_processes=('IBO_EtOH',))
 from biorefineries.isobutanol import scenarios
 
-SCENARIO = 'opt_PI_TRY_informed'
+SCENARIO = 'opt_EtOH_productivity'
 
 
 def load_simulate_baseline(stream_IDs=('ethanol', 'isobutanol'),

@@ -6,11 +6,12 @@
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
-"""Offline pure-logic test of build_opt_IRR_split12d_workbook (no load, no
+"""Offline pure-logic test of build_opt_split12d_workbooks (no load, no
 simulation). Loads the generator by file path -- its biorefineries imports
-live inside main(), so the import is build-free -- and checks the merge,
-the workbook writer (on a synthetic template in a temp dir), the
-reload-verify comparison and the ScenarioSpec block formatter.
+live inside main(), so the import is build-free -- and checks the
+OPT_SCENARIOS table, the merge, the metric-warning split, the workbook
+writer (on a synthetic template in a temp dir), the reload-verify
+comparison and the ScenarioSpec block formatter.
 Exit 0 + ALL CHECKS PASSED = clean."""
 import os
 import sys
@@ -30,9 +31,9 @@ def _load(name, path):
     return mod
 
 
-gen = _load('build_opt_IRR_split12d_workbook',
+gen = _load('build_opt_split12d_workbooks',
             os.path.join(PKG_DIR, 'analyses',
-                         'build_opt_IRR_split12d_workbook.py'))
+                         'build_opt_split12d_workbooks.py'))
 checks = []
 
 
@@ -53,10 +54,39 @@ def raises(exc_type, func, *args, **kwargs):
 check('importing the generator does not import biorefineries',
       not any(m == 'biorefineries' or m.startswith('biorefineries.')
               for m in sys.modules))
-check('settings default to the opt_IRR / trial-1602 relocation',
-      (gen.SCENARIO_NAME, gen.OBJECTIVE_NAME, gen.ANCHOR_SCENARIO,
-       gen.TRIAL_NUMBER) == ('opt_IRR', 'IRR', 'A', 1602)
-      and 'metabolic_split_12d' in gen.STUDY_NAME)
+OPT_NAMES = ('opt_PI_uninformed', 'opt_PI_TRY_informed', 'opt_IBO_titer',
+             'opt_IBO_yield', 'opt_IBO_productivity', 'opt_EtOH_titer',
+             'opt_EtOH_yield', 'opt_EtOH_productivity')
+check('OPT_SCENARIOS lists exactly the eight opt_* scenarios',
+      set(gen.OPT_SCENARIOS) == set(OPT_NAMES))
+check('every OPT_SCENARIOS campaign is a 12d A-anchored burden campaign',
+      all('ethanol_isobutanol_metabolic_split_12d' in study
+          and '_aA_' in study and study.endswith('_burden')
+          and isinstance(trial, int)
+          for _o, study, trial in gen.OPT_SCENARIOS.values()))
+check('the two PI scenarios pin PI; seven _rs350 campaigns + the relay',
+      gen.OPT_SCENARIOS['opt_PI_uninformed'][0] == 'PI'
+      and gen.OPT_SCENARIOS['opt_PI_TRY_informed'][0] == 'PI'
+      and sum('_rs350_' in study
+              for _o, study, _t in gen.OPT_SCENARIOS.values()) == 7
+      and '_rl15c111dc_' in gen.OPT_SCENARIOS['opt_PI_TRY_informed'][1])
+check('each non-PI scenario pins its own campaign objective (slug in name)',
+      all(objective.lower().replace(' ', '_') in study
+          for name, (objective, study, _t) in gen.OPT_SCENARIOS.items()
+          if not name.startswith('opt_PI')))
+check('anchor is scenario A', gen.ANCHOR_SCENARIO == 'A')
+check('workbook_filename follows the registry naming',
+      gen.workbook_filename('opt_IBO_titer')
+      == 'parameter-distributions_corn_IBO_EtOH_opt_IBO_titer.xlsx')
+
+# --- split_metric_warnings --------------------------------------------------
+levels = {'IBO titer': 'kinetic', 'IRR': 'system', 'PI': 'system'}
+blocking, tolerated = gen.split_metric_warnings(
+    ['IBO titer', 'IRR', 'tau', 'PI'], levels)
+check('fermentation-level warnings block (incl. tracked-only tau)',
+      blocking == ['IBO titer', 'tau'])
+check('system-level (TEA) warnings are tolerated',
+      tolerated == ['IRR', 'PI'])
 
 # --- merge_applied ----------------------------------------------------------
 a_snapshot = {'k_3': 5.81, 'k_7': 1.203, 'k_17': 0.1077, 'K_17': 0.0086}
@@ -147,26 +177,48 @@ check('reload deltas returned per key, all within tol',
 far = dict(close, isobutanol=1.25)
 check('a delta beyond tol raises RuntimeError',
       raises(RuntimeError, gen.assert_reload_matches, reproduced, far, 1e-3))
-check('a non-finite value raises RuntimeError',
+check('a finite-vs-NaN pair raises RuntimeError',
       raises(RuntimeError, gen.assert_reload_matches, reproduced,
              dict(close, ethanol=math.nan), 1e-3))
+check('a key absent from the reload raises RuntimeError',
+      raises(RuntimeError, gen.assert_reload_matches, reproduced,
+             {'ethanol': 0.5, 'isobutanol': 1.2}, 1e-3))
+nonfinite = gen.assert_reload_matches(
+    dict(isobutanol=math.nan, IRR=-math.inf),
+    dict(isobutanol=math.nan, IRR=-math.inf), 1e-3)
+check('NaN/NaN and same-infinity pairs match (delta NaN)',
+      all(math.isnan(d) for d in nonfinite.values()))
+check('opposite infinities raise RuntimeError',
+      raises(RuntimeError, gen.assert_reload_matches, dict(IRR=-math.inf),
+             dict(IRR=math.inf), 1e-3))
+
+# --- comparable_values ------------------------------------------------------
+values = gen.comparable_values(
+    {'ethanol': 0.46, 'isobutanol': math.nan},
+    {'IBO titer': 39.6, 'PI': 0.86, 'spike_feed_residual': 1e-5,
+     'n_sims_run': 3, 'final_drift': 4e-5})
+check('comparable_values: MPSPs + metrics, convergence diagnostics dropped',
+      set(values) == {'ethanol', 'isobutanol', 'IBO titer', 'PI'}
+      and all(type(v) is float for v in values.values()))
 
 # --- format_scenario_spec ---------------------------------------------------
 block = gen.format_scenario_spec(
-    'opt_IRR', 'parameter-distributions_corn_IBO_EtOH_opt_IRR.xlsx',
-    dict(threshold=170.90680171931479, target=175.90680171931479,
-         spike=600.0, max_n_spikes=50),
-    dict(ethanol=0.5, isobutanol=1.2), 'IRR', 0.2729)
+    'opt_PI_TRY_informed',
+    'parameter-distributions_corn_IBO_EtOH_opt_PI_TRY_informed.xlsx',
+    dict(threshold=189.19244688495075, target=194.19244688495075,
+         spike=600.0, max_n_spikes=1),
+    dict(ethanol=0.5, isobutanol=1.2), 'PI', 0.8559)
 registry = eval('{' + block + '}', {'ScenarioSpec': dict})
-entry = registry['opt_IRR']
+entry = registry['opt_PI_TRY_informed']
 check('ScenarioSpec block evaluates to the expected entry',
       entry == dict(
-          name='opt_IRR',
-          workbook='parameter-distributions_corn_IBO_EtOH_opt_IRR.xlsx',
-          max_n_spikes=50, threshold_conc=170.90680171931479,
-          target_conc=175.90680171931479,
+          name='opt_PI_TRY_informed',
+          workbook=('parameter-distributions_corn_IBO_EtOH_'
+                    'opt_PI_TRY_informed.xlsx'),
+          max_n_spikes=1, threshold_conc=189.19244688495075,
+          target_conc=194.19244688495075,
           expected={'ethanol': 0.5, 'isobutanol': 1.2},
-          objective_name='IRR', objective_value=0.2729))
+          objective_name='PI', objective_value=0.8559))
 check('block never sets spike_conc / stage_1_max_x (they stay None)',
       'spike_conc' not in block and 'stage_1_max_x' not in block)
 
