@@ -208,6 +208,7 @@ def create_sucrose_fermentation_system(ins, outs,
         **fermentation_kwargs,
     )
     R301.register_alias('bioreactor')
+    R301.register_alias('juice_bioreactor')
     if fed_batch: R301.ins.append(MT1.outs[0])
     T301 = bst.StorageTank('T301', R301-1, tau=4, vessel_material='Carbon steel')
     T301.line = 'Beer tank'
