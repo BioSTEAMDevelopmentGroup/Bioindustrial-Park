@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@amcharts/amcharts5": "^5.10.0",
-    "puppeteer": "^23.0.0"
+    "puppeteer": "^25.16.0"
   },
   "devDependencies": {
     "esbuild": "^0.24.0"
