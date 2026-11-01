@@ -15,6 +15,7 @@ from .. import units
 
 __all__ = (
     'create_sucrose_fermentation_system',
+    'create_cane_to_combined_1_and_2g_fermentation',
 )
   
 @SystemFactory(
@@ -280,7 +281,7 @@ def create_sucrose_fermentation_system(ins, outs,
 @SystemFactory(
     ID='cane_to_fermentation_sys',
     ins=[s.cane],
-    outs=[s.beer, s.lignin, s.condensate, s.pretreatment_wastewater,
+    outs=[s.vent, s.beer, s.lignin, s.condensate, s.pretreatment_wastewater,
           s.fiber_fines, s.bagasse_to_boiler],
 )
 def create_cane_to_combined_1_and_2g_fermentation(
@@ -295,6 +296,8 @@ def create_cane_to_combined_1_and_2g_fermentation(
         juicing_area=None,
         pretreatment_area=None,
         fermentation_area=None,
+        bagasse_splitter=None,
+        prepend_vent=None,
     ):
     """
     Create a system that produces crude oil and a fermentation-derived product 
@@ -302,7 +305,7 @@ def create_cane_to_combined_1_and_2g_fermentation(
     
     """
     oilcane, = ins
-    beer, lignin, condensate, pretreatment_wastewater, fiber_fines, bagasse_to_boiler = outs
+    vent, beer, lignin, condensate, pretreatment_wastewater, fiber_fines, bagasse_to_boiler = outs
     if fed_batch is None: fed_batch = False
     if SeedTrain is None: SeedTrain = units.SeedTrain
     if CoFermentation is None: CoFermentation = units.CoFermentation
@@ -316,11 +319,13 @@ def create_cane_to_combined_1_and_2g_fermentation(
         feedstock_handling_area=feedstock_handling_area,
         juicing_area=juicing_area,
         pretreatment_area=pretreatment_area,
+        bagasse_splitter=bagasse_splitter,
     )
-    juice, pretreated_biomass, pretreatment_wastewater, fiber_fines, bagasse_to_boiler = pretreatment_sys.outs
+    if bagasse_to_boiler not in pretreatment_sys.outs: outs.remove(bagasse_to_boiler)
+    juice, pretreated_biomass, *_ = pretreatment_sys.outs
     cellulosic_fermentation_sys, cfdct = create_cellulosic_fermentation_system(
         ins=(pretreated_biomass,),
-        outs=['vent', beer, lignin],
+        outs=[vent, beer, lignin],
         mockup=True,
         area=fermentation_area,
         udct=True,
@@ -339,7 +344,8 @@ def create_cane_to_combined_1_and_2g_fermentation(
     if add_urea: add_urea_nutrient(cofermentation, seedtrain)
     pressurefilter = cfdct['S303'] # Pressure filter
     pressurefilter.tag = "bagasse oil extraction"
-    pressurefilter.isplit['Lipid'] = 1. - 0.7
+    if 'Lipid' in pressurefilter.chemicals:
+        pressurefilter.isplit['Lipid'] = 1. - 0.7
     hydrolysate = pressurefilter.outs[1]
     hydrolysate_sink = hydrolysate.sink
     hydrolysate_sink.ins[0] = None

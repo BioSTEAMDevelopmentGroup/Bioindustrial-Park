@@ -273,6 +273,8 @@ def create_cellulosic_fermentation_system(
         )
     else:
         raise ValueError("invalid 'kind'")
+    
+    if vent.source is None: outs.remove(vent)
 
 
 @bst.SystemFactory(

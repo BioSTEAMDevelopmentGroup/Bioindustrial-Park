@@ -26,14 +26,30 @@ class SeedTrain(SeedTrain):
     
     def _init(self, reactions=None, saccharification=False):
         self.saccharification = saccharification
-        chemicals = self.chemicals
-        self.reactions = reactions or PRxn([
-    #   Reaction definition                   Reactant    Conversion
-    Rxn('Glucose -> 2 Ethanol + 2 CO2',       'Glucose',   0.9000, chemicals),
-    Rxn('3 Xylose -> 5 Ethanol + 5 CO2',      'Xylose',    0.8000, chemicals),
-    Rxn('Glucose -> Cellmass',                'Glucose',  0.0473, chemicals, correct_mass_balance=True),
-    Rxn('Xylose -> Cellmass',                 'Xylose',  0.0421, chemicals, correct_mass_balance=True),
-        ])
+        if reactions is None:
+            chemicals = self.chemicals
+            IDs = set(chemicals.IDs)
+            if 'Cellmass' in IDs:
+                Cellmass = 'Cellmass'
+            elif 'Yeast' in IDs:
+                Cellmass = 'Yeast'
+            elif 'Bacteria' in IDs:
+                Cellmass = 'Bacteria'
+            else:
+                Cellmass = None
+            reactions = [
+                #   Reaction definition              Reactant    Conversion
+                Rxn('Glucose -> 2 Ethanol + 2 CO2',  'Glucose',   0.9000, chemicals),
+                Rxn('3 Xylose -> 5 Ethanol + 5 CO2', 'Xylose',    0.8000, chemicals),
+            ]
+            if Cellmass is not None:
+                reactions.extend([
+                    #   Reaction definition    Reactant    Conversion
+                    Rxn(f'Glucose -> {Cellmass}', 'Glucose',  0.0473, chemicals, correct_mass_balance=True),
+                    Rxn(f'Xylose -> {Cellmass}',  'Xylose',  0.0421, chemicals, correct_mass_balance=True),
+                ])
+            reactions = PRxn(reactions)
+        self.reactions = reactions
         
     def _setup(self):
         super()._setup()
@@ -57,13 +73,31 @@ class CoFermentation(CoFermentation):
         self.P = P
         chemicals = self.chemicals
         self.loss = None
-        self.cofermentation = cofermentation or PRxn([
-    #   Reaction definition                   Reactant    Conversion
-    Rxn('Glucose -> 2 Ethanol + 2 CO2',       'Glucose',   0.9500, chemicals),
-    Rxn('3 Xylose -> 5 Ethanol + 5 CO2',      'Xylose',    0.8500, chemicals),
-    Rxn('Glucose -> Cellmass',                'Glucose',  0.05, chemicals, correct_mass_balance=True),
-    Rxn('Xylose -> Cellmass',                 'Xylose',  0.05, chemicals, correct_mass_balance=True),
-        ])
+        
+        if cofermentation is None:
+            chemicals = self.chemicals
+            IDs = set(chemicals.IDs)
+            if 'Cellmass' in IDs:
+                Cellmass = 'Cellmass'
+            elif 'Yeast' in IDs:
+                Cellmass = 'Yeast'
+            elif 'Bacteria' in IDs:
+                Cellmass = 'Bacteria'
+            else:
+                Cellmass = None
+            cofermentation = [
+                #   Reaction definition              Reactant    Conversion
+                Rxn('Glucose -> 2 Ethanol + 2 CO2',  'Glucose',   0.9500, chemicals),
+                Rxn('3 Xylose -> 5 Ethanol + 5 CO2', 'Xylose',    0.8500, chemicals),
+            ]
+            if Cellmass is not None:
+                cofermentation.extend([
+                    #   Reaction definition    Reactant    Conversion
+                    Rxn(f'Glucose -> {Cellmass}', 'Glucose',  0.05, chemicals, correct_mass_balance=True),
+                    Rxn(f'Xylose -> {Cellmass}',  'Xylose',  0.05, chemicals, correct_mass_balance=True),
+                ])
+            cofermentation = PRxn(cofermentation)
+        self.cofermentation = cofermentation
         
         if 'CSL' in chemicals:
             self.CSL_to_constituents = Rxn(

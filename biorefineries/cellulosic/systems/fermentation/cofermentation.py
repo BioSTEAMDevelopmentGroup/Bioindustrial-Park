@@ -25,7 +25,7 @@ def create_cofermentation_system(
         include_scrubber=None,
         seed_train_reactions=None,
         cofermentation_reactions=None,
-        add_nutrients=True,
+        add_nutrients=None,
     ):
     """
     Create co-fermentation system that includes a pressure filter to separate
@@ -34,8 +34,9 @@ def create_cofermentation_system(
     """
     slurry, DAP, CSL = ins
     vent, beer, lignin = outs
-    if not SeedTrain: SeedTrain = units.SeedTrain
-    if not CoFermentation: CoFermentation = units.CoFermentation
+    if SeedTrain is None: SeedTrain = units.SeedTrain
+    if CoFermentation is None: CoFermentation = units.CoFermentation
+    if add_nutrients is None: add_nutrients = True
     has_vent = CoFermentation._N_outs == 2
     if has_vent:
         if include_scrubber is None: include_scrubber = True
@@ -69,8 +70,9 @@ def create_cofermentation_system(
     
     S303 = bst.PressureFilter('S303', slurry, (lignin, ''))
     S304 = bst.Splitter('S304', S303-1, split=0.1)
+    S304.register_alias('seed_train_splitter')
     R302 = SeedTrain('R302', (S304-0, *nutrients_1), reactions=seed_train_reactions)
-    
+    R302.register_alias('seed_train')
     if add_nutrients:
         @R302.add_specification(run=True)
         def adjust_CSL_and_DAP_feed_to_seed_train():
@@ -93,26 +95,19 @@ def create_cofermentation_system(
             DAP_storage.ins[0].copy_like(DAP_storage.outs[0])
             CSL_storage.ins[0].copy_like(CSL_storage.outs[0])
         
-    T302 = units.BeerTank('T302', outs=beer)
-    
     if include_scrubber:
         stripping_water = Stream('stripping_water',
                                  Water=26836,
                                  units='kg/hr')
-        M401 = bst.Mixer('M401', (R303-1, None))
+        
         M304 = bst.Mixer('M304', (R302-0, R303-0))
         D401 = bst.VentScrubber('D401', (stripping_water, M304-0), (vent, ''),
-                                gas=('CO2', 'NH3', 'O2'))
-        D401-1-1-M401-0-T302
-    
-        stripping_water_over_vent = stripping_water.imol['Water'] / 21202.490455845436
-        @D401.add_specification(run=True)
-        def update_stripping_water():
-            stripping_water, vent = D401.ins
-            stripping_water.imol['Water'] = stripping_water_over_vent * vent.F_mass
-
+                                gas=('CO2', 'NH3', 'O2'), titer=5)
+        M401 = bst.Mixer('M401', (R303-1, D401-1))
+        beer_in = M401-0
     elif has_vent:
         M304 = bst.Mixer('M304', (R302-0, R303-0), vent)
-        R303-1-T302
+        beer_in = R303-1
     else:
-        R303-0-T302
+        beer_in = R303-0
+    units.BeerTank('T302', ins=beer_in, outs=beer)
