@@ -96,7 +96,7 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
         pretreatment_area=200,
         fermentation_area=300,
     )
-    beer, lignin, condensate, pretreatment_wastewater, fiber_fines, bagasse_to_boiler = oilcane_to_fermentation_sys.outs
+    vent, beer, lignin, condensate, pretreatment_wastewater, fiber_fines, bagasse_to_boiler = oilcane_to_fermentation_sys.outs
     hydrolysate_and_juice_mixer = bst.F.hydrolysate_and_juice_mixer
     post_fermentation_oil_separation_sys, pfls_dct = create_post_fermentation_oil_separation_system(
         ins=beer,
