@@ -1,0 +1,142 @@
+{
+  "GIS_data/States_with_transport.dbf": {
+    "source": "biorefineries/Location_SAF/GIS_data/States_with_transport.dbf",
+    "sha256": "01d4c0dd9847e2c5ba53ea6aeb4e3ffd1980deb41e02294aeaa8c438cd2f8648",
+    "bytes": 7201
+  },
+  "GIS_data/USA-rainfedStates.dbf": {
+    "source": "biorefineries/Location_SAF/GIS_data/USA-rainfedStates.dbf",
+    "sha256": "3a31c081c424d4cdb7dd75223fbb666d3b38af6cebf16af14ba959c4bb19ce8c",
+    "bytes": 4278
+  },
+  "GIS_data/Tortuosity_per_state.xlsx": {
+    "source": "biorefineries/Location_SAF/GIS_data/Tortuosity_per_state.xlsx",
+    "sha256": "8c4da86628993cab2293f6bc44efa0415d8b86298c4c2d4ccd63a65472530eb3",
+    "bytes": 11068
+  },
+  "GIS_data/US_map_for_boundary.shx": {
+    "source": "biorefineries/Location_SAF/GIS_data/US_map_for_boundary.shx",
+    "sha256": "6e5042ded8a1d617bf9e0c49655127657b16f56952375237f97af80499831a49",
+    "bytes": 492
+  },
+  "GIS_data/US_map_for_boundary.cpg": {
+    "source": "biorefineries/Location_SAF/GIS_data/US_map_for_boundary.cpg",
+    "sha256": "3ad3031f5503a4404af825262ee8232cc04d4ea6683d42c5dd0a2f2a27ac9824",
+    "bytes": 5
+  },
+  "GIS_data/US_map_for_boundary.shp": {
+    "source": "biorefineries/Location_SAF/GIS_data/US_map_for_boundary.shp",
+    "sha256": "770598a92065f5d2ded2f031c9cb3e088c2a54305fcf5726bf64ff31bdaf13ae",
+    "bytes": 13337968
+  },
+  "GIS_data/US_map_for_boundary.dbf": {
+    "source": "biorefineries/Location_SAF/GIS_data/US_map_for_boundary.dbf",
+    "sha256": "dcd5934430553bee04b2ad3492094db9f8f1d600b8fa555ae245bdeb5c560fb9",
+    "bytes": 6562
+  },
+  "GIS_data/USA-rainfedStates.shp": {
+    "source": "biorefineries/Location_SAF/GIS_data/USA-rainfedStates.shp",
+    "sha256": "860bdefc85c59feae025e0d39a0574677c197ef341c11f4548844bdc6879849b",
+    "bytes": 11303392
+  },
+  "GIS_data/USA-rainfedStates.cpg": {
+    "source": "biorefineries/Location_SAF/GIS_data/USA-rainfedStates.cpg",
+    "sha256": "3ad3031f5503a4404af825262ee8232cc04d4ea6683d42c5dd0a2f2a27ac9824",
+    "bytes": 5
+  },
+  "GIS_data/States_with_transport.shx": {
+    "source": "biorefineries/Location_SAF/GIS_data/States_with_transport.shx",
+    "sha256": "6e5042ded8a1d617bf9e0c49655127657b16f56952375237f97af80499831a49",
+    "bytes": 492
+  },
+  "GIS_data/USA-rainfedStates.shx": {
+    "source": "biorefineries/Location_SAF/GIS_data/USA-rainfedStates.shx",
+    "sha256": "42694d0e514118be94be3422ac17217872c8742dbf5bd6253511563e949d9a0d",
+    "bytes": 404
+  },
+  "GIS_data/States_with_transport.shp": {
+    "source": "biorefineries/Location_SAF/GIS_data/States_with_transport.shp",
+    "sha256": "770598a92065f5d2ded2f031c9cb3e088c2a54305fcf5726bf64ff31bdaf13ae",
+    "bytes": 13337968
+  },
+  "GIS_data/States_with_transport.cpg": {
+    "source": "biorefineries/Location_SAF/GIS_data/States_with_transport.cpg",
+    "sha256": "3ad3031f5503a4404af825262ee8232cc04d4ea6683d42c5dd0a2f2a27ac9824",
+    "bytes": 5
+  },
+  "GIS_data/US_map_for_boundary.prj": {
+    "source": "biorefineries/Location_SAF/GIS_data/US_map_for_boundary.prj",
+    "sha256": "9e687b0dc4caa595191d640cbed37c3198384137cbd100974687969c310ca802",
+    "bytes": 411
+  },
+  "GIS_data/switchgrass_data.csv": {
+    "source": "biorefineries/Location_SAF/GIS_data/switchgrass_data.csv",
+    "sha256": "2ead70b2145c12fe6f47999d24a5e6a3f62d6da06ca4cedf813f8fecd0d1577b",
+    "bytes": 8333242
+  },
+  "GIS_data/miscanthus_data.csv": {
+    "source": "biorefineries/Location_SAF/GIS_data/miscanthus_data.csv",
+    "sha256": "f9f2bcb4681079ed9c89c0a06b2c84783ab72689aaf28479f094fceb638168c0",
+    "bytes": 7717884
+  },
+  "GIS_data/USA-rainfedStates.prj": {
+    "source": "biorefineries/Location_SAF/GIS_data/USA-rainfedStates.prj",
+    "sha256": "9e687b0dc4caa595191d640cbed37c3198384137cbd100974687969c310ca802",
+    "bytes": 411
+  },
+  "GIS_data/States_with_transport.prj": {
+    "source": "biorefineries/Location_SAF/GIS_data/States_with_transport.prj",
+    "sha256": "9e687b0dc4caa595191d640cbed37c3198384137cbd100974687969c310ca802",
+    "bytes": 411
+  },
+  "data/coefficients/X_data_for_Ethanol_sat_Coef.npy": {
+    "source": "biorefineries/Location_multi-product/Notebooks/bc_coef/X_data_for_Ethanol_sat_Coef.npy",
+    "sha256": "3137c5d3a3a0fbe9166f5d5de324cc890b36ed2df4f4578d9d77518a43b39c35",
+    "bytes": 16000128
+  },
+  "data/coefficients/X_data_for_Succinic_Coef_2.npy": {
+    "source": "biorefineries/Location_multi-product/Biorefinery_simulations/Acrylic_acid/outputs/X_data_AA.npy",
+    "sha256": "3137c5d3a3a0fbe9166f5d5de324cc890b36ed2df4f4578d9d77518a43b39c35",
+    "bytes": 16000128
+  },
+  "data/coefficients/X_data_for_AA_Coef_2.npy": {
+    "source": "biorefineries/Location_multi-product/Notebooks/bc_coef/X_data_for_AA_Coef_2.npy",
+    "sha256": "3137c5d3a3a0fbe9166f5d5de324cc890b36ed2df4f4578d9d77518a43b39c35",
+    "bytes": 16000128
+  },
+  "data/coefficients/X_data_for_Potassium_Sorbate_Coef.npy": {
+    "source": "biorefineries/Location_multi-product/Biorefinery_simulations/Acrylic_acid/outputs/X_data_AA.npy",
+    "sha256": "3137c5d3a3a0fbe9166f5d5de324cc890b36ed2df4f4578d9d77518a43b39c35",
+    "bytes": 16000128
+  },
+  "data/coefficients/outputs_Potassium_Sorbate_Coef.npy": {
+    "source": "biorefineries/Location_multi-product/Notebooks/bc_coef/outputs_Potassium_Sorbate_Coef.npy",
+    "sha256": "f79bdd005df1618ff4249f6b9e786a3eaf8f68507f5ea66746057691f0565846",
+    "bytes": 16000128
+  },
+  "data/coefficients/outputs_AA_Coef_2.npy": {
+    "source": "biorefineries/Location_multi-product/Notebooks/bc_coef/outputs_AA_Coef_2.npy",
+    "sha256": "d3ebc33be7ed57ed3caa97e58dfcfbe28e0a2e4f4948f571fe2a374a5b66daf7",
+    "bytes": 16000128
+  },
+  "data/coefficients/outputs_Lactic_Acid_Coef_2.npy": {
+    "source": "biorefineries/Location_multi-product/Notebooks/bc_coef/outputs_Lactic_Acid_Coef_2.npy",
+    "sha256": "3619ba1852031c4311b69497f4f2b440584181de4a28cba476f765b100f2fea6",
+    "bytes": 16000128
+  },
+  "data/coefficients/outputs_Ethanol_sat_Coef.npy": {
+    "source": "biorefineries/Location_multi-product/Notebooks/bc_coef/outputs_Ethanol_sat_Coef.npy",
+    "sha256": "99d261352933324cbc8b142809977af85c7d41b67f7b8c3e3b78e636b00054ec",
+    "bytes": 16000128
+  },
+  "data/coefficients/outputs_Succinic_Coef_2.npy": {
+    "source": "biorefineries/Location_multi-product/Notebooks/bc_coef/outputs_Succinic_Coef_2.npy",
+    "sha256": "0625d65e306916778b9266f5bcde180ed7af8a16c59be3908b866577f302a28b",
+    "bytes": 16000128
+  },
+  "data/coefficients/X_data_for_Lactic_Acid_Coef_2.npy": {
+    "source": "biorefineries/Location_multi-product/Notebooks/bc_coef/X_data_for_Lactic_Acid_Coef_2.npy",
+    "sha256": "3137c5d3a3a0fbe9166f5d5de324cc890b36ed2df4f4578d9d77518a43b39c35",
+    "bytes": 16000128
+  }
+}

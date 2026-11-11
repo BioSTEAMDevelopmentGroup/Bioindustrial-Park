@@ -1,0 +1,12 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
+outputs/
+coupled_mc_results_full.csv
+coupled_mc.png
+
+# Prepared from verified existing repository inputs.
+GIS_data/
+data/coefficients/

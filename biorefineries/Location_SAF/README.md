@@ -256,3 +256,9 @@ Results are stored in dataframes:
 
 ## Citation
 1. Bianco, M. F.; Guo, W.; Khanna, M.; Guest, J. S. Co-Location of Cellulosic Bioethanol and Alcohol-to-Jet (ATJ) Production Facilities for Targeted Scale-Up of Sustainable Aviation Fuel (SAF) Production. Environ. Sci. Technol. 2026, 60 (7), 5505–5517. DOI: 10.1021/acs.est.5c17460
+
+## Biomass storage study
+
+The separate [coupled biomass storage model](storage/README.md) combines harvest,
+storage, farm allocation, transportation, and refinery MSP calculations. See its
+README for setup, input preparation, and a runnable Monte Carlo example.

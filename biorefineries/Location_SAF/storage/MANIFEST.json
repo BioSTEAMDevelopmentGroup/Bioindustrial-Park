@@ -1,0 +1,66 @@
+{
+  ".gitignore": {
+    "bytes": 195,
+    "sha256": "ff8b7ca8203b6c3453444999afc2e0b44ca0851622d97dce242384cf5302d8c9"
+  },
+  "DATA.md": {
+    "bytes": 2446,
+    "sha256": "e1ed053ce94575666ab76c86d0d7abdccd2b3c14a28db79cb42eb6b8942c2ed4"
+  },
+  "INPUTS.json": {
+    "bytes": 6676,
+    "sha256": "e86385d42febf0da6a2eef1b17dbd0799ea09ea166b4b0208adeca912c014883"
+  },
+  "README.md": {
+    "bytes": 6215,
+    "sha256": "db4d4e405e77dabdea8285394a3862811dabb20f7935af87534cd9c65a29f68e"
+  },
+  "Truck_cost_per_state.csv": {
+    "bytes": 756,
+    "sha256": "3613b55311c8537c6f205a84ef496a48bc19e5eedd1e3b2c4c3d9e2f85503a13"
+  },
+  "VALIDATION.md": {
+    "bytes": 1016,
+    "sha256": "3476d5d997ef227c6e9513b55857d1832cc8e6f1b211dcd3424ae1f97882b245"
+  },
+  "bc_functions.py": {
+    "bytes": 5083,
+    "sha256": "f98f4d7f60e0da5709e7f6443133a35c2467969e68481fe9aace04ec578f8532"
+  },
+  "biomass_transport_model_02.py": {
+    "bytes": 34441,
+    "sha256": "5b00b618fc9090e5b433cb05bddd87ee0f6c9cef3f9e14c7ceb1b5fcf723ad60"
+  },
+  "coupled_model_mc_10.py": {
+    "bytes": 41108,
+    "sha256": "3dd3003bda9e81fd56b99b8edc9c6564d410c45a4746e1ed0340946f57033540"
+  },
+  "farm_allocation_model_07.py": {
+    "bytes": 25879,
+    "sha256": "d2fffba2b211d7df1451a4008239abf9f8fd32e88c566e648cf30a12df6c1286"
+  },
+  "prepare_inputs.py": {
+    "bytes": 1437,
+    "sha256": "7bb02a738b243cf30f9580d2aa078aea564b42e70d166371522876d6fd46b575"
+  },
+  "pub_style.py": {
+    "bytes": 9085,
+    "sha256": "d76d3f65b7a4f670d50f35e5aabb76a6d8fb19f6497488270b7fc31204bacfca"
+  },
+  "refinery_model.py": {
+    "bytes": 5355,
+    "sha256": "b5fe45f14f882158ed184a65ff57eea3505668c8bb2ed2a83c0b2f3686787ef6"
+  },
+  "requirements.txt": {
+    "bytes": 225,
+    "sha256": "3f3d3ca707998427b7f4b53a07aafc11ec1ef7c8ae29e00b6de2e545a51f2bb8"
+  },
+  "run_example.py": {
+    "bytes": 1185,
+    "sha256": "ccbd0432e4e615920ea33510bd95cc6a8b93c03e6daa9616e0f87bf0356ece33"
+  },
+  "storage_model_05.py": {
+    "bytes": 20948,
+    "sha256": "284306435a4ddb7845520bcb1c1ef6b8d04953fb209c9ef05e4ed6e5d2f8a9af"
+  }
+}

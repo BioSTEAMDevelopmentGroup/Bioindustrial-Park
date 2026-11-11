@@ -1,0 +1,11 @@
+# Versions from the author's Storage3 environment (Python 3.9.21).
+numpy==1.26.4
+pandas==2.2.3
+scipy==1.13.0
+scikit-learn==1.2.2
+geopandas==1.0.1
+shapely==2.0.7
+matplotlib==3.9.2
+openpyxl==3.1.5
+pyproj==3.6.1
+pyogrio==0.11.1
