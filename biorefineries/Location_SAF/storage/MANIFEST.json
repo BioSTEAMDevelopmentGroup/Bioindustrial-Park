@@ -19,10 +19,6 @@
     "bytes": 756,
     "sha256": "3613b55311c8537c6f205a84ef496a48bc19e5eedd1e3b2c4c3d9e2f85503a13"
   },
-  "VALIDATION.md": {
-    "bytes": 1016,
-    "sha256": "3476d5d997ef227c6e9513b55857d1832cc8e6f1b211dcd3424ae1f97882b245"
-  },
   "bc_functions.py": {
     "bytes": 5083,
     "sha256": "f98f4d7f60e0da5709e7f6443133a35c2467969e68481fe9aace04ec578f8532"
