@@ -156,6 +156,9 @@ def create_chemicals(set_thermo: bool = True, include_hp3: bool = False,
         # atmospheric pressure, fixed assuming water.
         Ca3HP2 = bst.Chemical("Ca3HP2", search_ID="Calcium lactate", phase="s")
         Ca3HP2.Hf = 2 * HP.Hf + CalciumDihydroxide.Hf - 2 * Water.Hf
+        # thermosteam skips combustion data for chemicals whose C/H/O/N/S
+        # mass fraction is under 95%.
+        Ca3HP2.reset_combustion_data(check_combustible=False)
         Ca3HP2.V.add_model(tmo.functional.rho_to_V(_rho_solids, Ca3HP2.MW), top_priority=True)
         Ca3HP2.copy_models_from(Water, ["mu"])
 
