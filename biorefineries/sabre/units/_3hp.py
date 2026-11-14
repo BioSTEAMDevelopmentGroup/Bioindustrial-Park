@@ -93,8 +93,7 @@ class HPFermentation(BatchBioreactor):
     P : float
         Operating pressure [Pa] (`BatchBioreactor`'s own attribute name).
     V : float
-        Target reactor volume [m3] (`BatchBioreactor`'s own attribute
-        name).
+        Reactor volume [m3], passed to `BatchBioreactor` as `V_max`.
     **kwargs
         Forwarded to `biosteam.units.BatchBioreactor.__init__`.
 
@@ -125,7 +124,9 @@ class HPFermentation(BatchBioreactor):
         V: float = _FERMENTATION["V_m3"],
         **kwargs,
     ):
-        kwargs.setdefault("V", V)
+        # biosteam's batch bioreactor takes its reactor volume as `V_max`
+        # (it has no `V` argument); `V` is kept as this unit's own name.
+        kwargs.setdefault("V_max", V)
         super().__init__(ID, ins, outs, T=T, P=P, tau=None, **kwargs)
 
         self.substrates = {k: dict(v) for k, v in substrates.items()}
