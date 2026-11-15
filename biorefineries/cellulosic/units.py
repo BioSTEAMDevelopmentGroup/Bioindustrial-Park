@@ -118,10 +118,10 @@ class PretreatmentReactorSystem(bst.units.design_tools.PressureVessel, Unit):
     _graphics = bst.Flash._graphics
     _units = {'Residence time': 'hr',
               'Reactor volume': 'm3'}
+    vessel_material = bst.update_design_input(default='Stainless steel 316')
+    vessel_type = bst.update_design_input(default='Horizontal')
     
     def _init(self, T=130+273.15, tau=0.166, V_wf=0.8, length_to_diameter=2, 
-                 vessel_material='Stainless steel 316', 
-                 vessel_type='Horizontal',
                  reactions=None,
                  run_vle=True):
         self._load_components()
@@ -174,8 +174,6 @@ class PretreatmentReactorSystem(bst.units.design_tools.PressureVessel, Unit):
         self.tau = tau
         self.V_wf = V_wf
         self.length_to_diameter = length_to_diameter
-        self.vessel_material = vessel_material
-        self.vessel_type = vessel_type
         self.run_vle = run_vle
         
     def _load_components(self):
@@ -396,20 +394,17 @@ class ContinuousPresaccharification(Unit):
 class Saccharification(bst.BatchBioreactor):
     _N_ins = 1
     _N_outs = 1
-        
-    #: Unload and clean up time (hr)
-    tau_0 = 4
-    
-    #: Working volume fraction (filled tank to total tank volume)
-    V_wf = 0.9
-    
+    tau = bst.update_design_input(default=72)
+    tau_0 = bst.update_design_input(default=4) # Unload and clean up time (hr)
+    V_wf = bst.update_design_input(default=0.9) # Filled tank to total tank volume
+    V_max = bst.update_design_input(default=3785.4118)
+    T = bst.update_design_input(default=48+273.15)
     _units = {'Flow rate': 'm3/hr',
               'Reactor volume': 'm3',
               'Reactor duty': 'kJ/hr'}
-    
-    def _init(self, tau=72, N=None, V_max=3785.4118, T=48+273.15, P=101325,
-                 Nmin=2, Nmax=36, reactions=None):
-        super()._init(tau, N, V_max, T, P, Nmin, Nmax)
+
+    def _init(self, Nmin=2, Nmax=36, reactions=None):
+        super()._init(Nmin, Nmax)
         chemicals = self.chemicals
         #: [ParallelReaction] Enzymatic hydrolysis reactions including from 
         #: downstream batch tank in co-fermentation.
@@ -444,14 +439,12 @@ class Saccharification(bst.BatchBioreactor):
 class CoFermentation(bst.BatchBioreactor):
     _N_ins = 1
     _ins_size_is_fixed = False
-        
-    #: Unload and clean up time (hr)
-    tau_0 = 4
-    
-    def _init(self, tau=36, N=None, V_max=3785.4118, T=305.15, P=101325,
-              Nmin=2, Nmax=36, cofermentation=None, loss=None):
-        super()._init(tau, N, V_max, T, P, Nmin, Nmax)
-        self.P = P
+    tau = bst.update_design_input(default=36)
+    tau_0 = bst.update_design_input(default=4) # Unload and clean up time (hr)
+    V_max = bst.update_design_input(default=3785.4118)
+
+    def _init(self, Nmin=2, Nmax=36, cofermentation=None, loss=None):
+        super()._init(Nmin, Nmax)
         chemicals = self.chemicals
         self.loss = loss or ParallelRxn([
     #   Reaction definition               Reactant    Conversion

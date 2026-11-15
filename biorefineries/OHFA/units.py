@@ -11,18 +11,16 @@ __all__ = (
 )
 
 class AeratedCoFermentation(bst.AeratedBioreactor): # For microbial oil production
-    V_max_default = 500
-    def _init(
-            self, cofermentation, theta_O2=0.5, 
-            dT_hx_loop=8,
-            Q_O2_consumption=-460240, # [kJ/kmol] equivalent to 110 kcal / mol as in https://www.academia.edu/19636928/Bioreactor_Design_for_Chemical_Engineers
-            batch=True,
-            **kwargs,
-        ):
-        bst.StirredTankReactor._init(self, batch=batch, dT_hx_loop=dT_hx_loop, **kwargs)
-        self.theta_O2 = theta_O2
+    V_max = bst.update_design_input(default=500)
+    dT_hx_loop = bst.update_design_input(default=8)
+    Q_O2_consumption = bst.update_design_input(
+        default=-460240, # [kJ/kmol] equivalent to 110 kcal / mol as in https://www.academia.edu/19636928/Bioreactor_Design_for_Chemical_Engineers
+    )
+    batch = bst.update_design_input(default=True)
+    
+    def _init(self, cofermentation, **kwargs):
+        bst.StirredTankReactor._init(self, **kwargs)
         self.cofermentation = cofermentation
-        self.Q_O2_consumption = Q_O2_consumption
         self.optimize_power = True
         self.kLa_coefficients = "Van't Riet"
     

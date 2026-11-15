@@ -20,15 +20,7 @@ _Gcal2kJ = 4184e3
 class BlendingTankWithSkimming(bst.MixTank):
     _N_ins = 2
     _N_outs = 2
-    
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, *,
-                 vessel_type=None, tau=None, V_wf=None, 
-                 vessel_material=None, kW_per_m3=1.):
-        bst.MixTank.__init__(
-            self, ID, ins, outs, thermo,
-            vessel_type=vessel_type, tau=tau, V_wf=V_wf, 
-            vessel_material=vessel_material, kW_per_m3=kW_per_m3
-        )
+    kW_per_m3 = bst.update_design_input(default=1.)
         
     def _run(self):
         feeds = self.ins

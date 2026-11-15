@@ -15,9 +15,9 @@ class GlycerolysisReactor(bst.CSTR):
     _ins_size_is_fixed = False
     _N_ins = 2
     _N_outs = 2
-    T_default = 273.15 + 230
-    P_default = 101325
-    tau_default = 2
+    T = bst.update_design_input(default=273.15 + 230)
+    P = bst.update_design_input(default=101325)
+    tau = bst.update_design_input(default=2)
     
     def _setup(self):
         super()._setup()

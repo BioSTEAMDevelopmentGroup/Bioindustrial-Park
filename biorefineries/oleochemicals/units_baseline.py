@@ -29,46 +29,16 @@ class DihydroxylationReactor(bst.CSTR):
     #Methyl stearate has no unsaturation, therefore doesn't participate in the reaction  [1]
     #Modelled as a CSTR because CSTRs allow for better handling of viscous diol mixtures [1],[2]
      
-   #: Default maximum change in temperature for the heat exchanger loop.
-    dT_hx_loop_default: Optional[float] = 5
-   #: Default fraction of working volume over total volume.
-    V_wf_default: Optional[float] = 0.8
-    #: Default maximum volume of a reactor in m3.
-    V_max_default: Optional[float] = 355
-    #: Default length to diameter ratio.
-    length_to_diameter_default: Optional[float] = 3
-    #: Default power consumption for agitation [kW/m3].
-    kW_per_m3_default: Optional[float] = 0.985
-    #: Default cleaning and unloading time (hr).
-    tau_0_default: Optional[float]  = 3    
     
 
     def _init(self, T,P,tau,X_dih,
-                dT_hx_loop: Optional[float]=None,
-               V_wf: Optional[float]=None, 
-               V_max: Optional[float]=None,
-               length_to_diameter: Optional[float]=None, 
-               kW_per_m3: Optional[float]=None,
-               vessel_material: Optional[str]=None,
-               vessel_type: Optional[str]=None,
-               batch: Optional[bool]=None,
-               tau_0: Optional[float]=None,
                adiabatic: Optional[bool]=None,
           ):
              if adiabatic is None: adiabatic = False
              self.T = T
              self.adiabatic = adiabatic
              self.P = P
-             self.dT_hx_loop = self.dT_hx_loop_default if dT_hx_loop is None else abs(dT_hx_loop)
              self.tau = tau
-             self.V_wf = self.V_wf_default if V_wf is None else V_wf
-             self.V_max = self.V_max_default if V_max is None else V_max
-             self.length_to_diameter = self.length_to_diameter_default if length_to_diameter is None else length_to_diameter
-             self.kW_per_m3 = self.kW_per_m3_default if kW_per_m3 is None else kW_per_m3
-             self.vessel_material = 'Stainless steel 316' if vessel_material is None else vessel_material
-             self.vessel_type = 'Vertical' if vessel_type is None else vessel_type
-             self.tau_0 = self.tau_0_default if tau_0 is None else tau_0
-             self.batch = batch
              self.X_dih = X_dih      
              self.load_auxiliaries()
     def _setup(self):
@@ -112,18 +82,6 @@ class OxidativeCleavageReactor(bst.CSTR):
     _N_ins = 5
     _N_outs = 2
        
-   #: Default maximum change in temperature for the heat exchanger loop.
-    dT_hx_loop_default: Optional[float] = 5
-   #: Default fraction of working volume over total volume.
-    V_wf_default: Optional[float] = 0.8
-    #: Default maximum volume of a reactor in m3.
-    V_max_default: Optional[float] = 355
-    #: Default length to diameter ratio.
-    length_to_diameter_default: Optional[float] = 3
-    #: Default power consumption for agitation [kW/m3].
-    kW_per_m3_default: Optional[float] = 0.985
-    #: Default cleaning and unloading time (hr).
-    tau_0_default: Optional[float]  = 3    
     
 
    
@@ -133,31 +91,13 @@ class OxidativeCleavageReactor(bst.CSTR):
 
    
     def _init(self,T,P,tau,X_ox_rxn_1,X_oxidativecleavage,X_decomposition,decarboxylation_ratio,
-                dT_hx_loop: Optional[float]=None,
-               V_wf: Optional[float]=None, 
-               V_max: Optional[float]=None,
-               length_to_diameter: Optional[float]=None, 
-               kW_per_m3: Optional[float]=None,
-               vessel_material: Optional[str]=None,
-               vessel_type: Optional[str]=None,
-               batch: Optional[bool]=None,
-               tau_0: Optional[float]=None,
                adiabatic: Optional[bool]=None):
         
              if adiabatic is None: adiabatic = False
              self.T = T
              self.adiabatic = adiabatic
              self.P = P
-             self.dT_hx_loop = self.dT_hx_loop_default if dT_hx_loop is None else abs(dT_hx_loop)
              self.tau = tau
-             self.V_wf = self.V_wf_default if V_wf is None else V_wf
-             self.V_max = self.V_max_default if V_max is None else V_max
-             self.length_to_diameter = self.length_to_diameter_default if length_to_diameter is None else length_to_diameter
-             self.kW_per_m3 = self.kW_per_m3_default if kW_per_m3 is None else kW_per_m3
-             self.vessel_material = 'Stainless steel 316' if vessel_material is None else vessel_material
-             self.vessel_type = 'Vertical' if vessel_type is None else vessel_type
-             self.tau_0 = self.tau_0_default if tau_0 is None else tau_0
-             self.batch = batch
              self.X_ox_rxn_1 = X_ox_rxn_1    
              self.decarboxylation_ratio = decarboxylation_ratio
              self.X_oxidativecleavage = X_oxidativecleavage

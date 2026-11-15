@@ -120,8 +120,8 @@ class InternalCirculationRx(bst.MixTank):
     _Y = 0.05
 
     # Related to cost algorithm
-    _default_vessel_type = 'IC'
-    _default_vessel_material = 'Stainless steel'
+    vessel_type = bst.update_design_input(default='IC')
+    vessel_material = bst.update_design_input(default='Stainless steel')
     purchase_cost_algorithms = IC_purchase_cost_algorithms
 
     # Other equipment
@@ -139,7 +139,7 @@ class InternalCirculationRx(bst.MixTank):
         self.Y_biomass = Y_biomass
         self.biodegradability = \
             biodegradability if biodegradability else get_BD_dct(self.chemicals)
-        self.V_wf = V_wf or self._default_V_wf
+        self.V_wf = V_wf or type(self).V_wf.default
         self.vessel_type = 'IC'
         self.vessel_material = vessel_material
         self.kW_per_m3 = kW_per_m3

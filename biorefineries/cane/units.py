@@ -67,10 +67,8 @@ class SeedTrain(SeedTrain):
 
 class CoFermentation(CoFermentation):
     
-    def _init(self, tau=36, N=None, V_max=3785.4118, T=305.15, P=101325,
-              Nmin=2, Nmax=36, cofermentation=None):
-        bst.BatchBioreactor._init(self, tau, N, V_max, T, P, Nmin, Nmax)
-        self.P = P
+    def _init(self, Nmin=2, Nmax=36, cofermentation=None):
+        bst.BatchBioreactor._init(self, Nmin, Nmax)
         chemicals = self.chemicals
         self.loss = None
         
@@ -116,17 +114,15 @@ class CoFermentation(CoFermentation):
 
           
 class AeratedCoFermentation(bst.AeratedBioreactor): # For microbial oil production
-    V_max_default = 500
-    def _init(
-            self, cofermentation, 
-            dT_hx_loop=8,
-            Q_O2_consumption=-460240, # [kJ/kmol] equivalent to 110 kcal / mol as in https://www.academia.edu/19636928/Bioreactor_Design_for_Chemical_Engineers
-            batch=True,
-            **kwargs,
-        ):
-        bst.AeratedBioreactor._init(self, reactions=None, batch=batch, dT_hx_loop=dT_hx_loop, 
-                                    Q_O2_consumption=Q_O2_consumption,
-                                    optimize_power=True, **kwargs)
+    V_max = bst.update_design_input(default=500)
+    dT_hx_loop = bst.update_design_input(default=8)
+    Q_O2_consumption = bst.update_design_input(
+        default=-460240, # [kJ/kmol] equivalent to 110 kcal / mol as in https://www.academia.edu/19636928/Bioreactor_Design_for_Chemical_Engineers
+    )
+    batch = bst.update_design_input(default=True)
+
+    def _init(self, cofermentation, **kwargs):
+        bst.AeratedBioreactor._init(self, reactions=None, optimize_power=True, **kwargs)
         chemicals = self.chemicals
         self.hydrolysis_reaction = Rxn('Sucrose + Water -> 2Glucose', 'Sucrose', 1.00, chemicals)
         self.cofermentation = cofermentation
@@ -146,17 +142,15 @@ class AeratedCoFermentation(bst.AeratedBioreactor): # For microbial oil producti
         self.cofermentation.force_reaction(effluent)
         
 class AeratedFermentation(bst.AeratedBioreactor): # For microbial oil production
-    V_max_default = 500
-    def _init(
-            self, fermentation_reaction, cell_growth_reaction, 
-            dT_hx_loop=8,
-            Q_O2_consumption=-460240, # [kJ/kmol] equivalent to 110 kcal / mol as in https://www.academia.edu/19636928/Bioreactor_Design_for_Chemical_Engineers
-            batch=True,
-            **kwargs,
-        ):
-        bst.AeratedBioreactor._init(self, reactions=None, batch=batch, dT_hx_loop=dT_hx_loop, 
-                                    Q_O2_consumption=Q_O2_consumption,
-                                    optimize_power=True, **kwargs)
+    V_max = bst.update_design_input(default=500)
+    dT_hx_loop = bst.update_design_input(default=8)
+    Q_O2_consumption = bst.update_design_input(
+        default=-460240, # [kJ/kmol] equivalent to 110 kcal / mol as in https://www.academia.edu/19636928/Bioreactor_Design_for_Chemical_Engineers
+    )
+    batch = bst.update_design_input(default=True)
+
+    def _init(self, fermentation_reaction, cell_growth_reaction, **kwargs):
+        bst.AeratedBioreactor._init(self, reactions=None, optimize_power=True, **kwargs)
         chemicals = self.chemicals
         self.hydrolysis_reaction = Rxn('Sucrose + Water -> 2Glucose', 'Sucrose', 1.00, chemicals)
         self.fermentation_reaction = fermentation_reaction
@@ -178,11 +172,13 @@ class AeratedFermentation(bst.AeratedBioreactor): # For microbial oil production
         self.cell_growth_reaction.force_reaction(effluent)
     
 class OleinCrystallizer(bst.BatchCrystallizer):
-    
-    def _init(self, T, solid_purity=0.98, melt_purity=0.90,
+    tau = bst.update_design_input(default=5)
+    V = bst.update_design_input(default=1e6)
+
+    def _init(self, solid_purity=0.98, melt_purity=0.90,
               solid_IDs=('TAG', 'FFA', 'PL'), melt_IDs=('AcTAG',),
               order=None):
-        super()._init(tau=5, V=1e6, T=T)
+        super()._init()
         self.melt_purity = melt_purity
         self.solid_purity = solid_purity
         self.solid_IDs = solid_IDs

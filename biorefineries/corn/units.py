@@ -35,7 +35,6 @@ Solids handling
 .. autoclass:: biorefineries.corn.units.MilledCornHopper
 .. autoclass:: biorefineries.corn.units.LimeHopper
 .. autoclass:: biorefineries.corn.units.WetDDGSConveyor
-.. autoclass:: biorefineries.corn.units.Liquefaction
 .. autoclass:: biorefineries.corn.units.SimultaneousSaccharificationFermentation
 .. autoclass:: biorefineries.corn.units.DDGSHandling
 .. autoclass:: biorefineries.corn.units.DDGSCentrifuge

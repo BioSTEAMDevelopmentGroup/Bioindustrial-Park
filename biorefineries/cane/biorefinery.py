@@ -560,21 +560,16 @@ class Biorefinery:
         def set_glucose_yield(glucose_yield):
             if number in cellulosic_configurations:
                 glucose_yield *= 0.01
-                X1 = prs.reactions.X[0]
-                X1_side = prs.reactions.X[1:3].sum()
-                X2_side = saccharification.saccharification.X[:2].sum()
-                saccharification.saccharification.X[2] = X2 = (glucose_yield - X1) / (1 - X1_side)
-                X_excess = (X2_side + X2) - 1
-                if X_excess > 0: breakpoint()
+                X1 = prs.glucan_to_glucose.X
+                X1_side = prs.glucose_to_byproducts.X.sum()
+                saccharification.saccharification.X[2] = (glucose_yield - X1) / (1 - X1_side)
                 
         def set_xylose_yield(xylose_yield):
             if number in cellulosic_configurations:
                 xylose_yield *= 0.01
-                X1_side = prs.reactions.X[4:6].sum()
-                prs.reactions.X[3] = X1 = xylose_yield
-                X_excess = (X1_side + X1) - 1
-                if X_excess > 0.: breakpoint()
-        
+                X1_side = prs.xylose_to_byproducts.X.sum()
+                prs.xylan_to_xylose.X = min(xylose_yield, 1 - 1e-9 - X1_side)
+                
         if agile: 
             self.oilsorghum = oilsorghum = bst.Stream(
                 ID='oilsorghum', phase='l', T=298.15, P=101325, 
@@ -1017,7 +1012,8 @@ class Biorefinery:
                 # fermentor.cofermentation[2].X = 0.004 # Baseline
                 # fermentor.cofermentation[3].X = 0.006 # Baseline
                 # fermentor.loss[0].X = 0.03 # Baseline
-                split = u.S401.split.mean()
+                splitter = seed_train.ins[0].source
+                split = splitter.split.mean()
                 X1 = split * seed_train.reactions.X[0]
                 X2 = split * seed_train.reactions.X[2]
                 X3 = (glucose_to_ethanol_yield - X1) / (1 - X1 - X2)
@@ -1030,7 +1026,8 @@ class Biorefinery:
         def set_xylose_to_ethanol_yield(xylose_to_ethanol_yield):
             if number in cellulosic_ethanol_configurations:
                 xylose_to_ethanol_yield *= 0.01
-                split = u.S401.split.mean()
+                splitter = seed_train.ins[0].source
+                split = splitter.split.mean()
                 X1 = split * seed_train.reactions.X[1]
                 X2 = split * seed_train.reactions.X[3]
                 X3 = (xylose_to_ethanol_yield - X1) / (1 - X1 - X2)
@@ -1140,9 +1137,9 @@ class Biorefinery:
         @default(23, units='% oil', kind='coupled', name='TAG to FFA conversion')
         def set_TAG_to_FFA_conversion(TAG_to_FFA_conversion):
             if number in conventional_ethanol_biodiesel_configurations:
-                u.R301.oil_reaction.X[0] = TAG_to_FFA_conversion / 100.
+                u.fermentation.oil_reaction.X[0] = TAG_to_FFA_conversion / 100.
             elif number in cellulosic_ethanol_biodiesel_configurations:
-                u.R401.oil_reaction.X[0] = TAG_to_FFA_conversion / 100.
+                u.cofermentation.oil_reaction.X[0] = TAG_to_FFA_conversion / 100.
         
         @default_gwp(feedstock.characterization_factors[GWP], name='GWP', 
                  element='sugarcane', units='kg*CO2e/kg')
