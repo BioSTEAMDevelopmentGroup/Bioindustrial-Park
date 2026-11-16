@@ -130,29 +130,45 @@ class PretreatmentReactorSystem(bst.units.design_tools.PressureVessel, Unit):
         self.T = T
         chemicals = self.chemicals
         if reactions is None:
-            self.reactions = ParallelRxn([
-        #            Reaction definition                 Reactant    Conversion
-        Rxn('Glucan + H2O -> Glucose',                   'Glucan',   0.0990, chemicals),
-        Rxn('Glucan + H2O -> GlucoseOligomer',           'Glucan',   0.0030, chemicals),
-        Rxn('Glucan -> HMF + 2 H2O',                     'Glucan',   0.0030, chemicals),
-        Rxn('Galactan + H2O -> GalactoseOligomer',       'Galactan', 0.0240, chemicals),
-        Rxn('Galactan -> HMF + 2 H2O',                   'Galactan', 0.0030, chemicals),
-        Rxn('Mannan + H2O -> MannoseOligomer',           'Mannan',   0.0030, chemicals),
-        Rxn('Mannan -> HMF + 2 H2O',                     'Mannan',   0.0030, chemicals),
-        Rxn('Sucrose -> HMF + Glucose + 2H2O',           'Sucrose',  1.0000, chemicals),
-        Rxn('Xylan + H2O -> Xylose',                     'Xylan',    0.9000, chemicals),
-        Rxn('Xylan + H2O -> XyloseOligomer',             'Xylan',    0.0240, chemicals),
-        Rxn('Xylan -> Furfural + 2 H2O',                 'Xylan',    0.0500, chemicals),
-        Rxn('Arabinan + H2O -> Arabinose',               'Arabinan', 0.9000, chemicals),
-        Rxn('Arabinan + H2O -> ArabinoseOligomer',       'Arabinan', 0.0240, chemicals),
-        Rxn('Arabinan -> Furfural + 2 H2O',              'Arabinan', 0.0050, chemicals),
-        Rxn('Acetate -> AceticAcid',                     'Acetate',  1.0000, chemicals),
-        Rxn('Lignin -> SolubleLignin',                   'Lignin',   0.0500, chemicals)
-            ])
+            reactions = [
+                # Reaction definition                  Reactant    Conversion
+                Rxn('Glucan + H2O -> Glucose',         'Glucan',   0.0990, chemicals),
+                Rxn('Glucan + H2O -> GlucoseOligomer', 'Glucan',   0.0030, chemicals),
+                Rxn('Glucan -> HMF + 2 H2O',           'Glucan',   0.0030, chemicals),
+                Rxn('Xylan + H2O -> Xylose',           'Xylan',    0.9000, chemicals),
+                Rxn('Xylan + H2O -> XyloseOligomer',   'Xylan',    0.0240, chemicals),
+                Rxn('Xylan -> Furfural + 2 H2O',       'Xylan',    0.0500, chemicals),
+                Rxn('Lignin -> SolubleLignin',         'Lignin',   0.0500, chemicals)
+            ]
+            chemicals = self.chemicals
+            if 'Galactan' in chemicals:
+                reactions.extend([
+                    Rxn('Galactan + H2O -> GalactoseOligomer', 'Galactan', 0.0240, chemicals),
+                    Rxn('Galactan -> HMF + 2 H2O',             'Galactan', 0.0030, chemicals),
+                ])
+            if 'Mannan' in chemicals:
+                reactions.extend([
+                    Rxn('Mannan + H2O -> MannoseOligomer', 'Mannan',   0.0030, chemicals),
+                    Rxn('Mannan -> HMF + 2 H2O',           'Mannan',   0.0030, chemicals),
+                ])
+            if 'Sucrose' in chemicals:
+                reactions.append(
+                    Rxn('Sucrose -> HMF + Glucose + 2H2O', 'Sucrose',  1.0000, chemicals),
+                )
+            if 'Arabinan' in chemicals:
+        
+                    Rxn('Arabinan + H2O -> Arabinose',         'Arabinan', 0.9000, chemicals),
+                    Rxn('Arabinan + H2O -> ArabinoseOligomer', 'Arabinan', 0.0240, chemicals),
+                    Rxn('Arabinan -> Furfural + 2 H2O',        'Arabinan', 0.0050, chemicals),
+            if 'Acetate' in chemicals:
+                reactions.append(
+                    Rxn('Acetate -> AceticAcid', 'Acetate',  1.0000, chemicals),
+                )
+            self.reactions = ParallelRxn(reactions)
             self.glucan_to_glucose = self.reactions[0]
-            self.xylan_to_xylose = self.reactions[8]
+            self.xylan_to_xylose = self.reactions[3]
             self.glucose_to_byproducts = self.reactions[1:3]
-            self.xylose_to_byproducts = self.reactions[9:12]
+            self.xylose_to_byproducts = self.reactions[4:6]
         else:
             self.reactions = reactions
         self.tau = tau

@@ -30,7 +30,7 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs, WWT_kwargs=None):
     sugarcane, = ins
     ethanol, = outs
     cane_to_fermentation_sys = create_cane_to_combined_1_and_2g_fermentation('cane_to_fermentation_sys', ins=sugarcane)
-    beer, lignin, condensate, pretreatment_wastewater, fiber_fines, bagasse_to_boiler = cane_to_fermentation_sys.outs
+    vent, beer, lignin, condensate, pretreatment_wastewater, fiber_fines, bagasse_to_boiler = cane_to_fermentation_sys.outs
     cellulosic_beer_distillation_sys = create_beer_distillation_system(
         ins=beer,
         outs=[''],

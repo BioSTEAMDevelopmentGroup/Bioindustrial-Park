@@ -54,7 +54,7 @@ def create_oilcane_to_biodiesel_and_actag_combined_1_and_2g_post_fermentation_oi
         fed_batch=False,
         mockup=True
     )
-    beer, lignin, condensate, pretreatment_wastewater, fiber_fines, bagasse_to_boiler = oilcane_to_fermentation_sys.outs
+    vent, beer, lignin, condensate, pretreatment_wastewater, fiber_fines, bagasse_to_boiler = oilcane_to_fermentation_sys.outs
     
     fermentor = f(units.CoFermentation)
     fermentor.selectivity = 0.75

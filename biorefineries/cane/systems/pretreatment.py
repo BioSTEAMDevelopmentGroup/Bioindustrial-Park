@@ -23,6 +23,7 @@ def create_cane_combined_1_and_2g_pretreatment(ins, outs,
         feedstock_handling_area=None,
         juicing_area=None,
         pretreatment_area=None,
+        bagasse_splitter=None,
     ):
     """
     Create a system that produces juice and hydrolysate from cane.
@@ -30,6 +31,7 @@ def create_cane_combined_1_and_2g_pretreatment(ins, outs,
     """
     oilcane, = ins
     juice, hydrolysate, pretreatment_wastewater, fiber_fines, bagasse_to_boiler = outs
+    if bagasse_splitter is None: bagasse_splitter = True
     if feedstock_handling_area is None: feedstock_handling_area = 100
     if juicing_area is None: juicing_area = 200
     if pretreatment_area is None: pretreatment_area = 300
@@ -50,38 +52,44 @@ def create_cane_combined_1_and_2g_pretreatment(ins, outs,
     )
     screened_juice, bagasse, fiber_fines = juicing_sys.outs
     
-    S1 = bst.Splitter(200, bagasse, split=0.85) # 15% is sent to cogeneration
-    S1.isbagasse_splitter = True
-    
-    create_bagasse_drying_system(ins=S1-1, outs=bagasse_to_boiler, area=200)
-    
-    udct['S201'].isplit['Lipid'] = 1. # Vibrating screen
-    crushing_mill = udct['U201']
-    crushing_mill.tag = "oil extraction"
-    crushing_mill.isplit['Lipid'] = 0.90
-    conveying_belt = S1.outs[0].source
-    conveying_belt.cellulose_rxn = tmo.Reaction('Cellulose -> Glucan', 'Cellulose', 1.0, basis='wt')
-    conveying_belt.cellulose_rxn.basis = 'mol'
-    # Bagasse composition https://www.sciencedirect.com/science/article/pii/S0144861710005072
-    # South american; by HPLC
-    # Glucan: 41.3%
-    # Xylan: 24.9%
-    # Galactan: 0.6%
-    # Arabinan: 1.7%
-    # Lignin: 23.2%
-    # Acetyl: 3.0%
-    conveying_belt.hemicellulose_rxn = tmo.Reaction('30.2 Hemicellulose -> 24.9 Xylan + 1.7 Arabinan + 0.6 Galactan + 3 Acetate', 'Hemicellulose', 1.0, basis='wt')
-    conveying_belt.hemicellulose_rxn.basis = 'mol'
-    @conveying_belt.add_specification
-    def convert_hemicellulose():
-        conveying_belt.run()
-        bagasse = conveying_belt.outs[0]
-        conveying_belt.cellulose_rxn(bagasse)
-        conveying_belt.hemicellulose_rxn(bagasse)
+    if bagasse_splitter:
+        S1 = bst.Splitter(200, bagasse, split=0.85) # 15% is sent to cogeneration
+        S1.register_alias('bagasse_splitter')
+        S1.isbagasse_splitter = True
+        bagasse = S1-1
+        conveying_belt = S1.outs[0].source
+        conveying_belt.cellulose_rxn = tmo.Reaction('Cellulose -> Glucan', 'Cellulose', 1.0, basis='wt')
+        conveying_belt.cellulose_rxn.basis = 'mol'
+        # Bagasse composition https://www.sciencedirect.com/science/article/pii/S0144861710005072
+        # South american; by HPLC
+        # Glucan: 41.3%
+        # Xylan: 24.9%
+        # Galactan: 0.6%
+        # Arabinan: 1.7%
+        # Lignin: 23.2%
+        # Acetyl: 3.0%
+        conveying_belt.hemicellulose_rxn = tmo.Reaction('30.2 Hemicellulose -> 24.9 Xylan + 1.7 Arabinan + 0.6 Galactan + 3 Acetate', 'Hemicellulose', 1.0, basis='wt')
+        conveying_belt.hemicellulose_rxn.basis = 'mol'
+        @conveying_belt.add_specification
+        def convert_hemicellulose():
+            conveying_belt.run()
+            bagasse = conveying_belt.outs[0]
+            conveying_belt.cellulose_rxn(bagasse)
+            conveying_belt.hemicellulose_rxn(bagasse)
         
+        create_bagasse_drying_system(ins=bagasse, outs=bagasse_to_boiler, area=200)
+        bagasse = S1-0
+    else:
+        outs.remove(bagasse_to_boiler)
+    if 'Lipid' in udct['S201'].chemicals: 
+        udct['S201'].isplit['Lipid'] = 1. # Vibrating screen
+        crushing_mill = udct['U201']
+        crushing_mill.tag = "oil extraction"
+        crushing_mill.isplit['Lipid'] = 0.90
+    
     hot_water_pretreatment_sys, hw_dct = create_hot_water_pretreatment_system(
         outs=(hydrolysate, pretreatment_wastewater),
-        ins=S1-0,
+        ins=bagasse,
         mockup=True,
         area=pretreatment_area,
         udct=True,

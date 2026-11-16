@@ -570,8 +570,8 @@ class Biorefinery:
         def set_xylose_yield(xylose_yield):
             if number in cellulosic_configurations:
                 xylose_yield *= 0.01
-                X1_side = prs.reactions.X[9:11].sum()
-                prs.reactions.X[8] = X1 = xylose_yield
+                X1_side = prs.reactions.X[4:6].sum()
+                prs.reactions.X[3] = X1 = xylose_yield
                 X_excess = (X1_side + X1) - 1
                 if X_excess > 0.: breakpoint()
         

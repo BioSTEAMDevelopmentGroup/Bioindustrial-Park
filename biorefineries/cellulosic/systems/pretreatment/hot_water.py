@@ -47,6 +47,7 @@ def create_hot_water_pretreatment_system(
     M203 = bst.SteamMixer(f'M{n+2}', (feedstock, pretreatment_steam, warm_process_water),
                           P=P, solids_loading=solids_loading)
     R201 = units.PretreatmentReactorSystem(f'R{n+1}', M203-0, T=T_pretreatment_reactor)
+    R201.register_alias('pretreatment')
     P201 = units.BlowdownDischargePump(f'P{n+1}', R201-1)
     F201 = units.PretreatmentFlash(f'F{n+1}', P201-0, P=101325, Q=0)
     M204 = bst.Mixer(f'M{n+3}', (R201-0, F201-0))
