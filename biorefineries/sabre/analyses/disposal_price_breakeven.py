@@ -8,8 +8,7 @@
 """
 disposal_price_breakeven.py
 ----------------------------
-For the four standalone SaBRe flowsheets (the 'integrated' flowsheet is
-excluded, same as `msp_comparison.py`), solve the solid-waste disposal
+For the four standalone SaBRe flowsheets, solve the solid-waste disposal
 price ($/kg) that hits the target IRR (data/tea.yaml `tea.IRR`), holding
 every product at its data/tea.yaml baseline selling price:
 

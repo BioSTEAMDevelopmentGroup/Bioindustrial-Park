@@ -12,12 +12,11 @@ Razin's senior thesis (below), plus a standalone biostimulant pathway:
 - Methanogenic anaerobic digestion (AD) for biomethane production.
 - Acidogenic AD for volatile fatty acid (VFA) production
 - Acidogenic AD with VFA fermentation to product microbial oil.
-- Integrated systesm splitting between the biomethane and microbial oil product pathways.
 
 Additional flowsheets are expected to be added here over time
 as more of that work is incorporated.
 
-The five flowsheets currently available (see ``load()`` in
+The four flowsheets currently available (see ``load()`` in
 ``__init__.py`` for how to select one):
 
 - **Biostimulant** (``'biostimulant'``, default): press -> pressate
@@ -37,10 +36,6 @@ The five flowsheets currently available (see ``load()`` in
   microbial oil, with cell disruption, extraction, and biomass recycle —
   simulated together as one ``bst.System`` from feedstock straight
   through to microbial oil.
-- **Integrated** (``'integrated'``): shared preprocessing with an
-  alpha-split between the methanogenic AD pathway and the VFA-to-oil
-  pathway, so both products can be produced from one feedstock at a
-  tunable ratio.
 
 Getting started
 ----------------
@@ -53,7 +48,7 @@ Getting started
 
 Repository structure
 ---------------------
-``_chemicals.py``: chemical species used across all five flowsheets.
+``_chemicals.py``: chemical species used across all four flowsheets.
 
 ``utils.py``: utility functions, e.g., loading feedstock and process
 assumptions (stored in ``data``).
@@ -64,15 +59,14 @@ and minimum-selling-price helpers.
 ``units/``: unit operations (digesters, press, mill, pretreatment options,
 H2S removal, biogas upgrading, dewatering, fermentation, oil extraction).
 
-``systems/``: the five flowsheet builders described above.
+``systems/``: the four flowsheet builders described above.
 
 ``analyses/``: new analysis and plotting scripts.
 
-``legacy/``: retired code kept for reference and regression coverage --
+``legacy/``: retired code kept for reference only --
 ``legacy/analyses/`` holds the original exploratory analysis and plotting
 scripts (heatmaps, sensitivity studies, TEA scenario comparisons) from
-Azhar Razin's thesis work, covered by the regression tests in
-``tests.py``; ``legacy/results/`` their old output; ``legacy/assumptions.yaml``
+Azhar Razin's thesis work, no longer covered by ``tests.py``; ``legacy/results/`` their old output; ``legacy/assumptions.yaml``
 the pre-migration monolithic assumptions file, superseded by the
 topic-specific files under ``data/``.
 

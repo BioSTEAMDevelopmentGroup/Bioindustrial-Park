@@ -9,8 +9,7 @@
 cost_breakdown.py
 ------------------
 Generate a capital- and operating-cost breakdown for the four standalone
-SaBRe flowsheets (the 'integrated' flowsheet is excluded, same as
-`msp_comparison.py`):
+SaBRe flowsheets:
 
     - Biostimulant
     - Biomethane   (data/pretreatment.yaml `pretreatment_ad` case

@@ -49,9 +49,7 @@ def create_biomethane_system(
         `feedstock_type`) and create_biostimulant_system() is called to
         build Press -> PressateConcentrator -> BiostimulantEvaporator,
         followed by a Mill on the pressed cake, to get a milled feed.
-        If a stream, it's used directly as the already-milled feed (e.g.
-        a splitter-derived stream from systems._ad_integrated_system,
-        which builds its own shared preprocessing once).
+        If a stream, it's used directly as the already-milled feed.
     pretreatment_case : str
         data/pretreatment.yaml `pretreatment_ad` case name.
     biostimulant_price : float, optional

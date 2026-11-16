@@ -8,7 +8,7 @@
 """
 SaBRe (Sargassum Biorefinery) flowsheets.
 
-Five flowsheets are available, selected via `load(flowsheet_name=...)`:
+Four flowsheets are available, selected via `load(flowsheet_name=...)`:
     - 'biostimulant' (default): press -> pressate concentrator -> biostimulant
       evaporator -> biostimulant product (pressed cake is a disposal liability)
     - 'biomethane': press -> mill -> [pretreatment] -> AD -> H2S
@@ -16,8 +16,6 @@ Five flowsheets are available, selected via `load(flowsheet_name=...)`:
     - 'vfa': press -> mill -> acidogenic AD -> digestate screw press -> VFA broth
     - 'microbial_oil': press -> mill -> acidogenic AD -> VFA broth ->
       Yarrowia lipolytica fermentation -> microbial oil
-    - 'integrated': shared preprocessing, alpha-split between the
-      methanogenic AD pathway and the VFA-to-oil pathway
 
 Based on Azhar Razin's Princeton University senior thesis, "Turning the
 Tide on Sargassum: A BioSTEAM Techno-Economic Analysis for a Sargassum
@@ -60,8 +58,7 @@ def load(flowsheet_name: str = 'biostimulant', **kwargs):
     Parameters
     ----------
     flowsheet_name : str
-        One of 'biostimulant', 'biomethane', 'vfa', 'microbial_oil',
-        'integrated'.
+        One of 'biostimulant', 'biomethane', 'vfa', 'microbial_oil'.
     **kwargs
         Forwarded to the corresponding `create_*` system builder.
     """
@@ -88,13 +85,10 @@ def load(flowsheet_name: str = 'biostimulant', **kwargs):
     elif flowsheet_name == 'microbial_oil':
         sys = create_microbial_oil_system(**kwargs)
         sys.simulate()
-    elif flowsheet_name == 'integrated':
-        sys = create_ad_integrated_system(**kwargs)
-        sys.simulate()
     else:
         raise ValueError(
             f"Unknown flowsheet_name {flowsheet_name!r}. "
-            "Choose from 'biostimulant', 'biomethane', 'vfa', 'microbial_oil', 'integrated'."
+            "Choose from 'biostimulant', 'biomethane', 'vfa', 'microbial_oil'."
         )
 
     _loaded_flowsheet_name = flowsheet_name

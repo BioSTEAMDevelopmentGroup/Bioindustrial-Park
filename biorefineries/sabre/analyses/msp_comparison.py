@@ -9,8 +9,7 @@
 msp_comparison.py
 ------------------
 Compare minimum selling price (MSP) across the four standalone SaBRe
-flowsheets. The 'integrated' flowsheet (alpha-split between the
-methanogenic and VFA-to-oil pathways) is intentionally excluded.
+flowsheets.
 
     - Biostimulant     -> biostimulant liquid product, $/kg product
     - Biomethane    -> biomethane, $/mmbtu, one bar per data/pretreatment.yaml

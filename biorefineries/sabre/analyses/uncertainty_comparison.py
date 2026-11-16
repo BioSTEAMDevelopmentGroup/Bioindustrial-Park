@@ -12,9 +12,7 @@ Compare MSP uncertainty (Monte Carlo, N=1000) and the top Spearman-correlated
 parameters across the four standalone SaBRe flowsheets, using the
 biorefineries/sabre/results/tables/model_*_N1000.xlsx files produced by
 analyses/model_biostimulant.py, model_vfa.py, model_biomethane.py, and
-model_microbial_oil.py. The 'integrated' flowsheet is not covered (no
-model file exists for it, per prior scope decision).
-
+model_microbial_oil.py.
 Each system's 'MSP' metric is USD/kg of that system's own value-carrying
 product (biostimulant liquid, VFA broth, biomethane, crude microbial oil,
 respectively) -- same $/kg-of-product basis, but not the same product, same

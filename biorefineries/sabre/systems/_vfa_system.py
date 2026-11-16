@@ -44,9 +44,7 @@ def create_vfa_system(
         `feedstock_type`) and create_biostimulant_system() is called to
         build Press -> PressateConcentrator -> BiostimulantEvaporator,
         followed by a Mill on the pressed cake, to get a milled feed.
-        If a stream, it's used directly as the already-milled feed (e.g.
-        a splitter-derived stream from systems._ad_integrated_system,
-        which builds its own shared preprocessing once).
+        If a stream, it's used directly as the already-milled feed.
     add_product_splitter : bool
         If True (default), adds SP_PRODUCT: a splitter on vfa_broth that
         recovers `vfa_product_splitter.vfa_recovery_frac` (data/
