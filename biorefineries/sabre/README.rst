@@ -56,6 +56,9 @@ assumptions (stored in ``data``).
 ``_tea.py``: SaBRe-specific techno-economic analysis (``SaBReTEA``)
 and minimum-selling-price helpers.
 
+``_lca.py``: cradle-to-gate global warming potential (GWP100) accounting
+for the 3-HP system (characterization factors in ``data/lca.yaml``).
+
 ``units/``: unit operations (digesters, press, mill, pretreatment options,
 H2S removal, biogas upgrading, dewatering, fermentation, oil extraction).
 

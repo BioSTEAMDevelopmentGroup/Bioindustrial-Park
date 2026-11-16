@@ -856,12 +856,13 @@ def create_3hp_system(
     # credit, per the design spec sec. 5 and the user's explicit
     # instruction to route both press cake and cell mass to the boiler --
     # not priced as disposal (see the comments at PR/MI/S401 above).
-    # Minimal standalone bst.BoilerTurbogenerator usage (no CoolingTower/
-    # ProcessWaterCenter/etc.), matching the class's own docstring example
-    # rather than biorefineries.cellulosic's create_facilities wrapper
-    # (which also builds four *other* facilities sabre has no use for --
-    # ChilledWaterPackage, CIPpackage, AirDistributionPackage,
-    # FireWaterTank -- none of which exist anywhere else in sabre either).
+    # Standalone bst.BoilerTurbogenerator, plus a CoolingTower and a
+    # ChilledWaterPackage (below) so the cooling and chilled water the units
+    # draw have their capital cost, power and makeup water in the TEA and the
+    # LCA, and a ProcessWaterCenter for their makeup water. Not
+    # biorefineries.cellulosic's create_facilities wrapper, which also builds
+    # other facilities (CIPpackage, AirDistributionPackage, FireWaterTank)
+    # sabre has no use for.
     # bst defaults (boiler_efficiency=0.80, turbogenerator_efficiency=0.85,
     # fuel_price=0.218) are used as-is; these are standard literature
     # baseline values already, not sabre-specific assumptions, so they're
@@ -890,9 +891,27 @@ def create_3hp_system(
     # priced here -- doing so would double-count the same cost).
     BT.outs[1].price = _TEA_PRICE["disposal_wastewater"]["baseline"]
 
+    CT = bst.CoolingTower("CT")
+    CWP = bst.ChilledWaterPackage("CWP")
+    # Process water center, as in biosteam's create_facilities and
+    # biorefineries.cellulosic: balances the boiler and cooling-tower makeup
+    # water (reverse-osmosis grade) and any fresh process water in the system
+    # (both defaulted at run time), charging their prices and capital.
+    PWC = bst.ProcessWaterCenter("PWC")
+    # Facility order matters: they run in the order given, and the cooling
+    # tower and PWC size themselves from the duties and makeup flows of the
+    # facilities before them. The cooling tower must come after both the
+    # boiler (turbogenerator condenser, ~6 MW) and the chilled water package
+    # (~5 MW), which put their duty on cooling water, so this follows
+    # biorefineries.cellulosic's order (BT, CWP, CT, PWC). Neither
+    # bst.create_facilities (CT before CWP) nor bst.Facility.ordered_facilities
+    # (CWP, CT, BT, PWC) does, and either sizes the cooling tower 25-40% too
+    # small here; bst.System(..., facilities=) uses the order as given.
+    facilities = (BT, CWP, CT, PWC)
+
     sys = bst.System(
         "hp3_sys" if configuration == "enzymatic_press" else f"hp3_{configuration}_sys",
-        path=path, facilities=(BT,),
+        path=path, facilities=facilities,
     )
     create_tea(sys)
 

@@ -27,6 +27,7 @@ from . import systems
 from . import _chemicals
 from . import utils
 from . import _tea
+from . import _lca
 
 from .units import *
 from .systems import *

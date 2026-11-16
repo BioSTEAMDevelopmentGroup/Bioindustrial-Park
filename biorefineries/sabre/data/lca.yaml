@@ -1,0 +1,34 @@
+# Model Assumptions: Life Cycle Assessment (LCA)
+#
+# Cradle-to-gate 100-year global warming potential (GWP100), kg CO2-eq per kg
+# of material unless noted. Scope and conventions are documented in
+# sabre/_lca.py. Every value below is a PLACEHOLDER taken from another
+# biorefinery in this repo, not a Sargassum- or 3-HP-specific life cycle
+# inventory: see the `sources` notes for what each one is and how reliable.
+
+gwp100:
+  # Feedstock: collected nuisance Sargassum is assumed to arrive with no
+  # environmental burden (as it arrives at zero price in data/tea.yaml).
+  # Harvest and transport are NOT included; set a per-kg-wet value here to test it.
+  sargassum_kg_CO2e_per_kg_wet: 0.0
+
+  electricity_kg_CO2e_per_kWh: 0.48  # same value for grid electricity consumed and for exported electricity displacing the grid
+  enzyme: 2.24
+  lime: 0.9764  # as Ca(OH)2: 1.29 kg CO2e/kg CaO x 56.0774/74.093
+  methane_upstream: 0.40  # natural gas supply chain, per kg CH4; combustion CO2 is added from stoichiometry
+  sulfuric_acid: 0.04447
+  ammonia: 2.64  # as NH3
+
+  sources:
+    reused_from_lactic:
+      key: biorefineries.lactic._process_settings.GWP_CFs
+      note: "All values except the feedstock come from the lactic biorefinery's GWP_CFs (itself 'all from ref [3]' in that file; electricity 0.48 kg CO2e/kWh, 'NA NG from shale and conventional recovery' for methane). The lactic file notes that it is unclear whether in-plant receiving and preprocessing of feedstock are included."
+    enzyme:
+      key: placeholder_flagged
+      note: "2.24 kg CO2e/kg enzyme is lactic's value; lactic's own comment says an ecoinvent value would be ~12.24, i.e. about 5x higher. At the ASPECT enzyme cap of 25 mg/g dry biomass, the enzyme is the largest single burden, so this factor matters most. Replace with a value for a cellulase + alginate lyase cocktail."
+    electricity:
+      key: placeholder_flagged
+      note: "0.48 kg CO2e/kWh is a fixed US-grid-like value, assumed for both consumption and export. The net exported electricity credit therefore uses the same factor; results are reported with and without it."
+    sargassum:
+      key: user_specified
+      note: "Zero burden for collected Sargassum; harvest, transport and any drying/stabilization are out of scope."
