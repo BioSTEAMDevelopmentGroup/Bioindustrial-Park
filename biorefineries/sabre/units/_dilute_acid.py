@@ -17,13 +17,13 @@ _M_TO_FT = 3.28084
 _PA_TO_PSI = 0.000145038
 
 # Loaded assumptions
-_PRETREATMENT = load_assumptions("3hp.yaml")["cake_dilute_acid_pretreatment"]
+_PRETREATMENT = load_assumptions("3hp.yaml")["acid_pretreatment"]
 
 
 class DiluteAcidReactor(PressureVessel, bst.Unit):
     """
-    Dilute-acid pretreatment pressure reactor for the 3-HP cake
-    configurations: a sabre-local adaptation of
+    Dilute-acid pretreatment pressure reactor for the 3-HP press pulp
+    in the `baseline` scenario (the `acid_press` scenario reuses its conversions): a sabre-local adaptation of
     biorefineries.cellulosic's `PretreatmentReactorSystem` (corn stover),
     re-implemented here rather than imported for the same reason as
     `HPFermentation` (sabre's dependency boundary, and cellulosic's reaction
@@ -36,7 +36,7 @@ class DiluteAcidReactor(PressureVessel, bst.Unit):
     time. Both reactions are exactly atom-balanced:
 
     - `Glucan + Water -> Glucose`
-    - `Alginate + Water -> AlginateMonomer`
+    - `Alginate + Water -> Uronics`
 
     Degradation products (HMF, furfural) are not modeled: they are not in
     sabre's chemical set.
@@ -50,7 +50,7 @@ class DiluteAcidReactor(PressureVessel, bst.Unit):
     glucan_conversion : float
         Fraction of Glucan hydrolyzed to Glucose.
     alginate_conversion : float
-        Fraction of Alginate hydrolyzed to AlginateMonomer.
+        Fraction of Alginate hydrolyzed to Uronics.
     tau : float
         Residence time [hr].
     V_wf : float
@@ -66,7 +66,7 @@ class DiluteAcidReactor(PressureVessel, bst.Unit):
 
     See Also
     --------
-    Refer to data/3hp.yaml (`cake_dilute_acid_pretreatment`) for the default
+    Refer to data/3hp.yaml (`acid_pretreatment`) for the default
     values and references.
     """
 
@@ -79,7 +79,7 @@ class DiluteAcidReactor(PressureVessel, bst.Unit):
     def __init__(
         self, ID="", ins=None, outs=(),
         glucan_conversion=_PRETREATMENT["glucan_to_glucose_conversion"],
-        alginate_conversion=_PRETREATMENT["alginate_to_alginate_monomer_conversion"],
+        alginate_conversion=_PRETREATMENT["alginate_to_uronics_conversion"],
         tau=_PRETREATMENT["reactor_tau_hr"],
         V_wf=_PRETREATMENT["reactor_V_wf"],
         length_to_diameter=_PRETREATMENT["reactor_length_to_diameter"],
@@ -99,7 +99,7 @@ class DiluteAcidReactor(PressureVessel, bst.Unit):
         self.reactions = tmo.ParallelReaction([
             tmo.Reaction('Glucan + Water -> Glucose', reactant='Glucan',
                          X=self.glucan_conversion),
-            tmo.Reaction('Alginate + Water -> AlginateMonomer', reactant='Alginate',
+            tmo.Reaction('Alginate + Water -> Uronics', reactant='Alginate',
                          X=self.alginate_conversion),
         ])
 

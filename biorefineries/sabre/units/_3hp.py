@@ -11,7 +11,7 @@ from biosteam.units import BatchBioreactor
 
 from biorefineries.sabre.utils import load_assumptions
 
-__all__ = ('HPFermentation', 'CaHPCrystallizer', 'CrystalCentrifuge')
+__all__ = ('HPFermentation', 'CaHPCrystallizer', 'CrystalCentrifuge', 'HydrolysisTank')
 
 # Loaded assumptions
 _3HP_YAML = load_assumptions("3hp.yaml")
@@ -42,7 +42,7 @@ class HPFermentation(BatchBioreactor):
       `biomass_yield_kg_per_kg_consumed`.
 
     Glucose -> 2 HP is exactly mass-balanced (2x HP's MW == Glucose's MW),
-    but Mannitol and AlginateMonomer are not exact multiples of HP's MW.
+    but Mannitol and Uronics are not exact multiples of HP's MW.
     thermosteam.Reaction does not enforce or warn on an unbalanced
     reaction -- confirmed by direct testing that it silently destroys real
     mass -- so all three substrates are handled with the same imperative,
@@ -422,3 +422,81 @@ class CrystalCentrifuge(bst.units.SolidsCentrifuge):
 
         self.design_results["Entrained liquor fraction"] = phi
         self.design_results["Entrained liquor (kg/h)"] = phi * liquor_feed_kg
+
+
+class HydrolysisTank(bst.Unit):
+    """
+    Enzymatic hydrolysis holding tanks, costed like the continuous
+    saccharification tanks of `biorefineries.cellulosic`
+    (`ContinuousPresaccharification`, from Humbird et al. 2011, NREL/TP-5100-47764)
+    and `biorefineries.HP` (`Saccharification`): large tanks whose cost scales
+    with volume to the 0.7 power from the reference tank, rather than many small
+    stirred tanks. The reaction itself is applied by a specification on the unit
+    (see systems/_3hp_system.py); `_run` only passes the slurry through.
+
+    Parameters
+    ----------
+    tau : float
+        Residence time [h].
+    V_max : float
+        Largest single tank volume [m3]; the number of tanks is
+        ceil(total volume / V_max). Default 3,785 m3 (1,000,000 gal), the
+        maximum vessel size of `biorefineries.cellulosic.Saccharification`.
+    V_wf : float
+        Working volume fraction.
+    T : float
+        Temperature [K].
+
+    Notes
+    -----
+    Reference tank: 250,000 gal (946 m3) at $480,000 (3,840,000 / 8 tanks, CE
+    522), bare-module factor 2.0, exponent 0.7. Transfer pumps: $47,200 and
+    58 kW each at 352 gpm (80 m3/h), exponent 0.8, bare-module factor 2.3
+    (cellulosic basis). Sizes beyond the reference are extrapolated. The
+    tanks carry no agitation power in that basis.
+    """
+    _N_ins = 1
+    _N_outs = 1
+    _F_BM_default = {"Tanks": 2.0, "Transfer pumps": 2.3}
+    _units = {"Tank volume": "m3", "Flow rate": "m3/hr"}
+
+    _V_ref = 250e3 * 0.00378541  # m3
+    _tank_cost_ref = 3840e3 / 8
+    _pump_cost_ref = 47200.0
+    _pump_kW_ref = 58.0
+    _pump_flow_ref = 352 * 0.2271247  # gpm -> m3/hr
+    _CE_ref = 522.0
+
+    def _init(self, tau=96.0, V_max=3785.4118, V_wf=0.9, T=48 + 273.15):
+        self.tau = tau
+        self.V_max = V_max
+        self.V_wf = V_wf
+        self.T = T
+
+    def _run(self):
+        feed, = self.ins
+        effluent, = self.outs
+        effluent.copy_like(feed)
+        effluent.T = self.T
+
+    def _design(self):
+        import math
+        v_0 = self.ins[0].F_vol
+        total = v_0 * self.tau / self.V_wf
+        N = max(1, math.ceil(total / self.V_max))
+        N_pumps = max(1, math.ceil(v_0 / self._pump_flow_ref))
+        D = self.design_results
+        D["Number of tanks"] = N
+        D["Tank volume"] = total / N
+        D["Total volume"] = total
+        D["Number of pumps"] = N_pumps
+        D["Flow rate"] = v_0 / N_pumps
+
+    def _cost(self):
+        D = self.design_results
+        C = self.baseline_purchase_costs
+        scale = bst.CE / self._CE_ref
+        C["Tanks"] = D["Number of tanks"] * self._tank_cost_ref * scale * (D["Tank volume"] / self._V_ref) ** 0.7
+        q = D["Flow rate"] / self._pump_flow_ref
+        C["Transfer pumps"] = D["Number of pumps"] * self._pump_cost_ref * scale * q ** 0.8
+        self.power_utility(D["Number of pumps"] * self._pump_kW_ref * q)

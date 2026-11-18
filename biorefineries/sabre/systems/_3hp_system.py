@@ -7,15 +7,24 @@
 """
 Sargassum-to-dried-Ca(3HP)2 system builder for the SaBRe flowsheets.
 
-Pathway:
-    raw Sargassum
-      -> Mill (milled_biomass, milling_losses)
-      -> EnzymaticPress (pressed_cake, pressate)
-      -> PFS (splits pressate into only the fraction that needs
-         concentrating) -> PressateConcentrator -> DIL (blends concentrate
-         + bypass pressate + fresh water) -> fermentation_feed_evaporator
-         (targets ~20 wt% dissolved solids, analogous to
-         biorefineries.HP's EnzymeHydrolysateMixer.solid_loading)
+Pathway, following the collaborators' process:
+    raw Sargassum -> Mill (MI) -> Press (PR: juice + pulp)
+      juice -> PFS/PC/DIL/EV (membrane + evaporator concentration)
+      pulp  -> [baseline scenario only: dilute-acid pretreatment
+               (ACID_ST/AM/M_PT/R_PT/F_PT/H_PT) and ammonia neutralization
+               (NH3_ST/NT)]
+            -> M_SA (enzyme) -> H_SA -> SA (96 h hydrolysis tank) -> SLS
+               (residue to the boiler) -> HPFS/HPC/HDIL/HEV (concentration)
+      concentrated juice + concentrated hydrolysate -> FM -> HPFermentation
+      -> the shared downstream below (cell mass to the boiler as before).
+    Two scenarios: `baseline` (with the dilute-acid pretreatment) and
+    `acid_press` (no pretreatment reactor; H2SO4 dosed to 1 wt% of the
+    pre-press biomass, assumed to give the same hydrolysis as the baseline
+    pretreatment, then enzymatic hydrolysis with ammonia neutralization).
+    The hydrolysate is concentrated as well as the juice, because at 20 wt%
+    insoluble solids it carries only about 4 wt% sugar.
+
+Downstream of the fermentation feed:
       -> HPFermentation (Ca(OH)2 dosed in situ; Ca3HP2 already formed by
          the time broth leaves this unit)
       -> S401 (SolidsCentrifuge: removes CellMass)
@@ -44,13 +53,13 @@ Pathway:
     cell mass to the boiler.
 
 Chemical-set note: this pathway needs sabre._chemicals.create_chemicals's
-include_hp3=True chemical superset (Glucose, AlginateMonomer, Enzyme, HP,
+include_hp3=True chemical superset (Glucose, Uronics, Enzyme, HP,
 CalciumDihydroxide, Ca3HP2), which every other sabre system deliberately
 excludes to avoid a small (~0.08%) NumPy-pairwise-summation-driven drift on
 their own golden-value regression tests (see create_chemicals's own
 docstring). Because thermosteam's chemical set is process-global, this
 system must not be built in the same Python process as any of the other
-five sabre systems -- create_3hp_system() unconditionally (re)builds the
+sabre systems -- create_3hp_system() unconditionally (re)builds the
 superset every time it's called, which would silently corrupt the other
 five if they ran afterward in that same process. This is also why
 create_3hp_system() is not wired into sabre.__init__.load()'s dispatcher.
@@ -68,28 +77,22 @@ from biorefineries.sabre.utils import (
     get_solids_group_IDs,
 )
 from biorefineries.sabre.units import (
-    Mill, Press, EnzymaticPress, PressateConcentrator, BiostimulantEvaporator,
-    HPFermentation, CaHPCrystallizer, CrystalCentrifuge, DiluteAcidReactor,
+    Mill, Press, PressateConcentrator, BiostimulantEvaporator,
+    HPFermentation, CaHPCrystallizer, CrystalCentrifuge, HydrolysisTank,
+    DiluteAcidReactor,
 )
 from biorefineries.sabre._tea import create_tea
 
-__all__ = ('create_3hp_system', 'price_3hp_system', 'CONFIGURATIONS')
-
-# Upstream configurations (see create_3hp_system's docstring).
-CONFIGURATIONS = ("enzymatic_press", "biostimulant_cake", "juice_cake")
+__all__ = ('create_3hp_system', 'price_3hp_system', 'SCENARIOS')
 
 _TEA_PRICE = load_assumptions("tea.yaml")["price"]
 _3HP_YAML = load_assumptions("3hp.yaml")
-_ACID_PRETREATMENT = _3HP_YAML["cake_dilute_acid_pretreatment"]
-_SACCHARIFICATION = _3HP_YAML["cake_saccharification"]
 _HYDROLYSATE_SEPARATOR = _3HP_YAML["hydrolysate_separator"]
-_ENZYMATIC_PRESS = load_assumptions("preprocessing.yaml")["enzymatic_press"]
+_PULP_HYDROLYSIS = _3HP_YAML["pulp_enzymatic_hydrolysis"]
+_ACID_PRETREATMENT = _3HP_YAML["acid_pretreatment"]
+SCENARIOS = ("baseline", "acid_press")
+_ACID_PRESS = _3HP_YAML["acid_press"]
 
-# Unit IDs of the "biostimulant_cake" configuration's biostimulant subsystem
-# (its Press plus the prefixed PFS/PC/DIL/EV chain), excluded from the 3-HP-
-# only TEA scope when price_3hp_system(credit_tipping_fee=True) -- same role
-# as systems._biostimulant_system.BIOSTIMULANT_UNIT_IDS for the AD pathways.
-_BIOSTIMULANT_SCOPE_UNIT_IDS = frozenset({"PR", "BPFS", "BPC", "BDIL", "BEV"})
 _PRESS_CAKE_SOLIDS_WT_FRAC_OVERRIDE = _3HP_YAML["press_cake_solids_wt_frac_override"]
 _PRESSATE_CONCENTRATOR = _3HP_YAML["pressate_concentrator"]
 _FEED_EVAPORATOR = _3HP_YAML["fermentation_feed_evaporator"]
@@ -100,11 +103,14 @@ _CRYSTAL_SEPARATOR = _3HP_YAML["crystal_separator"]
 _ML_RECYCLE = _3HP_YAML["mother_liquor_recycle"]
 _DRYER = _3HP_YAML["dryer"]
 
+_ACID_PRESS_DISSOLVED_IDS = ("Glucose", "Uronics", "H2SO4")
+_NOT_HEAT_INTEGRATED = frozenset({"M_PR", "NJ", "H_SA", "M_PT", "R_PT", "F_PT", "H_PT", "AM", "NT"})
+
 FRESH_WATER_PRICE_USD_PER_KG = bst.stream_utility_prices['Process water']
 
 # PressateConcentrator/BiostimulantEvaporator settings of the 3-HP sugar
-# concentration chain (data/3hp.yaml), same values the enzymatic_press
-# configuration passes inline.
+# concentration chain (data/3hp.yaml), applied to both the juice and
+# the hydrolysate.
 _SUGAR_PC_KWARGS = dict(
     retained_solute_IDs=tuple(_PRESSATE_CONCENTRATOR["retained_solute_IDs"]),
     water_recovery_to_permeate=_PRESSATE_CONCENTRATOR["water_recovery_to_permeate"],
@@ -133,10 +139,9 @@ def _make_pressate_concentration_chain(
     """
     PFS -> PressateConcentrator -> DIL -> BiostimulantEvaporator: the same
     split-and-bypass concentration chain
-    systems._biostimulant_system.create_biostimulant_system builds (and the
-    `enzymatic_press` configuration builds inline above), factored out here
-    so the cake configurations can build it twice with different settings
-    ('B'-prefixed biostimulant chain and the 3-HP sugar chain). PFS's
+    systems._biostimulant_system.create_biostimulant_system builds, factored
+    out here so it can be built twice ('' prefix for the juice, 'H' for the
+    pulp hydrolysate). PFS's
     specification splits the feed into only the fraction that needs
     concentrating and a raw bypass, drawing fresh water if even bypassing
     everything is still above the EV target -- see
@@ -231,29 +236,27 @@ def _make_pressate_concentration_chain(
     return PFS, PC, DIL, EV
 
 
-def _make_cake_hydrolysis_train(cake):
+def _make_pulp_pretreatment_train(cake):
     """
-    Dilute-acid pretreatment -> neutralization -> saccharification ->
-    solid-liquid separation of the press cake, mirroring
-    biorefineries.cellulosic's corn stover train
-    (systems/pretreatment/dilute_acid.py, then its saccharification system)
-    with sabre-local units. See data/3hp.yaml (`cake_dilute_acid_pretreatment`,
-    `cake_saccharification`, `hydrolysate_separator`).
+    Dilute-acid pretreatment and neutralization of the press pulp (the
+    `baseline` scenario), placed ahead of the enzymatic hydrolysis:
+    acid dosing -> steam mixer -> pressure reactor -> flash -> condensate,
+    flashed slurry -> ammonia neutralization. Mirrors biorefineries.cellulosic's
+    corn stover train (systems/pretreatment/dilute_acid.py) with sabre-local
+    units; see data/3hp.yaml (`acid_pretreatment`).
 
     Acid and ammonia are dosed by specifications on their storage tanks,
     so the fresh-feed streams (the ones priced) carry the actual demand.
     Steam for the steam mixer is booked as a heat utility by
     bst.SteamMixer itself, so there is no priced steam stream.
 
-    Returns (units, residue, hydrolysate): the units in path order, the
-    filter's residual-solids outlet, and its hydrolysate outlet.
+    Returns (units, neutralized_slurry): the units in path order and the
+    neutralized slurry outlet, which feeds the enzymatic hydrolysis.
     """
     A = _ACID_PRETREATMENT
-    S = _SACCHARIFICATION
-    H = _HYDROLYSATE_SEPARATOR
     price_wastewater = _TEA_PRICE["disposal_wastewater"]["baseline"]
 
-    def dry_cake_kgph():
+    def dry_pulp_kgph():
         return cake.F_mass - cake.imass["Water"]
 
     # --- Acid dosing ------------------------------------------------------
@@ -273,14 +276,14 @@ def _make_cake_hydrolysis_train(cake):
 
     @ACID_ST.add_specification(run=True)
     def dose_acid():
-        solution_kgph = A["acid_solution_loading_kg_per_kg_dry"] * dry_cake_kgph()
+        solution_kgph = A["acid_solution_loading_kg_per_kg_dry"] * dry_pulp_kgph()
         total_ref = A["acid_solution_H2SO4_kg"] + A["acid_solution_water_kg"]
         sulfuric_acid.imass["H2SO4"] = solution_kgph * A["acid_solution_H2SO4_kg"] / total_ref
         sulfuric_acid.imass["Water"] = solution_kgph * A["acid_solution_water_kg"] / total_ref
 
     @AM.add_specification(run=True)
     def dose_warm_water():
-        warm_water_1.imass["Water"] = A["warm_water_kg_per_kg_dry"] * dry_cake_kgph()
+        warm_water_1.imass["Water"] = A["warm_water_kg_per_kg_dry"] * dry_pulp_kgph()
 
     # --- Steam mixer -> pressure reactor -> flash -> condenser --------------
     warm_water_2 = bst.Stream(
@@ -327,136 +330,230 @@ def _make_cake_hydrolysis_train(cake):
         NT._run()
         neutralization_rxn.adiabatic_reaction(NT.outs[0])
 
-    # --- Saccharification -------------------------------------------------
-    enzyme = bst.Stream("saccharification_enzyme", units="kg/hr")
-    enzyme.price = _TEA_PRICE["enzyme"]["baseline"]
-    saccharification_water = bst.Stream("saccharification_water", Water=0.0, units="kg/hr")
-    saccharification_water.price = FRESH_WATER_PRICE_USD_PER_KG
-    M_SA = bst.Mixer(
-        "M_SA", ins=(NT - 0, enzyme, saccharification_water),
-        outs=("slurry_with_enzyme",),
-    )
-    # Dissolved ammonium sulfate is locked to the solid phase (like corn
-    # stover's) but is not an insoluble solid for loading/filtration purposes.
-    solids_IDs = get_solids_group_IDs()
-    insoluble_IDs = [i for i in solids_IDs if i != "AmmoniumSulfate"]
-    enzyme_dose_frac = (
-        _ENZYMATIC_PRESS["enzyme_loading_mg_per_g_substrate"] / 1000.0
-        * (1.0 + _ENZYMATIC_PRESS["enzyme_excess_frac"])
-    )
+    units = [ACID_ST, AM, M_PT, R_PT, F_PT, H_PT, NH3_ST, NT]
+    return units, NT - 0
 
-    @M_SA.add_specification(run=True)
+
+def _build_juice_pulp_upstream(MI, press_params=None, scenario="baseline"):
+    """
+    Upstream section, following the
+    collaborators' process description: mill (MI) -> plain screw press (PR,
+    juice = `pressate` and `pressed_cake` = pulp) -> juice concentration
+    (PFS/PC/DIL/EV); in the `baseline` scenario the pulp is first
+    dilute-acid pretreated and neutralized (`_make_pulp_pretreatment_train`),
+    in `acid_press` the acid is dosed ahead of the screw press instead; the pulp goes through an enzymatic hydrolysis tank (SA,
+    96 h) and a pressure filter (SLS, residual solids to the boiler); the
+    concentrated juice and the pulp hydrolysate are blended (FM) into the
+    single fermentation feed.
+
+    Scenario parameters live on the units: `M_SA.enzyme_loading_mg_per_g_dwb`
+    (total enzyme per g dry biomass fed to the press), `SA.hydrolysis_conversion` and (with
+    `SA.hydrolysis_rxns.X`) the monomer release, and `FM.target_solids_wt_frac`
+    (dissolved-solids wt frac of the fermentation feed).
+
+    Returns a dict with 'units' (path order, MI included),
+    'fermentation_feed' and 'boiler_solids'.
+    """
+    # A feedstock type with a measured press split (feedstock.yaml `press`)
+    # sets the cake solids and the per-component cake fractions.
+    press_params = press_params or {}
+    if scenario not in SCENARIOS:
+        raise ValueError(f"scenario must be one of {SCENARIOS}, got {scenario!r}")
+    A = _ACID_PRETREATMENT
+    cake_fraction = dict(press_params.get("cake_fraction") or {})
+    press_feed = MI - 0
+    press_units = []
+    # Neutralization of dissolved H2SO4 with ammonia: 2 NH3 + H2SO4 -> (NH4)2SO4.
+    neutralization_rxn = tmo.Reaction(
+        "2 Ammonia + H2SO4 -> AmmoniumSulfate", reactant="H2SO4", X=1.0)
+    if scenario == "acid_press":
+        # Concentrated H2SO4 (the same ~93.3 wt% solution as the baseline acid)
+        # dosed into the milled biomass ahead of the screw press so that H2SO4
+        # is `H2SO4_wt_frac_pre_press` of the pre-press mixture. The press with
+        # acid is assumed to give the baseline pretreatment's hydrolysis (same
+        # Glucan and Alginate conversions), applied to the mixture. The
+        # monomers and the acid are dissolved, so they follow the water between
+        # cake and pressate (set below); Mannitol keeps the measured split.
+        for cid in _ACID_PRESS_DISSOLVED_IDS:
+            cake_fraction[cid] = 0.0
+        press_acid = bst.Stream("press_sulfuric_acid", units="kg/hr")
+        press_acid.price = _TEA_PRICE["sulfuric_acid"]["baseline"]
+        M_PR = bst.Mixer(
+            "M_PR", ins=(MI - 0, press_acid), outs=("biomass_with_acid",))
+        M_PR.H2SO4_wt_frac_pre_press = _ACID_PRESS["H2SO4_wt_frac_pre_press"]
+        press_hydrolysis_rxns = tmo.ParallelReaction([
+            tmo.Reaction("Glucan + Water -> Glucose", reactant="Glucan",
+                         X=A["glucan_to_glucose_conversion"]),
+            tmo.Reaction("Alginate + Water -> Uronics", reactant="Alginate",
+                         X=A["alginate_to_uronics_conversion"]),
+        ])
+
+        @M_PR.add_specification
+        def dose_acid_and_hydrolyze():
+            biomass = MI.outs[0]
+            solution_H2SO4 = A["acid_solution_H2SO4_kg"] / (
+                A["acid_solution_H2SO4_kg"] + A["acid_solution_water_kg"])
+            # solution mass a: solution_H2SO4 * a = x * (biomass + a)
+            x = M_PR.H2SO4_wt_frac_pre_press
+            a = x * float(biomass.F_mass) / (solution_H2SO4 - x)
+            press_acid.empty()
+            press_acid.imass["H2SO4"] = a * solution_H2SO4
+            press_acid.imass["Water"] = a * (1.0 - solution_H2SO4)
+            M_PR._run()
+            press_hydrolysis_rxns(M_PR.outs[0])
+
+        press_feed = M_PR - 0
+        press_units = [M_PR]
+    PR = Press(
+        "PR", ins=press_feed, outs=("pressed_cake", "pressate"),
+        cake_solids_wt_frac=press_params.get(
+            "cake_solids_wt_frac", _PRESS_CAKE_SOLIDS_WT_FRAC_OVERRIDE),
+        component_cake_frac=cake_fraction or None,
+    )
+    if scenario == "acid_press":
+        @PR.add_specification
+        def dissolved_follow_water():
+            PR._run()
+            cake_out, pressate_out = PR.outs
+            water = float(cake_out.imass["Water"] + pressate_out.imass["Water"])
+            to_cake_water = float(cake_out.imass["Water"]) / water if water > 0 else 0.0
+            for cid in _ACID_PRESS_DISSOLVED_IDS:
+                total = float(cake_out.imass[cid] + pressate_out.imass[cid])
+                cake_out.imass[cid] = total * to_cake_water
+                pressate_out.imass[cid] = total * (1.0 - to_cake_water)
+    S = _PULP_HYDROLYSIS
+    H = _HYDROLYSATE_SEPARATOR
+    cake = PR - 0
+    pretreatment_units = []
+    if scenario == "baseline":
+        pretreatment_units, cake = _make_pulp_pretreatment_train(PR - 0)
+
+    # acid_press: the juice carries part of the acid and is neutralized before
+    # its concentration (the cake's acid is neutralized in the hydrolysis, M_SA).
+    juice = PR - 1
+    juice_units = []
+    if scenario == "acid_press":
+        juice_ammonia = bst.Stream("juice_ammonia", Ammonia=1.0, units="kg/hr", phase="l")
+        juice_ammonia.price = _TEA_PRICE["ammonia"]["baseline"]
+        NJ = bst.MixTank("NJ", ins=(PR - 1, juice_ammonia), outs=("neutralized_pressate",))
+
+        @NJ.add_specification
+        def neutralize_juice():
+            juice_ammonia.empty()
+            juice_ammonia.phase = "l"
+            juice_ammonia.imol["Ammonia"] = (
+                A["ammonia_mol_per_mol_H2SO4"] * float(NJ.ins[0].imol["H2SO4"]))
+            NJ._run()
+            neutralization_rxn.adiabatic_reaction(NJ.outs[0])
+
+        juice = NJ - 0
+        juice_units = [NJ]
+
+    enzyme = bst.Stream("hydrolysis_enzyme", units="kg/hr")
+    enzyme.price = _TEA_PRICE["enzyme"]["baseline"]
+    hydrolysis_water = bst.Stream("hydrolysis_water", Water=0.0, units="kg/hr")
+    hydrolysis_water.price = FRESH_WATER_PRICE_USD_PER_KG
+    # acid_press: ammonia for neutralizing the cake's acid joins the hydrolysis mixer.
+    hydrolysis_ammonia = bst.Stream("hydrolysis_ammonia", Ammonia=0.0, units="kg/hr", phase="l")
+    hydrolysis_ammonia.price = _TEA_PRICE["ammonia"]["baseline"]
+    M_SA = bst.Mixer(
+        "M_SA",
+        ins=(cake, enzyme, hydrolysis_water, *((hydrolysis_ammonia,) if scenario == "acid_press" else ())),
+        outs=("pulp_with_enzyme",),
+    )
+    M_SA.enzyme_loading_mg_per_g_dwb = _PULP_HYDROLYSIS["enzyme_loading_mg_per_g_dwb"]
+    insoluble_IDs = [i for i in get_solids_group_IDs() if i != "AmmoniumSulfate"]
+
+    @M_SA.add_specification
     def dose_enzyme_and_water():
-        slurry = M_SA.ins[0]
+        pulp = M_SA.ins[0]
         enzyme.empty()
         enzyme.phase = "l"
-        saccharification_water.empty()
-        enzyme.imass["Enzyme"] = enzyme_dose_frac * (
-            slurry.imass["Glucan"] + slurry.imass["Alginate"]
-        )
-        insoluble_kgph = float(slurry.imass[insoluble_IDs].sum())
-        total_kgph = slurry.F_mass + enzyme.F_mass
-        saccharification_water.imass["Water"] = max(
-            insoluble_kgph / S["solids_loading"] - total_kgph, 0.0
-        )
+        hydrolysis_water.empty()
+        hydrolysis_ammonia.empty()
+        hydrolysis_ammonia.phase = "l"
+        if scenario == "acid_press":
+            hydrolysis_ammonia.imol["Ammonia"] = (
+                A["ammonia_mol_per_mol_H2SO4"] * float(pulp.imol["H2SO4"]))
+        biomass = MI.outs[0]  # milled biomass fed to the press
+        dry_kgph = float(biomass.F_mass - biomass.imass["Water"])
+        enzyme.imass["Enzyme"] = M_SA.enzyme_loading_mg_per_g_dwb / 1000.0 * dry_kgph
+        insoluble_kgph = float(pulp.imass[insoluble_IDs].sum())
+        total_kgph = pulp.F_mass + enzyme.F_mass + hydrolysis_ammonia.F_mass
+        hydrolysis_water.imass["Water"] = max(insoluble_kgph / S["solids_loading"] - total_kgph, 0.0)
+        M_SA._run()
+        if scenario == "acid_press":
+            neutralization_rxn.adiabatic_reaction(M_SA.outs[0])
 
-    H_SA = bst.HXutility(
-        "H_SA", ins=M_SA - 0, outs=("slurry_to_saccharification",), T=S["T_K"],
+    H_SA = bst.HXutility("H_SA", ins=M_SA - 0, outs=("pulp_to_hydrolysis",), T=S["T_K"])
+    SA = HydrolysisTank(
+        "SA", ins=H_SA - 0, outs=("hydrolyzed_pulp",), tau=S["tau_hr"], V_max=S["V_max_m3"],
     )
-    SA = bst.MixTank("SA", ins=H_SA - 0, outs=("saccharified_slurry",), tau=S["tau_hr"])
-    hydrolysis_rxns = tmo.ParallelReaction([
-        tmo.Reaction("Glucan + Water -> Glucose", reactant="Glucan",
-                     X=S["hydrolysis_conversion"]),
-        tmo.Reaction("Alginate + Water -> AlginateMonomer", reactant="Alginate",
-                     X=S["hydrolysis_conversion"]),
+    SA.hydrolysis_conversion = _PULP_HYDROLYSIS["hydrolysis_conversion"]
+    SA.hydrolysis_rxns = tmo.ParallelReaction([
+        tmo.Reaction("Glucan + Water -> Glucose", reactant="Glucan", X=SA.hydrolysis_conversion),
+        tmo.Reaction("Alginate + Water -> Uronics", reactant="Alginate", X=SA.hydrolysis_conversion),
     ])
 
     @SA.add_specification
-    def saccharify():
+    def hydrolyze():
         SA._run()
-        hydrolysis_rxns(SA.outs[0])
+        SA.hydrolysis_rxns.X[:] = SA.hydrolysis_conversion
+        SA.hydrolysis_rxns(SA.outs[0])
 
-    # --- Solid-liquid separation -------------------------------------------
     split = {
         cid: (H["solids_split_to_cake"] if cid in insoluble_IDs else H["solutes_split_to_cake"])
         for cid in SA.chemicals.IDs if cid != "Water"
     }
     SLS = bst.PressureFilter(
-        "SLS", ins=SA - 0, outs=("hydrolysis_residue", "hydrolysate"),
+        "SLS", ins=SA - 0, outs=("hydrolysis_residue", "pulp_hydrolysate"),
         split=split, moisture_content=H["moisture_content"],
     )
 
-    units = [ACID_ST, AM, M_PT, R_PT, F_PT, H_PT, NH3_ST, NT, M_SA, H_SA, SA, SLS]
-    return units, SLS - 0, SLS - 1
-
-
-def _build_cake_saccharification_upstream(configuration, MI, biostimulant_price):
-    """
-    Upstream section of the 'biostimulant_cake' and 'juice_cake'
-    configurations: plain Press on the milled biomass, the cake through
-    `_make_cake_hydrolysis_train`, and the 3-HP sugar concentration chain.
-    In 'biostimulant_cake' the pressate goes to a separate biostimulant
-    chain (unit IDs prefixed 'B') instead; in 'juice_cake' it is mixed with
-    the hydrolysate (M_JH), like biorefineries.cane's hydrolysate-and-juice
-    mixer.
-
-    Returns a dict with 'units' (path order, MI included),
-    'fermentation_feed' and 'boiler_solids'.
-    """
-    PR = Press(
-        "PR", ins=MI - 0, outs=("pressed_cake", "pressate"),
-        cake_solids_wt_frac=_PRESS_CAKE_SOLIDS_WT_FRAC_OVERRIDE,
-    )
-    units = [MI, PR]
-
-    if configuration == "biostimulant_cake":
-        BPFS, BPC, BDIL, BEV = _make_pressate_concentration_chain(
-            PR - 1, unit_prefix="B", stream_prefix="biostimulant_",
-            fresh_water_ID="biostimulant_fresh_water",
-            product_ID="biostimulant_product",
-            condensate_ID="biostimulant_condensed_vapor",
-            pc_kwargs={}, ev_kwargs={},  # biostimulant.yaml defaults
-        )
-        BEV.outs[0].price = (
-            _TEA_PRICE["biostimulant"]["baseline"] if biostimulant_price is None
-            else float(biostimulant_price)
-        )
-        units += [BPFS, BPC, BDIL, BEV]
-
-    train_units, residue, hydrolysate = _make_cake_hydrolysis_train(PR.outs[0])
-    units += train_units
-
-    if configuration == "juice_cake":
-        M_JH = bst.Mixer("M_JH", ins=(PR - 1, hydrolysate), outs=("juice_and_hydrolysate",))
-        units.append(M_JH)
-        sugar_feed = M_JH - 0
-    else:
-        sugar_feed = hydrolysate
-
+    # Juice concentration chain (PFS/PC/DIL/EV) on the pressate.
     PFS, PC, DIL, EV = _make_pressate_concentration_chain(
-        sugar_feed, unit_prefix="", stream_prefix="",
+        juice, unit_prefix="", stream_prefix="",
         fresh_water_ID="fermentation_fresh_water",
-        product_ID="fermentation_feed", condensate_ID="EV_condensed_vapor",
+        product_ID="concentrated_juice", condensate_ID="EV_condensed_vapor",
         pc_kwargs=_SUGAR_PC_KWARGS, ev_kwargs=_SUGAR_EV_KWARGS,
     )
-    units += [PFS, PC, DIL, EV]
+    # The pulp hydrolysate carries only a few wt% sugar (the hydrolysis slurry is
+    # 20 wt% insoluble solids), and boiling off that water would dominate the
+    # plant's heat demand, so it goes through the same membrane/evaporator
+    # concentration chain ('H' prefix) before blending. Its evaporator target
+    # follows the juice evaporator's, the one knob the scenario scripts set.
+    HPFS, HPC, HDIL, HEV = _make_pressate_concentration_chain(
+        SLS - 1, unit_prefix="H", stream_prefix="hydrolysate_",
+        fresh_water_ID="hydrolysate_fresh_water",
+        product_ID="concentrated_hydrolysate",
+        condensate_ID="HEV_condensed_vapor",
+        pc_kwargs=_SUGAR_PC_KWARGS, ev_kwargs=_SUGAR_EV_KWARGS,
+    )
 
-    return dict(units=tuple(units), fermentation_feed=EV - 0, boiler_solids=(residue,))
+    @SLS.add_specification(run=True)
+    def sync_hydrolysate_target():
+        HEV.target_solids_wt_frac = EV.target_solids_wt_frac
+
+    FM = bst.Mixer("FM", ins=(EV - 0, HEV - 0), outs=("fermentation_feed",))
+    units = (MI, *press_units, PR, *juice_units, PFS, PC, DIL, EV, *pretreatment_units, M_SA, H_SA, SA, SLS, HPFS, HPC, HDIL, HEV, FM)
+    return dict(units=units, fermentation_feed=FM - 0, boiler_solids=(SLS - 0,))
 
 
 def create_3hp_system(
-    feedstock: str = "pelagic",
+    feedstock: str = "wiatrowski2026",
     ca3hp2_price: float | None = None,
-    configuration: str = "enzymatic_press",
-    biostimulant_price: float | None = None,
+    scenario: str = "baseline",
 ):
     """
     Build the full feedstock-to-product system: raw Sargassum -> Mill ->
-    [upstream, per `configuration`] -> HPFermentation -> cell-mass removal ->
+    pulp/juice upstream -> HPFermentation -> cell-mass removal ->
     broth concentration -> CaHPCrystallizer -> crystal separation -> drying
     -> dried Ca(3HP)2, split (accounting only) into a pure-Ca3HP2 stream and
-    an impurities stream. Everything from HPFermentation on is identical
-    across configurations.
+    an impurities stream. Upstream (see the module docstring): mill, plain
+    press; juice concentrated; pulp enzymatically hydrolyzed in a 96 h tank,
+    filtered and concentrated; the two concentrates blended into one
+    fermentation feed. Scenario knobs: `M_SA.enzyme_loading_mg_per_g_dwb`,
+    `SA.hydrolysis_conversion`, `EV.target_solids_wt_frac`.
 
     Parameters
     ----------
@@ -466,47 +563,28 @@ def create_3hp_system(
         Price (USD/kg of pure Ca3HP2) to set on the `ca3hp2_product`
         stream, i.e. on the Ca3HP2 content of the dried product only.
         Defaults to data/tea.yaml `price.3hp.baseline` when not given.
-    configuration : str
-        One of `CONFIGURATIONS`:
-
-        - 'enzymatic_press' (default): EnzymaticPress hydrolyzes part of the
-          glucan/alginate in the press; the pressate is concentrated and
-          fermented and the pressed cake goes to the boiler.
-        - 'biostimulant_cake': plain Press; the pressate becomes a
-          biostimulant product and the cake is dilute-acid pretreated,
-          saccharified and filtered into the fermentation feed (residual
-          solids to the boiler), analogous to sugarcane bagasse.
-        - 'juice_cake': plain Press; the pressate ("juice") and the cake's
-          hydrolysate (same train as above) are combined into the
-          fermentation feed, analogous to biorefineries.cane's combined
-          1G+2G design.
-    biostimulant_price : float, optional
-        Price (USD/kg) set on the `biostimulant_product` stream
-        ('biostimulant_cake' only). Defaults to data/tea.yaml
-        `price.biostimulant.baseline`.
-
+    scenario : str
+        'baseline' (milled biomass -> press -> dilute-acid pretreatment and
+        neutralization of the pulp -> enzymatic hydrolysis) or
+        'acid_press' (H2SO4 dosed to 1 wt% of the pre-press biomass, same
+        hydrolysis as the baseline pretreatment assumed in the press; ammonia
+        neutralization in the hydrolysis step and for the juice).
     Returns
     -------
     sys : bst.System
         Key streams and units are accessible via `sys.flowsheet.stream`
         and `sys.flowsheet.unit` (e.g. 'sargassum_feed', 'pressed_cake',
-        'ca3hp2_product', 'MI', 'PR', 'F401', 'C401'; plus 'PT'-area units
-        such as 'R_PT', 'SA', 'SLS' in the cake configurations).
+        'ca3hp2_product', 'MI', 'PR', 'SA', 'SLS', 'F401', 'C401').
     """
-    if configuration not in CONFIGURATIONS:
-        raise ValueError(
-            f"Unknown configuration {configuration!r}. Choose from {CONFIGURATIONS}."
-        )
-
     # Always rebuilds the include_hp3 chemical superset -- see module
     # docstring for why this can't reuse an already-set thermo the way
     # every other sabre system's `try: get_chemicals() except: create_...`
-    # guard does. The cake configurations additionally need the dilute-acid
-    # chemicals (H2SO4, AmmoniumSulfate); the baseline's own set is left
-    # exactly as it was.
+    # guard does.
+    if scenario not in SCENARIOS:
+        raise ValueError(f"scenario must be one of {SCENARIOS}, got {scenario!r}")
     create_chemicals(
         set_thermo=True, include_hp3=True,
-        include_dilute_acid=(configuration != "enzymatic_press"),
+        include_dilute_acid=True,
     )
 
     feedstock_assumptions = load_assumptions("feedstock.yaml")
@@ -522,155 +600,21 @@ def create_3hp_system(
     feed.price = _TEA_PRICE["sargassum"]["baseline"]
 
     # -------------------------------------------------
-    # Preprocessing: Mill -> [Press, per configuration]
+    # Preprocessing: Mill -> press and pulp/juice upstream
     # -------------------------------------------------
     MI = Mill("MI", ins=feed, outs=("milled_biomass", "milling_losses"))
     # milling_losses is combustible biomass, same as pressed_cake -- routed
     # to BT below instead of priced as disposal.
 
-    # What each configuration's upstream section hands to the shared
-    # fermentation-to-product section below:
+    # What the upstream section hands to the fermentation-to-product section:
     #   upstream_units     -- units in path order, MI included
     #   fermentation_feed  -- stream feeding HPFermentation
     #   boiler_solids      -- solid streams (besides milling_losses and
     #                         cell_mass) that go to BT
-    if configuration == "enzymatic_press":
-        enzyme = bst.Stream("enzyme_cocktail")
-        enzyme.price = _TEA_PRICE["enzyme"]["baseline"]
-
-        PR = EnzymaticPress(
-            "PR", ins=(MI - 0, enzyme), outs=("pressed_cake", "pressate"),
-            # Overrides preprocessing.yaml's own cake_solids_wt_frac (0.15) --
-            # see data/3hp.yaml press_cake_solids_wt_frac_override's own
-            # sources note for why.
-            cake_solids_wt_frac=_PRESS_CAKE_SOLIDS_WT_FRAC_OVERRIDE,
-        )
-        # pressed_cake (unconverted Glucan/Alginate, Ash, Protein, Fucoidan,
-        # OtherSolids) is NOT priced as disposal -- it's routed to BT (the
-        # BoilerTurbogenerator facility, wired near the end of this function)
-        # for steam/electricity credit, per the design spec sec. 5.
-
-        # -------------------------------------------------
-        # Pressate concentration: PFS (splits raw pressate) -> PC -> DIL ->
-        # fermentation_feed_evaporator (~20 wt% dissolved solids target).
-        # Mirrors systems._biostimulant_system.create_biostimulant_system's own
-        # PFS/PC/DIL/EV chain exactly (same adjust_pressate_split logic),
-        # retargeted to this pathway's own solute set/yaml section.
-        # -------------------------------------------------
-        fresh_water = bst.Stream("fermentation_fresh_water", Water=0.0, units="kg/hr")
-        fresh_water.price = FRESH_WATER_PRICE_USD_PER_KG
-
-        PFS = bst.MockSplitter(
-            "PFS",
-            ins=PR - 1,
-            outs=("to_concentrator", "bypass_pressate"),
-        )
-
-        PC = PressateConcentrator(
-            "PC", ins=PFS - 0,
-            outs=("membrane_concentrate", "permeate"),
-            retained_solute_IDs=tuple(_PRESSATE_CONCENTRATOR["retained_solute_IDs"]),
-            water_recovery_to_permeate=_PRESSATE_CONCENTRATOR["water_recovery_to_permeate"],
-            retained_solute_recovery_to_concentrate=_PRESSATE_CONCENTRATOR["retained_solute_recovery_to_concentrate"],
-            nontarget_solute_recovery_to_permeate=_PRESSATE_CONCENTRATOR["nontarget_solute_recovery_to_permeate"],
-            design_flux_L_m2_h=_PRESSATE_CONCENTRATOR["design_flux_L_m2_h"],
-            operating_pressure_bar=_PRESSATE_CONCENTRATOR["operating_pressure_bar"],
-            electricity_kWh_per_m3_feed=_PRESSATE_CONCENTRATOR["electricity_kWh_per_m3_feed"],
-            capex_usd_per_m2=_PRESSATE_CONCENTRATOR["capex_usd_per_m2"],
-            maintenance_frac_of_capex_per_yr=_PRESSATE_CONCENTRATOR["maintenance_frac_of_capex_per_yr"],
-        )
-        PC.outs[1].price = _TEA_PRICE["disposal_wastewater"]["baseline"]
-
-        DIL = bst.Mixer(
-            "DIL",
-            ins=(PC - 0, PFS - 1, fresh_water),
-            outs=("diluted_pressate",),
-        )
-
-        EV = BiostimulantEvaporator(
-            "EV",
-            ins=DIL - 0,
-            outs=("fermentation_feed", "EV_condensed_vapor"),
-            target_solids_wt_frac=_FEED_EVAPORATOR["target_solids_wt_frac"],
-            boiling_temperature_K=_FEED_EVAPORATOR["boiling_temperature_K"],
-            condensing_temperature_K=_FEED_EVAPORATOR["condensing_temperature_K"],
-            nonwater_recovery_to_product=_FEED_EVAPORATOR["nonwater_recovery_to_product"],
-            tau=_FEED_EVAPORATOR["tau"],
-            vacuum_system_preference=_FEED_EVAPORATOR["vacuum_system_preference"],
-        )
-        EV.outs[1].price = _TEA_PRICE["disposal_wastewater"]["baseline"]
-
-        @PFS.add_specification(run=True)
-        def adjust_pressate_split():
-            pressate = PFS.ins[0]
-            to_conc, bypass = PFS.outs
-
-            fresh_water.empty()
-
-            F = float(pressate.F_mass)
-            ids = set(pressate.chemicals.IDs)
-            water_raw = float(pressate.imass["Water"]) if "Water" in ids else 0.0
-            nonwater_raw = F - water_raw
-
-            target = EV.target_solids_wt_frac
-
-            if (
-                target is None or not (0.0 < target < 1.0)
-                or nonwater_raw <= 0 or not PC.enabled
-            ):
-                to_conc.copy_like(pressate)
-                bypass.empty()
-                return
-
-            retained = set(PC.retained_solute_IDs)
-            conc_water = water_raw * (1.0 - PC.water_recovery_to_permeate)
-            conc_nonwater = 0.0
-            for cid in pressate.chemicals.IDs:
-                if cid == "Water":
-                    continue
-                m = float(pressate.imass[cid])
-                if m <= 0:
-                    continue
-                rec = (
-                    PC.retained_solute_recovery_to_concentrate if cid in retained
-                    else (1.0 - PC.nontarget_solute_recovery_to_permeate)
-                )
-                conc_nonwater += m * rec
-            conc_mass_full = conc_water + conc_nonwater
-
-            if conc_mass_full <= 0:
-                to_conc.copy_like(pressate)
-                bypass.empty()
-                return
-
-            x_raw = nonwater_raw / F
-            x_conc = conc_nonwater / conc_mass_full
-
-            if target <= x_raw:
-                f = 0.0
-                water_needed_total = nonwater_raw * (1.0 - target) / target
-                fresh_water.imass["Water"] = max(water_needed_total - water_raw, 0.0)
-            elif target >= x_conc:
-                f = 1.0
-            else:
-                A = conc_mass_full * (x_conc - target)
-                B = F * (x_raw - target)
-                f = B / (B - A)
-
-            to_conc.copy_like(pressate)
-            to_conc.mol *= f
-            bypass.copy_like(pressate)
-            bypass.mol *= (1.0 - f)
-
-        upstream_units = (MI, PR, PFS, PC, DIL, EV)
-        fermentation_feed = EV - 0
-        boiler_solids = (PR - 0,)
-
-    else:
-        upstream = _build_cake_saccharification_upstream(configuration, MI, biostimulant_price)
-        upstream_units = upstream["units"]
-        fermentation_feed = upstream["fermentation_feed"]
-        boiler_solids = upstream["boiler_solids"]
+    upstream = _build_juice_pulp_upstream(MI, params.get("press"), scenario)
+    upstream_units = upstream["units"]
+    fermentation_feed = upstream["fermentation_feed"]
+    boiler_solids = upstream["boiler_solids"]
 
     # -------------------------------------------------
     # Fermentation
@@ -844,7 +788,12 @@ def create_3hp_system(
     HXN = bst.HeatExchangerNetwork(
         "HXN",
         units=(
-            *upstream_units,
+            # H_SA heats a solids-laden slurry (Glucan, Alginate, ...) whose
+            # components have no vapor-phase thermo, which breaks the pinch
+            # analysis; it and the acid-pretreatment units (same slurry, plus
+            # the flash) are left out of heat integration (their steam is
+            # charged in full).
+            *(u for u in upstream_units if u.ID not in _NOT_HEAT_INTEGRATED),
             F401, S401, M_ML, F402, F402_P, C401, S402, SP_ML, F403,
         ),
     )
@@ -892,6 +841,8 @@ def create_3hp_system(
     BT.outs[1].price = _TEA_PRICE["disposal_wastewater"]["baseline"]
 
     CT = bst.CoolingTower("CT")
+    # Cooling-tower blowdown is liquid waste like the other purged streams.
+    CT.outs[0].price = _TEA_PRICE["disposal_wastewater"]["baseline"]
     CWP = bst.ChilledWaterPackage("CWP")
     # Process water center, as in biosteam's create_facilities and
     # biorefineries.cellulosic: balances the boiler and cooling-tower makeup
@@ -910,7 +861,7 @@ def create_3hp_system(
     facilities = (BT, CWP, CT, PWC)
 
     sys = bst.System(
-        "hp3_sys" if configuration == "enzymatic_press" else f"hp3_{configuration}_sys",
+        "hp3_sys",
         path=path, facilities=facilities,
     )
     create_tea(sys)
@@ -918,93 +869,26 @@ def create_3hp_system(
     return sys
 
 
-def price_3hp_system(
-    configuration: str = "enzymatic_press",
-    credit_tipping_fee: bool = False,
-) -> dict:
+def price_3hp_system(scenario: str = "baseline") -> dict:
     """
-    Parameters
-    ----------
-    configuration : str
-        One of `CONFIGURATIONS` (see create_3hp_system).
-    credit_tipping_fee : bool
-        Only for configuration='biostimulant_cake', mirroring
-        systems._biomethane_system.price_biomethane_system's switch of the
-        same name.
-
-        If False (default): biostimulant is priced at its flat data/tea.yaml
-        `price.biostimulant.baseline`, and Ca(3HP)2's price is solved on a
-        single TEA covering every unit, biostimulant's included.
-
-        If True: biostimulant is instead priced at its own standalone MSP
-        (price_biostimulant_system()), and Ca(3HP)2's price is solved
-        against a 3-HP-only TEA scope that excludes the biostimulant
-        subsystem's capital (its Press and 'B'-prefixed chain) -- which
-        biostimulant's own price already recovers -- plus a tipping-fee
-        credit equal to data/tea.yaml `price.disposal_solid.baseline` on the
-        pressed_cake mass taken in, since biostimulant would otherwise have
-        paid that same fee to dispose of it.
+    Build, simulate and price the 3-HP system (`create_3hp_system()`): solves
+    the minimum selling price of the pure Ca(3HP)2 stream. Returns a dict with
+    the MSP (`msp_usd_per_kg`), annual product (`annual_product_kg`) and the
+    simulated system (`sys`).
     """
-    from biorefineries.sabre._tea import (
-        solve_product_msp, disposal_avoided_credit_usd_per_yr, apply_revenue_credit,
-    )
-    if credit_tipping_fee and configuration != "biostimulant_cake":
-        raise ValueError("credit_tipping_fee only applies to configuration='biostimulant_cake'.")
-
-    biostimulant_price = None
-    if configuration == "biostimulant_cake":
-        if credit_tipping_fee:
-            from biorefineries.sabre.systems._biostimulant_system import price_biostimulant_system
-            # Base chemical set first, so the standalone biostimulant price
-            # doesn't depend on whichever set an earlier call left behind.
-            create_chemicals(set_thermo=True)
-            biostimulant_price = price_biostimulant_system()["msp_usd_per_kg"]
-        else:
-            biostimulant_price = _TEA_PRICE["biostimulant"]["baseline"]
+    from biorefineries.sabre._tea import solve_product_msp
 
     bst.main_flowsheet.clear()
-
-    sys = create_3hp_system(configuration=configuration, biostimulant_price=biostimulant_price)
+    sys = create_3hp_system(scenario=scenario)
     sys.simulate()
-
-    product = sys.flowsheet.stream.ca3hp2_product
-
-    tipping_fee_usd_per_yr = 0.0
-    if credit_tipping_fee:
-        specific_units = [u for u in sys.units if u.ID not in _BIOSTIMULANT_SCOPE_UNIT_IDS]
-        specific_sys = bst.System.from_units("hp3_specific_sys", units=specific_units)
-        specific_tea = create_tea(specific_sys)
-        msp = solve_product_msp(tea=specific_tea, product_stream=product)
-        msp_before_tipping_credit = msp["usd_per_kg"]
-        tipping_fee_usd_per_yr = disposal_avoided_credit_usd_per_yr(
-            sys.flowsheet.stream.pressed_cake, _TEA_PRICE["disposal_solid"]["baseline"], specific_tea,
-        )
-        msp = apply_revenue_credit(msp, tipping_fee_usd_per_yr)
-    else:
-        msp = solve_product_msp(tea=sys.TEA, product_stream=product)
-
-    result = {
+    msp = solve_product_msp(tea=sys.TEA, product_stream=sys.flowsheet.stream.ca3hp2_product)
+    return {
         "label": "Calcium 3-hydroxypropionate",
         "product_desc": "dried crystalline Ca(3HP)2",
-        "configuration": configuration,
         "msp_usd_per_kg": msp["usd_per_kg"],
         "annual_product_kg": msp["annual_product_kg"],
         "sys": sys,
     }
-    if configuration == "biostimulant_cake":
-        result.update(
-            biostimulant_price_usd_per_kg=biostimulant_price,
-            credit_tipping_fee=credit_tipping_fee,
-            tipping_fee_usd_per_yr=tipping_fee_usd_per_yr,
-        )
-        if credit_tipping_fee:
-            # The 3-HP-only-scope MSP before the tipping-fee credit, and that
-            # scope's TCI -- the credit is large enough to dominate the result.
-            result.update(
-                msp_before_tipping_credit_usd_per_kg=msp_before_tipping_credit,
-                specific_scope_TCI=specific_tea.TCI,
-            )
-    return result
 
 
 if __name__ == '__main__':

@@ -1,7 +1,7 @@
 # Model Assumptions: 3-HP Fermentation and Crystallization
 
-# Overrides sabre.units._preprocessing's EnzymaticPress instance in
-# systems/_3hp_system.py only.
+# Default cake solids of the press in systems/_3hp_system.py; a feedstock
+# type's own `press` block (data/feedstock.yaml) overrides it.
 press_cake_solids_wt_frac_override: 0.27  # see sources below
 
 sources:
@@ -15,10 +15,10 @@ sources:
 
 
 pressate_concentrator:
-  # Retargets sabre.units.PressateConcentrator at the EnzymaticPress pressate's
-  # fermentable sugars (Glucose, Mannitol, AlginateMonomer).
+  # Retargets sabre.units.PressateConcentrator at the pressate's and hydrolysate's
+  # fermentable sugars (Glucose, Mannitol, Uronics).
   enabled: true
-  retained_solute_IDs: [Glucose, Mannitol, AlginateMonomer]
+  retained_solute_IDs: [Glucose, Mannitol, Uronics]
   water_recovery_to_permeate: 0.93  # same basis as biostimulant.yaml's own instance
   retained_solute_recovery_to_concentrate: 0.95  # same basis as biostimulant.yaml's own instance
   nontarget_solute_recovery_to_permeate: 0.70  # no reference; same placeholder as biostimulant.yaml
@@ -83,7 +83,7 @@ fermentation:
   #
   # Glucose -> 2 HP is exactly mass-balanced (2 * HP's MW == Glucose's MW,
   # both 180.15588), so its hp_yield_kg_per_kg_consumed is exactly 1.0.
-  # Mannitol and AlginateMonomer are NOT exact multiples of HP's MW, and
+  # Mannitol and Uronics are NOT exact multiples of HP's MW, and
   # thermosteam.Reaction does not enforce or warn on an unbalanced
   # reaction -- confirmed by direct testing that running an unbalanced
   # Reaction (e.g. "Mannitol -> 2 HP") silently destroys real mass. To
@@ -110,7 +110,7 @@ fermentation:
       hp_yield_kg_per_kg_consumed: 0.9889341794798491
       biomass_conversion: 0.05
       biomass_yield_kg_per_kg_consumed: 0.8179386113412968
-    AlginateMonomer:
+    Uronics:
       hp_conversion: 0.40
       hp_yield_kg_per_kg_consumed: 0.9279717563771187
       biomass_conversion: 0.05
@@ -138,7 +138,7 @@ fermentation:
   sources:
     conversions_and_titer:
       key: user_specified
-      note: "Mannitol/AlginateMonomer hp_conversion (0.40) and productivity_g_per_L_per_h (0.76) are still the generic HP-pathway defaults biorefineries.HP itself uses for its own Glucose/Xylose -> HP conversions, not derived from literature for Sargassum-derived substrates or this organism specifically -- see glucose_conversion below for the one substrate that HAS been updated."
+      note: "Mannitol/Uronics hp_conversion (0.40) and productivity_g_per_L_per_h (0.76) are still the generic HP-pathway defaults biorefineries.HP itself uses for its own Glucose/Xylose -> HP conversions, not derived from literature for Sargassum-derived substrates or this organism specifically -- see glucose_conversion below for the one substrate that HAS been updated."
     glucose_conversion:
       key: Tan_2026_Issatchenkia_orientalis
       note: >
@@ -166,7 +166,7 @@ fermentation:
         per-consumed yield). Caveats: (1) measured on dextrose/CSL medium,
         not on Sargassum-derived sugars, so transferability to this
         feedstock's actual hydrolysate (mixed Glucose/Mannitol/
-        AlginateMonomer, residual ash/salts) is unverified; (2) the 95%
+        Uronics, residual ash/salts) is unverified; (2) the 95%
         consumption fraction is this model's own assumption, not read
         directly off the paper; (3) titer (92 g/L) and productivity
         (0.55 g/L/h) from the same paper were NOT incorporated here --
@@ -209,7 +209,7 @@ cell_mass_centrifuge:
   # bst.units.SolidsCentrifuge:
   # separates CellMass (formed as a small side product in HPFermentation)
   # from the clarified broth before the broth_evaporator/CaHPCrystallizer chain.
-  cellmass_split_to_cake: 0.98  # fraction of CellMass captured to the solids-rich outlet; same basis as EnzymaticPress/Press's own solids_capture_frac
+  cellmass_split_to_cake: 0.98  # fraction of CellMass captured to the solids-rich outlet; same basis as Press's own solids_capture_frac
   moisture_content: 0.65  # scoping placeholder for a wet cell-mass cake; no source found for this value
 
   sources:
@@ -252,13 +252,62 @@ dryer:
       note: "Patent's oven-drying step (Examples 1/2) reports final moisture in the ~200-5000 ppm range; 500 ppm selected as a representative mid-range target."
 
 
+hydrolysate_separator:
+  # bst.PressureFilter after saccharification, as cellulosic's cornstover
+  # train does. Residual solids go to the boiler; the filtrate is the
+  # hydrolysate.
+  moisture_content: 0.35  # BioSTEAM PressureFilter default (Humbird et al. 2011)
+  solids_split_to_cake: 0.98  # Humbird's insoluble-solids retention (PressureFilter defaults)
+  solutes_split_to_cake: 0.03714  # Humbird's dissolved-species carryover in the cake moisture
+
+  sources:
+    filter:
+      key: cellulosic_precedent
+      note: "Values are biosteam.PressureFilter's own defaults, taken from Humbird et al. (2011) NREL/TP-5100-47764."
+
+
 # ---------------------------------------------------------------------------
-# Cake-saccharification configurations ("biostimulant_cake", "juice_cake";
-# systems/_3hp_system.py). The plain Press cake is dilute-acid pretreated,
-# saccharified, and filtered, mirroring biorefineries.cellulosic's corn stover
-# train (systems/pretreatment/dilute_acid.py) with sabre-local units.
+# "juice_pulp" configuration (systems/_3hp_system.py): mill -> screw press ->
+# juice concentration; press pulp -> enzymatic hydrolysis tank -> filter;
+# juice concentrate and pulp hydrolysate are combined as one fermentation feed.
 # ---------------------------------------------------------------------------
-cake_dilute_acid_pretreatment:
+pulp_enzymatic_hydrolysis:
+  # Scenario scripts set the conversion on the hydrolysis tank (SA) and the
+  # enzyme loading on the enzyme mixer (M_SA).
+  # Fraction of Glucan and of Alginate hydrolyzed directly to Glucose / Uronics.
+  hydrolysis_conversion: 0.80
+  # Total enzyme per g dry biomass fed to the press (the ASPECT milestone cap).
+  enzyme_loading_mg_per_g_dwb: 25.0
+  solids_loading: 0.20  # insoluble-solids wt frac in the hydrolysis tank; water added only if the pulp is more concentrated
+  T_K: 321.15  # 48 degC, same as cellulosic's saccharification
+  V_max_m3: 3785.4  # largest single tank (1,000,000 gal), as biorefineries.cellulosic.Saccharification
+  tau_hr: 96.0  # hydrolysis time in the proposal's milestone text; PLACEHOLDER for vessel sizing
+
+  sources:
+    hydrolysis_conversion:
+      key: proposal_milestones
+      note: "80% monomer release, the BP3/GNG2/BP5 target; a target, not a measured value for this feedstock and enzyme."
+    enzyme_loading:
+      key: proposal_milestones
+      note: "25 mg enzyme/g dry weight biomass, the milestone cap, as the total dose; the stream is priced at data/tea.yaml price.enzyme."
+    tank_costing:
+      key: cellulosic_HP_precedent
+      note: "SA is sabre.units.HydrolysisTank, costed like biorefineries.cellulosic ContinuousPresaccharification and biorefineries.HP Saccharification (Humbird et al. 2011): volume-scaled tanks (exponent 0.7) up to V_max each, instead of 30 m3 stirred MixTanks. Both references use 24 h residence; 96 h here is the proposal's figure, so the tank volume is extrapolated well beyond the Humbird size."
+    tau:
+      key: proposal_milestones
+      note: "96 h is the hydrolysis time in the ASPECT milestone table / project prompt; no feedstock-specific kinetics are modeled, only a fixed conversion, so the tank is sized for this residence time."
+    solids_loading:
+      key: HP_precedent
+      note: "biorefineries.HP.units.EnzymeHydrolysateMixer's solid_loading (0.20)."
+
+# ---------------------------------------------------------------------------
+# `baseline` scenario (systems/_3hp_system.py): the press pulp is
+# dilute-acid pretreated and neutralized before the enzymatic hydrolysis,
+# mirroring biorefineries.cellulosic's corn stover train
+# (systems/pretreatment/dilute_acid.py) with sabre-local units. The
+# `acid_press` scenario skips this step.
+# ---------------------------------------------------------------------------
+acid_pretreatment:
   # Sulfuric acid dosing. The acid stream is a ~93.3 wt% H2SO4 solution
   # (1800 kg H2SO4 : 130 kg water, biorefineries.cellulosic.streams), and the
   # loading is on a SOLUTION-mass basis per kg of dry feed, as in
@@ -283,7 +332,7 @@ cake_dilute_acid_pretreatment:
   # Conversions applied in the reactor. Glucan value is corn stover's own
   # (PretreatmentReactorSystem's Glucan + H2O -> Glucose, X=0.099).
   glucan_to_glucose_conversion: 0.099
-  alginate_to_alginate_monomer_conversion: 0.099  # PLACEHOLDER: reuses the Glucan value
+  alginate_to_uronics_conversion: 0.099  # PLACEHOLDER: reuses the Glucan value
 
   flash_P_Pa: 101325.0
   ammonia_mol_per_mol_H2SO4: 2.0  # 2 NH3 + H2SO4 -> (NH4)2SO4, full neutralization
@@ -303,38 +352,27 @@ cake_dilute_acid_pretreatment:
       note: "Corn stover also adds 2435.6 kg process water per kmol NH4OH; omitted here (the hydrolysate is diluted or concentrated to spec downstream anyway)."
 
 
-cake_saccharification:
-  # Enzyme dose and excess reuse data/preprocessing.yaml `enzymatic_press`
-  # (20 mg/g + 10%), read there rather than duplicated here.
-  hydrolysis_conversion: 0.80  # PLACEHOLDER (Glucan and Alginate -> Glucose / AlginateMonomer), applied to what survives pretreatment
-  solids_loading: 0.20  # insoluble-solids wt frac; water is added only if the slurry is more concentrated than this
-  T_K: 321.15  # 48 degC, same as cellulosic's HydrolysateHeatExchanger
-  tau_hr: 48.0  # PLACEHOLDER
+# ---------------------------------------------------------------------------
+# `acid_press` scenario: no pretreatment reactor; concentrated H2SO4 is dosed
+# into the milled biomass ahead of the screw press, which is assumed to give
+# the same hydrolysis as the baseline's dilute-acid pretreatment. The acid is
+# neutralized with ammonia in the enzymatic hydrolysis step (and for the juice).
+# ---------------------------------------------------------------------------
+acid_press:
+  H2SO4_wt_frac_pre_press: 0.01  # H2SO4 as a wt fraction of the pre-press mixture (biomass + acid solution)
+  # Acid solution composition, Glucan/Alginate conversions and the ammonia
+  # ratio are the baseline's (`acid_pretreatment` above).
 
   sources:
-    hydrolysis_conversion:
+    acid_dose:
       key: user_specified
-      note: "User-chosen placeholder (higher than the 0.50 used in EnzymaticPress, on the basis that dilute-acid pretreatment improves enzyme accessibility); not derived from literature for this feedstock. Sensitivity-test."
-    solids_loading:
-      key: HP_precedent
-      note: "biorefineries.HP.units.EnzymeHydrolysateMixer's own solid_loading (0.20)."
-    T:
-      key: cellulosic_precedent
-      note: "48 degC, biorefineries.cellulosic saccharification_system's HydrolysateHeatExchanger."
-    tau:
-      key: scoping_placeholder
-      note: "No source for this feedstock/enzyme combination; sensitivity-test."
-
-
-hydrolysate_separator:
-  # bst.PressureFilter after saccharification, as cellulosic's cornstover
-  # train does. Residual solids go to the boiler; the filtrate is the
-  # hydrolysate.
-  moisture_content: 0.35  # BioSTEAM PressureFilter default (Humbird et al. 2011)
-  solids_split_to_cake: 0.98  # Humbird's insoluble-solids retention (PressureFilter defaults)
-  solutes_split_to_cake: 0.03714  # Humbird's dissolved-species carryover in the cake moisture
-
-  sources:
-    filter:
-      key: cellulosic_precedent
-      note: "Values are biosteam.PressureFilter's own defaults, taken from Humbird et al. (2011) NREL/TP-5100-47764."
+      note: "1 wt% H2SO4 in the pre-press biomass, dosed as the ~93.3 wt% solution (user-specified, collaborator feedback)."
+    hydrolysis_in_press:
+      key: user_specified
+      note: "The screw press with acid is assumed to give the same hydrolysis as the baseline dilute-acid pretreatment (Glucan and Alginate conversions of acid_pretreatment), applied to the mixture ahead of the press, with no heating."
+    press_split:
+      key: simplification
+      note: "The measured 15 psi split was made without acid. Glucose, Uronics and H2SO4 are treated as dissolved and follow the water between cake and pressate; the other components keep the measured split. The juice therefore carries part of the acid and is neutralized before concentration (an addition: the cake's acid is neutralized in the hydrolysis step). Acid-resistant press materials are not costed."
+    enzyme:
+      key: simplification
+      note: "Enzyme is dosed only in the hydrolysis step (25 mg/g dry biomass, as in the baseline): an enzyme in the acidic press would not be active. The press-enzyme and NaCl-brine design of the earlier pretreatment_press scenario was dropped."

@@ -69,22 +69,53 @@ def test_microbial_oil():
 _3HP_SCRIPT = """
 import json, sys
 from biorefineries.sabre.systems import price_3hp_system
-r = price_3hp_system(configuration=sys.argv[1])
+r = price_3hp_system(scenario=sys.argv[1])
 print("RESULT" + json.dumps({k: r[k] for k in ("msp_usd_per_kg", "annual_product_kg")}))
 """
 
 
-@pytest.mark.parametrize("configuration, msp, annual_kg", [
-    ("enzymatic_press", 0.8823, 49136479.8),
-    ("biostimulant_cake", -1.6780, 67836637.4),
-    ("juice_cake", 1.1562, 72930492.9),
+@pytest.mark.parametrize("scenario, msp, annual", [
+    ("baseline", 1.3769, 75215630.6),
+    ("acid_press", 1.149, 75497210.2),
 ])
-def test_3hp(configuration, msp, annual_kg):
+def test_3hp(scenario, msp, annual):
     proc = subprocess.run(
-        [sys.executable, "-c", _3HP_SCRIPT, configuration],
+        [sys.executable, "-c", _3HP_SCRIPT, scenario],
         capture_output=True, text=True, check=True,
     )
     line = next(l for l in proc.stdout.splitlines() if l.startswith("RESULT"))
     r = json.loads(line[len("RESULT"):])
-    _assert_close(r["msp_usd_per_kg"], msp, f"{configuration} MSP")
-    _assert_close(r["annual_product_kg"], annual_kg, f"{configuration} annual product")
+    _assert_close(r["msp_usd_per_kg"], msp, f"3-HP MSP ({scenario})")
+    _assert_close(r["annual_product_kg"], annual, f"3-HP annual product ({scenario})")
+
+
+_3HP_INVENTORY_SCRIPT = """
+import json, sys
+from biorefineries.sabre import _lca
+from biorefineries.sabre.systems import price_3hp_system
+sys = price_3hp_system(scenario=sys.argv[1])["sys"]
+_lca.set_characterization_factors(sys)
+sys.simulate()
+rows = _lca.inventory_check(sys, sys.flowsheet.stream.ca3hp2_product)
+print("RESULT" + json.dumps(dict(
+    missing=[r["stream"] for r in rows if r["status"] != "ok"], n=len(rows),
+    gwp=_lca.get_gwp(sys, sys.flowsheet.stream.ca3hp2_product)["gwp_no_credit_per_kg_3hp"],
+)))
+"""
+
+
+@pytest.mark.parametrize("scenario, gwp", [
+    ("baseline", 1.3561),
+    ("acid_press", 1.8987),
+])
+def test_3hp_inventory_complete(scenario, gwp):
+    """Every inlet and outlet of each 3-HP scenario has a cost and an impact basis."""
+    proc = subprocess.run(
+        [sys.executable, "-c", _3HP_INVENTORY_SCRIPT, scenario],
+        capture_output=True, text=True, check=True,
+    )
+    line = next(l for l in proc.stdout.splitlines() if l.startswith("RESULT"))
+    r = json.loads(line[len("RESULT"):])
+    assert r["missing"] == [], r["missing"]
+    assert r["n"] > 20
+    _assert_close(r["gwp"], gwp, "GWP100 without electricity credit, per kg 3-HP")

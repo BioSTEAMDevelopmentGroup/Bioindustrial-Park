@@ -12,7 +12,6 @@
 .. autoclass:: biorefineries.sabre.units.MethanogenicAD
 .. autoclass:: biorefineries.sabre.units.AcidogenicAD
 .. autoclass:: biorefineries.sabre.units.Press
-.. autoclass:: biorefineries.sabre.units.EnzymaticPress
 .. autoclass:: biorefineries.sabre.units.Mill
 .. autoclass:: biorefineries.sabre.units.DigestateScrewPress
 .. autoclass:: biorefineries.sabre.units.DigestateDecanterCentrifuge
@@ -30,6 +29,7 @@
 .. autoclass:: biorefineries.sabre.units.HPFermentation
 .. autoclass:: biorefineries.sabre.units.CaHPCrystallizer
 .. autoclass:: biorefineries.sabre.units.CrystalCentrifuge
+.. autoclass:: biorefineries.sabre.units.HydrolysisTank
 .. autoclass:: biorefineries.sabre.units.DiluteAcidReactor
 """
 from . import _ad

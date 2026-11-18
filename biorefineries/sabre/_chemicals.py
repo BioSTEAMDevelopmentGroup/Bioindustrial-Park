@@ -40,16 +40,14 @@ def create_chemicals(set_thermo: bool = True, include_hp3: bool = False,
     ----------
     include_hp3 : bool
         If True, also construct and include the chemicals used only by
-        the EnzymaticPress/3-HP-from-Sargassum pathway (Glucose,
-        AlginateMonomer, Enzyme, ...).
+        the 3-HP-from-Sargassum pathway (Glucose,
+        Uronics, Enzyme, ...).
     include_dilute_acid : bool
         If True (requires `include_hp3`), also include the chemicals used
-        only by the 3-HP cake-saccharification configurations' dilute-acid
-        pretreatment (H2SO4, AmmoniumSulfate), and lock Glucose to the
-        liquid phase (needed by the pretreatment flash). Kept behind its own flag,
-        separate from `include_hp3`, so the `enzymatic_press` 3-HP
-        configuration's chemical set (and hence its simulated results)
-        stays exactly as it was.
+        only by the 3-HP scenarios with dilute acid (`baseline`, `acid_press`) (H2SO4,
+        AmmoniumSulfate), and lock Glucose to the liquid phase (needed by the
+        pretreatment flash). Kept behind its own flag, separate from
+        `include_hp3`, so a chemical set without them stays exactly as it was.
     """
     if include_dilute_acid and not include_hp3:
         raise ValueError("include_dilute_acid=True requires include_hp3=True.")
@@ -92,29 +90,33 @@ def create_chemicals(set_thermo: bool = True, include_hp3: bool = False,
     # reason as Alginate.
     Fucoidan = _structural_solid("Fucoidan", "C6H10O4", -233200)
     Mannitol = bst.Chemical("Mannitol")
-    # No known formula/composition for this lumped catch-all; treated as
-    # generically Glucan-like (same MW/Cn/V/Hf).
-    OtherSolids = Glucan.copy("OtherSolids")
+    # Lumped catch-all with no known formula. In the 3-HP chemical set it is
+    # treated as lignin (C8H8O3, same Hf/Cp/density as biorefineries.cellulosic
+    # and biorefineries.cane): the unidentified Sargassum solids are mostly the
+    # polyphenolic residue that resembles lignin (Wiatrowski et al. 2026). The
+    # other chemical sets keep the earlier Glucan-like proxy (same MW/Cn/V/Hf),
+    # so their regression values do not move.
+    OtherSolids = Lignin.copy("OtherSolids") if include_hp3 else Glucan.copy("OtherSolids")
 
-    # EnzymaticPress/3-HP-only chemicals.
+    # 3-HP-only chemicals.
     hp3_chemicals = []
     if include_hp3:
         Glucose = bst.Chemical("Glucose")
 
         # Free monomer form of Alginate (mannuronic/guluronic acid, hydrated:
         # Alginate's C6H8O6 repeat unit + H2O -> C6H10O7), formed by
-        # enzymatic hydrolysis in EnzymaticPress. Liquid density is a rough
+        # enzymatic hydrolysis of the pulp (SA). Liquid density is a rough
         # concentrated-sugar-acid-solution proxy (1200 kg/m3, vs. Glucan's
         # solid-phase 1540 kg/m3), and viscosity borrows Water's model for
         # the same NEGLECT_P-workaround reason as the nutrient salts below.
-        AlginateMonomer = bst.Chemical("AlginateMonomer", search_db=False, default=True,
+        Uronics = bst.Chemical("Uronics", search_db=False, default=True,
                                         phase="l", formula="C6H10O7", Hf=-233200 * _cal2joule)
-        AlginateMonomer.Cn.add_model(_Cp_structural * AlginateMonomer.MW, top_priority=True)
-        AlginateMonomer.V.add_model(tmo.functional.rho_to_V(1200, AlginateMonomer.MW), top_priority=True)
-        AlginateMonomer.copy_models_from(Water, ["mu"])
+        Uronics.Cn.add_model(_Cp_structural * Uronics.MW, top_priority=True)
+        Uronics.V.add_model(tmo.functional.rho_to_V(1200, Uronics.MW), top_priority=True)
+        Uronics.copy_models_from(Water, ["mu"])
 
         # Generic-protein proxy for the hydrolysis enzyme cocktail (cellulase +
-        # alginate lyase, dosed in EnzymaticPress) -- same formula/Hf
+        # alginate lyase, dosed in the pulp hydrolysis, M_SA) -- same formula/Hf
         # convention biorefineries.cellulosic uses for its own 'Enzyme'
         # chemical (CH1.59O0.42N0.24S0.01, Hf shared with Protein-like
         # chemicals). Modeled as phase="l" (dosed as a dilute
@@ -184,11 +186,11 @@ def create_chemicals(set_thermo: bool = True, include_hp3: bool = False,
         CaSO4.Tb = Water.Tb
 
         hp3_chemicals = [
-            Glucose, AlginateMonomer, Enzyme, HP, CalciumDihydroxide, Ca3HP2,
+            Glucose, Uronics, Enzyme, HP, CalciumDihydroxide, Ca3HP2,
             SO2, P4O10, CaSO4,
         ]
 
-    # Dilute-acid pretreatment chemicals (3-HP cake configurations only).
+    # Dilute-acid pretreatment chemicals (`baseline` and `acid_press` scenarios).
     # Same choices biorefineries.cellulosic makes for its own corn stover
     # dilute-acid pretreatment: H2SO4 as a liquid, and ammonium sulfate as a
     # single-phase chemical locked to its database phase (solid) that
@@ -196,7 +198,7 @@ def create_chemicals(set_thermo: bool = True, include_hp3: bool = False,
     acid_chemicals = []
     if include_dilute_acid:
         # Glucose is formed upstream of the pretreatment flash here (it never
-        # enters a flash in the enzymatic_press configuration), and its
+        # enters a flash in the baseline scenario), and its
         # database entry has no vapor-phase enthalpy data (missing Hvap at
         # Tb), so the flash's VLE fails on it. Lock it to the liquid phase,
         # as biorefineries.cellulosic does for its own Glucose. Only in this

@@ -12,7 +12,7 @@ import thermosteam as tmo
 
 from biorefineries.sabre.utils import get_solids_group_IDs, load_assumptions
 
-__all__ = ('Press', 'EnzymaticPress', 'Mill')
+__all__ = ('Press', 'Mill')
 
 # --- constants ---
 KG_PER_METRIC_TON = 1000.0
@@ -22,7 +22,6 @@ HR_PER_DAY = 24.0
 # Loaded assumptions
 _PREPROCESSING = load_assumptions("preprocessing.yaml")
 _PRESS = _PREPROCESSING["press"]
-_ENZYMATIC_PRESS = _PREPROCESSING["enzymatic_press"]
 _MILL = _PREPROCESSING["mill"]
 
 
@@ -55,6 +54,10 @@ class Press(bst.Unit):
     solubles_to_pressate_frac : float
         Fraction of non-solids, non-water mass routed to pressate (0-1);
         the remainder stays in the cake.
+    component_cake_frac : dict[str, float], optional
+        Per-chemical fraction to the cake (0-1) that overrides the two
+        fractions above for the listed chemicals, e.g. to reproduce a
+        measured cake composition. Default None leaves the split unchanged.
     power_kWh_per_dry_ton_TS : float
         Electricity intensity per dry ton of TS processed (preferred
         basis).
@@ -86,6 +89,7 @@ class Press(bst.Unit):
         solids_capture_frac=_PRESS["solids_capture_frac"],
         cake_solids_wt_frac=_PRESS["cake_solids_wt_frac"],
         solubles_to_pressate_frac=_PRESS["solubles_to_pressate_frac"],
+        component_cake_frac=None,
 
         # --- utilities ---
         power_kWh_per_dry_ton_TS=_PRESS["power_kWh_per_dry_ton_TS"],
@@ -103,6 +107,7 @@ class Press(bst.Unit):
         self.solids_capture_frac = float(solids_capture_frac)
         self.cake_solids_wt_frac = float(cake_solids_wt_frac)
         self.solubles_to_pressate_frac = float(solubles_to_pressate_frac)
+        self.component_cake_frac = dict(component_cake_frac or {})
         self.power_kWh_per_dry_ton_TS = power_kWh_per_dry_ton_TS
         self.ref_capacity_tph_wet = float(ref_capacity_tph_wet)
         self.capex_installed_ref_usd = float(capex_installed_ref_usd)
@@ -121,10 +126,7 @@ class Press(bst.Unit):
 
     def _split_to_cake_and_pressate(self, feed, cake, pressate):
         """
-        Core cake/pressate mass-split logic, factored out of `_run` so
-        that `EnzymaticPress` can apply it to a hydrolyzed feed stream
-        instead of `self.ins[0]` directly, without duplicating the split
-        rules.
+        Core cake/pressate mass-split logic, factored out of `_run`.
 
         The by-component split (everything except water) delegates to
         `Stream.split_to` -- the same native primitive
@@ -167,6 +169,10 @@ class Press(bst.Unit):
             if chem_id in solids_set or chem_id == "Water":
                 continue
             split[chem_id] = 1.0 - sol_to_p
+
+        for chem_id, frac in self.component_cake_frac.items():
+            if chem_id in feed.chemicals.IDs:
+                split[chem_id] = min(max(float(frac), 0.0), 1.0)
 
         isplit = feed.chemicals.isplit(split)
         feed.split_to(cake, pressate, isplit.data, energy_balance=False)
@@ -230,93 +236,6 @@ class Press(bst.Unit):
         self.design_results["Installed CAPEX ($)"] = capex
 
         self.baseline_purchase_costs["Press system"] = capex
-
-
-class EnzymaticPress(Press):
-    """
-    `Press` subclass that hydrolyzes a fraction of Glucan and Alginate to
-    their soluble monomers (Glucose, AlginateMonomer) using an added
-    enzyme cocktail (cellulase + alginate lyase), before the inherited
-    cake/pressate mass split runs. Once hydrolyzed, Glucose/AlginateMonomer
-    are not in the "solids" chemical group (see
-    `biorefineries.sabre._chemicals`), so they follow the existing
-    "solubles" path into the pressate, while unconverted Glucan/Alginate
-    stay solid and are captured to the cake at `solids_capture_frac`, same
-    as Ash/Protein/Fucoidan/OtherSolids.
-
-    This unit replaces both a dilute-acid pretreatment reactor and a
-    separate enzymatic saccharification step -- there is no intermediate
-    oligomer chemistry; hydrolysis goes directly to the monomer form.
-
-    Parameters
-    ----------
-    ins : tuple[stream, stream]
-        Wet biomass feed and enzyme cocktail feed. The enzyme stream's
-        flow is set internally by `_run` (dose scales with Glucan +
-        Alginate mass in the feed); any pre-existing content is
-        overwritten.
-    outs : tuple[stream, stream]
-        Pressed cake and pressate (same as `Press`).
-    hydrolysis_conversion : float
-        Fraction of Glucan and Alginate hydrolyzed to Glucose/
-        AlginateMonomer (0-1), applied identically to both substrates.
-    enzyme_loading_mg_per_g_substrate : float
-        Enzyme dose per g of Glucan + Alginate in the feed, before the
-        excess allowance.
-    enzyme_excess_frac : float
-        Fractional excess added on top of `enzyme_loading_mg_per_g_substrate`
-        (e.g. 0.10 for 10% excess).
-    **kwargs
-        Forwarded to `Press.__init__` (solids_capture_frac,
-        cake_solids_wt_frac, power_kWh_per_dry_ton_TS, etc.) and, from
-        there, to `bst.Unit.__init__`.
-
-    See Also
-    --------
-    Refer to data/preprocessing.yaml (`enzymatic_press`) for the default
-    values and references.
-    """
-
-    _N_ins = 2  # wet biomass feed, enzyme cocktail
-
-    def __init__(
-        self, ID="", ins=None, outs=(),
-        hydrolysis_conversion=_ENZYMATIC_PRESS["hydrolysis_conversion"],
-        enzyme_loading_mg_per_g_substrate=_ENZYMATIC_PRESS["enzyme_loading_mg_per_g_substrate"],
-        enzyme_excess_frac=_ENZYMATIC_PRESS["enzyme_excess_frac"],
-        **kwargs
-    ):
-        super().__init__(ID, ins, outs, **kwargs)
-        self.hydrolysis_conversion = float(hydrolysis_conversion)
-        self.enzyme_loading_mg_per_g_substrate = float(enzyme_loading_mg_per_g_substrate)
-        self.enzyme_excess_frac = float(enzyme_excess_frac)
-
-        # Internal working stream: feed + enzyme, post-hydrolysis. Kept
-        # separate from self.ins[0] so the upstream feed stream is never
-        # mutated in place.
-        self._hydrolyzed_feed = bst.Stream(None, thermo=self.thermo)
-
-        self.hydrolysis_rxns = tmo.ParallelReaction([
-            tmo.Reaction('Glucan + Water -> Glucose', reactant='Glucan',
-                         X=self.hydrolysis_conversion),
-            tmo.Reaction('Alginate + Water -> AlginateMonomer', reactant='Alginate',
-                         X=self.hydrolysis_conversion),
-        ])
-
-    def _run(self):
-        feed, enzyme = self.ins
-        substrate_kgph = feed.imass['Glucan'] + feed.imass['Alginate']
-        dose_frac = (self.enzyme_loading_mg_per_g_substrate / 1000.0
-                     * (1.0 + self.enzyme_excess_frac))
-        enzyme.empty()
-        enzyme.phase = "l"
-        enzyme.imass['Enzyme'] = dose_frac * substrate_kgph
-
-        combined = self._hydrolyzed_feed
-        combined.mix_from([feed, enzyme])
-        self.hydrolysis_rxns(combined)
-
-        self._split_to_cake_and_pressate(combined, *self.outs)
 
 
 class Mill(bst.Unit):

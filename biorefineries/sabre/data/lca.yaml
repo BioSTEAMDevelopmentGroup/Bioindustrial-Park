@@ -16,8 +16,16 @@ gwp100:
   enzyme: 2.24
   lime: 0.9764  # as Ca(OH)2: 1.29 kg CO2e/kg CaO x 56.0774/74.093
   methane_upstream: 0.40  # natural gas supply chain, per kg CH4; combustion CO2 is added from stoichiometry
-  sulfuric_acid: 0.04447
   ammonia: 2.64  # as NH3
+  sulfuric_acid: 0.04447  # per kg of H2SO4 (baseline and acid_press scenarios); charged on the H2SO4 content of the solution
+
+  # Water, facility chemicals and waste handling (added so every inlet and every
+  # liquid/solid outlet of the system carries an impact).
+  process_water: 0.00035559  # kg CO2e per kg tap/process water (conventional treatment)
+  cooling_tower_chemicals: 0.56  # per kg; sodium bicarbonate proxy for corrosion inhibitor
+  boiler_chemicals: 2.05  # per kg; sodium hydroxide proxy
+  wastewater_treatment: 0.0005  # per kg of liquid waste leaving the plant (0.5 kg CO2e/m3)
+  ash_disposal: 0.0  # per kg of wet boiler ash; user-specified: no GHG emission
 
   sources:
     reused_from_lactic:
@@ -29,6 +37,15 @@ gwp100:
     electricity:
       key: placeholder_flagged
       note: "0.48 kg CO2e/kWh is a fixed US-grid-like value, assumed for both consumption and export. The net exported electricity credit therefore uses the same factor; results are reported with and without it."
+    water_and_facility_chemicals:
+      key: biorefineries.oleochemicals.prices_and_GWP_factors.Utility_GWP_factors
+      note: "process_water 0.00035559 (tap water production, conventional treatment), cooling_tower_chemicals 0.56 (sodium bicarbonate proxy, GREET 2023) and boiler_chemicals 2.05 (NaOH proxy), as used in the oleochemicals biorefinery. Not checked against the original sources."
+    wastewater_treatment:
+      key: placeholder_flagged
+      note: "0.0005 kg CO2e/kg (0.5 kg CO2e/m3) is mid-range of published municipal wastewater-treatment LCAs (about 0.1-1 kg CO2e/m3). The mother-liquor purge and permeate carry sugars and salts, so their real burden may be much higher, and the clean evaporator condensates much lower. Applied to every liquid stream the model prices as wastewater."
+    ash_disposal:
+      key: user_specified
+      note: "Boiler ash is assumed to carry no GHG emission (0 kg CO2e/kg). Its disposal cost is still charged through the boiler utility (data/tea.yaml price.disposal_solid)."
     sargassum:
       key: user_specified
       note: "Zero burden for collected Sargassum; harvest, transport and any drying/stabilization are out of scope."
