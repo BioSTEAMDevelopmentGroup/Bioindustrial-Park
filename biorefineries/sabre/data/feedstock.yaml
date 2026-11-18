@@ -109,5 +109,8 @@ policies:
   retain_salinity: true
 
 scale:
-  wet_feed_ton_per_day: 15000
+  # NLR base case (Wiatrowski et al. 2026): 3.0 million wet tonnes/year, i.e.
+  # 429,000 dry tonnes/year at 14.3% solids, 1,306 dry tonnes/day, = 9,133 wet
+  # tonnes/day of processing capacity. Previously 15,000.
+  wet_feed_ton_per_day: 9133
   ton_definition: metric

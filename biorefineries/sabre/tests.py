@@ -10,7 +10,7 @@ Regression tests for the current SaBRe systems (biostimulant, biomethane, VFA,
 microbial oil, and 3-HP), via each system's `price_*_system()` function, which
 builds, simulates, and solves the minimum selling price (MSP) of the product.
 
-Golden values were recorded from the current code. The tolerance is loose
+Golden values were recorded from the current code (feed scale 9,133 wet t/day, data/feedstock.yaml). The tolerance is loose
 because results move by several percent with upstream biosteam/thermosteam/
 hensmith updates (e.g., heat exchanger network results), so these tests guard
 against gross regressions rather than exact reproduction.
@@ -43,27 +43,27 @@ def _assert_close(actual, expected, label):
 
 def test_biostimulant():
     r = price_biostimulant_system()
-    _assert_close(r["msp_usd_per_kg"], 2.7226, "MSP")
-    _assert_close(r["annual_product_kg"], 71104378.5, "annual product")
+    _assert_close(r["msp_usd_per_kg"], 2.7247, "MSP")
+    _assert_close(r["annual_product_kg"], 43293085.9, "annual product")
 
 
 def test_biomethane_press_mill_only():
     r = price_biomethane_system(pretreatment_case="press_mill_only")
-    _assert_close(r["msp_usd_per_kg"], 0.6109, "MSP $/kg")
-    _assert_close(r["msp_usd_per_mmbtu"], 11.6145, "MSP $/MMBtu")
-    _assert_close(r["annual_product_kg"], 40036080.1, "annual product")
+    _assert_close(r["msp_usd_per_kg"], 0.6236, "MSP $/kg")
+    _assert_close(r["msp_usd_per_mmbtu"], 11.8564, "MSP $/MMBtu")
+    _assert_close(r["annual_product_kg"], 24376634.6, "annual product")
 
 
 def test_vfa():
     r = price_vfa_system()
-    _assert_close(r["msp_usd_per_kg"], 0.10329, "MSP")
-    _assert_close(r["annual_product_kg"], 104671217.4, "annual product")
+    _assert_close(r["msp_usd_per_kg"], 0.10513, "MSP")
+    _assert_close(r["annual_product_kg"], 63730815.2, "annual product")
 
 
 def test_microbial_oil():
     r = price_microbial_oil_system()
-    _assert_close(r["msp_usd_per_kg"], 3.8144, "MSP")
-    _assert_close(r["annual_product_kg"], 13101480.6, "annual product")
+    _assert_close(r["msp_usd_per_kg"], 3.8667, "MSP")
+    _assert_close(r["annual_product_kg"], 7977054.8, "annual product")
 
 
 _3HP_SCRIPT = """
@@ -75,8 +75,8 @@ print("RESULT" + json.dumps({k: r[k] for k in ("msp_usd_per_kg", "annual_product
 
 
 @pytest.mark.parametrize("scenario, msp, annual", [
-    ("baseline", 1.3769, 75215630.6),
-    ("acid_press", 1.149, 75497210.2),
+    ("baseline", 1.4298, 45796290.3),
+    ("acid_press", 1.2057, 45967734.7),
 ])
 def test_3hp(scenario, msp, annual):
     proc = subprocess.run(
