@@ -10,14 +10,15 @@ Sargassum-to-dried-Ca(3HP)2 system builder for the SaBRe flowsheets.
 Pathway, following the collaborators' process:
     raw Sargassum -> Mill (MI) -> Press (PR: juice + pulp)
       juice -> PFS/PC/DIL/EV (membrane + evaporator concentration)
-      pulp  -> [baseline scenario only: dilute-acid pretreatment
-               (ACID_ST/AM/M_PT/R_PT/F_PT/H_PT) and ammonia neutralization
+      pulp  -> [baseline scenario only: mild thermochemical pretreatment
+               (1% H2SO4, 1 M NaCl, 121 degC, 20 min; Chundawat) in
+               ACID_ST/AM/M_PT/R_PT/F_PT/H_PT, and ammonia neutralization
                (NH3_ST/NT)]
             -> M_SA (enzyme) -> H_SA -> SA (96 h hydrolysis tank) -> SLS
                (residue to the boiler) -> HPFS/HPC/HDIL/HEV (concentration)
       concentrated juice + concentrated hydrolysate -> FM -> HPFermentation
       -> the shared downstream below (cell mass to the boiler as before).
-    Two scenarios: `baseline` (with the dilute-acid pretreatment) and
+    Two scenarios: `baseline` (with the mild thermochemical pretreatment) and
     `acid_press` (no pretreatment reactor; H2SO4 dosed to 1 wt% of the
     pre-press biomass, assumed to give the same hydrolysis as the baseline
     pretreatment, then enzymatic hydrolysis with ammonia neutralization).
@@ -104,6 +105,8 @@ _ML_RECYCLE = _3HP_YAML["mother_liquor_recycle"]
 _DRYER = _3HP_YAML["dryer"]
 
 _ACID_PRESS_DISSOLVED_IDS = ("Glucose", "Uronics", "H2SO4")
+# Database solids that behave as dissolved salts (not insoluble solids).
+_DISSOLVED_SALT_IDS = ("AmmoniumSulfate", "NaCl")
 _NOT_HEAT_INTEGRATED = frozenset({"M_PR", "NJ", "H_SA", "M_PT", "R_PT", "F_PT", "H_PT", "AM", "NT"})
 
 FRESH_WATER_PRICE_USD_PER_KG = bst.stream_utility_prices['Process water']
@@ -238,8 +241,9 @@ def _make_pressate_concentration_chain(
 
 def _make_pulp_pretreatment_train(cake):
     """
-    Dilute-acid pretreatment and neutralization of the press pulp (the
-    `baseline` scenario), placed ahead of the enzymatic hydrolysis:
+    Mild thermochemical pretreatment (1% H2SO4, 1 M NaCl, 121 degC, 20 min)
+    and neutralization of the press pulp (the `baseline` scenario), placed
+    ahead of the enzymatic hydrolysis:
     acid dosing -> steam mixer -> pressure reactor -> flash -> condensate,
     flashed slurry -> ammonia neutralization. Mirrors biorefineries.cellulosic's
     corn stover train (systems/pretreatment/dilute_acid.py) with sabre-local
@@ -272,7 +276,11 @@ def _make_pulp_pretreatment_train(cake):
         T=A["warm_water_T_K"], P=A["warm_water_P_atm"] * 101325,
     )
     warm_water_1.price = FRESH_WATER_PRICE_USD_PER_KG
-    AM = bst.Mixer("AM", ins=(warm_water_1, ACID_ST - 0), outs=("acid_liquor",))
+    # NaCl of the mild thermochemical pretreatment (1 M in the slurry liquid),
+    # dosed on dry pulp like the acid; bought fresh, no recycle.
+    sodium_chloride = bst.Stream("sodium_chloride", NaCl=0.0, units="kg/hr", phase="s")
+    sodium_chloride.price = _TEA_PRICE["sodium_chloride"]["baseline"]
+    AM = bst.Mixer("AM", ins=(warm_water_1, ACID_ST - 0, sodium_chloride), outs=("acid_liquor",))
 
     @ACID_ST.add_specification(run=True)
     def dose_acid():
@@ -284,6 +292,7 @@ def _make_pulp_pretreatment_train(cake):
     @AM.add_specification(run=True)
     def dose_warm_water():
         warm_water_1.imass["Water"] = A["warm_water_kg_per_kg_dry"] * dry_pulp_kgph()
+        sodium_chloride.imass["NaCl"] = A["nacl_kg_per_kg_dry"] * dry_pulp_kgph()
 
     # --- Steam mixer -> pressure reactor -> flash -> condenser --------------
     warm_water_2 = bst.Stream(
@@ -462,7 +471,7 @@ def _build_juice_pulp_upstream(MI, press_params=None, scenario="baseline"):
         outs=("pulp_with_enzyme",),
     )
     M_SA.enzyme_loading_mg_per_g_dwb = _PULP_HYDROLYSIS["enzyme_loading_mg_per_g_dwb"]
-    insoluble_IDs = [i for i in get_solids_group_IDs() if i != "AmmoniumSulfate"]
+    insoluble_IDs = [i for i in get_solids_group_IDs() if i not in _DISSOLVED_SALT_IDS]
 
     @M_SA.add_specification
     def dose_enzyme_and_water():

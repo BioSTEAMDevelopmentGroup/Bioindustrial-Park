@@ -214,7 +214,18 @@ def create_chemicals(set_thermo: bool = True, include_hp3: bool = False,
         # at process T/P, same issue and fix as the nutrient salts below.
         AmmoniumSulfate.copy_models_from(Water, ["mu"])
 
-        acid_chemicals = [H2SO4, AmmoniumSulfate]
+        # NaCl dosed with the acid in the mild thermochemical pretreatment of
+        # the baseline scenario (1 M NaCl). Same treatment as AmmoniumSulfate:
+        # a database solid that behaves as a dissolved salt downstream, with
+        # Water's liquid viscosity.
+        NaCl = bst.Chemical("NaCl")
+        NaCl.at_state("s")
+        NaCl.copy_models_from(Water, ["mu"])
+        # NaCl reaches the boiler in the residue moisture; it is not a fuel, and
+        # thermosteam's default combustion would need an HCl chemical.
+        NaCl.combustion = {}
+
+        acid_chemicals = [H2SO4, AmmoniumSulfate, NaCl]
 
     # Gases
     CH4 = bst.Chemical("Methane", phase="g")

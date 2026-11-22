@@ -314,14 +314,16 @@ acid_pretreatment:
   # cellulosic's SulfuricAcidTank specification.
   acid_solution_H2SO4_kg: 1800.0
   acid_solution_water_kg: 130.0
-  acid_solution_loading_kg_per_kg_dry: 0.02316
+  acid_solution_loading_kg_per_kg_dry: 0.0432  # H2SO4 = 1 wt% of the slurry liquid (calibrated, see sources.mild_thermochemical)
+  nacl_kg_per_kg_dry: 0.2405  # NaCl = 1 M (58.4 g/L) in the slurry liquid (calibrated, see sources.mild_thermochemical)
   warm_water_kg_per_kg_dry: 0.282  # dilution water mixed with the acid before the steam mixer
 
-  # Steam mixer + pressure reactor.
-  reactor_T_K: 431.15  # 158 degC
-  reactor_P_atm: 5.5
+  # Steam mixer + pressure reactor: the mild thermochemical pretreatment
+  # (1% H2SO4, 1 M NaCl, 121 degC, 20 min) of Chundawat (Rutgers).
+  reactor_T_K: 394.15  # 121 degC
+  reactor_P_atm: 2.1  # just above the saturation pressure of water at 121 degC (2.05 atm)
   solids_loading: 0.30  # SteamMixer target solids wt frac (process water added only if the cake is above this)
-  reactor_tau_hr: 0.166
+  reactor_tau_hr: 0.3333  # 20 min
   reactor_V_wf: 0.8
   reactor_length_to_diameter: 2.0
   reactor_vessel_material: "Stainless steel 316"
@@ -338,9 +340,12 @@ acid_pretreatment:
   ammonia_mol_per_mol_H2SO4: 2.0  # 2 NH3 + H2SO4 -> (NH4)2SO4, full neutralization
 
   sources:
-    acid_and_reactor:
+    mild_thermochemical:
+      key: chundawat_technical_narrative
+      note: "The baseline pretreatment is the mild thermochemical pretreatment of S. Chundawat (Rutgers), as in the Team Technical Narrative: 1% H2SO4, 1 M NaCl, 121 degC, 20 min (measured on dilute biomass; the narrative gives no loading for the pretreatment itself, so this model keeps its 30 wt% target solids). The acid and NaCl doses are calibrated on the simulated slurry: 4.03 kg liquid water per kg dry pulp after the steam mixer (cake 24.3 wt% solids, 22.3 wt% after steam), so 1 wt% H2SO4 of the liquid = 0.0403 kg H2SO4 = 0.0432 kg of the 93.3 wt% solution per kg dry pulp, and 1 M NaCl (about 0.0597 kg per kg of liquid water) = 0.2405 kg NaCl per kg dry pulp. Recalibrate them if the cake, warm water or steam change. NaCl is bought fresh (data/tea.yaml price.sodium_chloride, $0.08/kg; data/lca.yaml sodium_chloride, 0.043 kg CO2e/kg) with no recycle; 316 stainless steel is kept for the reactor although 1 M chloride at 121 degC may need a more resistant alloy (not costed)."
+    reactor_other:
       key: cellulosic_corn_stover_precedent
-      note: "acid_solution_*, loading, warm_water_kg_per_kg_dry, reactor_T_K/P_atm/tau/V_wf, solids_loading and the Glucan conversion are the corn stover values in biorefineries/cellulosic/systems/pretreatment/dilute_acid.py and cellulosic/units.py (PretreatmentReactorSystem)."
+      note: "warm_water_kg_per_kg_dry, reactor_V_wf, solids_loading, warm_water_T_K/P_atm and the Glucan and Alginate conversions are still the corn stover values (158 degC dilute-acid) of biorefineries/cellulosic/systems/pretreatment/dilute_acid.py and cellulosic/units.py (PretreatmentReactorSystem). The conversions are kept so the baseline and acid_press scenarios stay comparable; they are not measured for the mild conditions."
     ash_buffering_caveat:
       key: known_model_limitation
       note: "Sargassum is ~35 wt% dry ash (modeled as inert CaO), which in reality buffers the acid, and alginate gels at low pH. The corn stover acid loading is used unchanged and does NOT account for either, so acid and neutralizer costs are likely understated. Placeholder pending Sargassum-specific dilute-acid data."

@@ -55,6 +55,7 @@ _CHEMICAL_KEYS = {
     "CalciumDihydroxide": "lime",
     "Ammonia": "ammonia",
     "H2SO4": "sulfuric_acid",
+    "NaCl": "sodium_chloride",
 }
 # Chemicals that carry no burden (process water, air) or whose burden is
 # negligible and not tracked.
@@ -176,7 +177,7 @@ def get_gwp(sys, product, feedstock_ID: str = "sargassum_feed") -> dict:
 
     contrib = {
         "feedstock": 0.0, "enzyme": 0.0, "lime": 0.0, "natural_gas": 0.0,
-        "water": 0.0, "ammonia": 0.0, "sulfuric_acid": 0.0,
+        "water": 0.0, "ammonia": 0.0, "sulfuric_acid": 0.0, "sodium_chloride": 0.0,
         "facility_chemicals": 0.0, "other_feeds": 0.0,
     }
     for s in sys.feeds:
@@ -197,6 +198,8 @@ def get_gwp(sys, product, feedstock_ID: str = "sargassum_feed") -> dict:
             contrib["ammonia"] += impact
         elif "H2SO4" in s.chemicals.IDs and s.imass["H2SO4"] > 0:
             contrib["sulfuric_acid"] += impact
+        elif "NaCl" in s.chemicals.IDs and s.imass["NaCl"] > 0.5 * s.F_mass:
+            contrib["sodium_chloride"] += impact
         elif _is_water_only(s) and s.characterization_factors[key] == _GWP["process_water"]:
             contrib["water"] += impact
         else:
