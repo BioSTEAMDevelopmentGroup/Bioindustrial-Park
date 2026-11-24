@@ -358,27 +358,27 @@ mild_pretreatment:
 
 
 # ---------------------------------------------------------------------------
-# `pretreatment_press` scenario: no pretreatment reactor; the same 1 wt% H2SO4 and 1 M NaCl as the baseline are dosed
-# into the milled biomass ahead of the screw press, which is assumed to give
-# the same hydrolysis as the baseline's mild thermochemical pretreatment. The acid is
-# neutralized with ammonia in the enzymatic hydrolysis step (and for the juice).
+# `pretreatment_press` scenario: no pretreatment reactor; the same H2SO4 and NaCl
+# as the baseline, per kg of dry pulp, are dosed onto the pressed pulp at the end
+# of the screw press (after nearly all the press water is gone), and the pulp is
+# assumed to reach the baseline's hydrolysis. The acid is neutralized with
+# ammonia in the enzymatic hydrolysis step. The juice carries none of them.
 # ---------------------------------------------------------------------------
 pretreatment_press:
-  H2SO4_wt_frac_of_liquid: 0.01  # H2SO4 as a wt fraction of the liquid of the pre-press mixture (biomass water + acid solution water), as in the baseline pretreatment
-  NaCl_kg_per_kg_liquid_water: 0.0597  # 1 M NaCl (58.4 g/L) per kg of that liquid, as in the baseline pretreatment (0.0596 simulated)
-  # Acid solution composition, Glucan/Alginate conversions and the ammonia
-  # ratio are the baseline's (`mild_pretreatment` above).
+  # No parameters of its own: the doses (acid_solution_loading_kg_per_kg_dry,
+  # nacl_kg_per_kg_dry), the acid solution composition, the Glucan/Alginate
+  # conversions and the ammonia ratio are the baseline's (`mild_pretreatment` above).
 
   sources:
     pretreatment_dose:
       key: user_specified
-      note: "Same chemistry as the baseline's mild thermochemical pretreatment (1 wt% H2SO4 and 1 M NaCl in the liquid), applied to the pre-press mixture: H2SO4 dosed as the ~93.3 wt% solution to 1 wt% of the liquid, NaCl at 0.0597 kg per kg of liquid water, bought fresh with no recycle. No heating or hold time is modeled in the press (user-specified, collaborator feedback)."
+      note: "Same H2SO4 and NaCl use as the baseline per kg of dry pulp (0.0432 kg of the ~93.3 wt% acid solution and 0.2405 kg NaCl), as if added toward the end of the screw press so that nearly all the water is already removed (user-specified). NaCl is bought fresh with no recycle. The doses are therefore more concentrated in the pulp liquid than in the baseline slurry, which also has steam condensate and dilution water. No heating, dilution water or hold time is modeled in the press."
     hydrolysis_in_press:
       key: user_specified
-      note: "The screw press with the acid and NaCl dosed ahead of it is assumed to give the same hydrolysis as the baseline mild thermochemical pretreatment (Glucan and Alginate conversions of mild_pretreatment), applied to the mixture ahead of the press, with no heating."
+      note: "The pulp dosed at the end of the press is assumed to give the same hydrolysis as the baseline mild thermochemical pretreatment (Glucan and Alginate conversions of mild_pretreatment), applied in the dosing mixer, with no heating."
     press_split:
       key: simplification
-      note: "The measured 15 psi split was made without acid. Glucose, Uronics and H2SO4 are treated as dissolved and follow the water between cake and pressate; the other components keep the measured split. The juice therefore carries part of the acid and is neutralized before concentration (an addition: the cake's acid is neutralized in the hydrolysis step). Acid-resistant press materials are not costed."
+      note: "The press itself is the plain measured press split (no chemicals ahead of it). Acid-resistant press materials are not costed."
     enzyme:
       key: simplification
       note: "Enzyme is dosed only in the hydrolysis step (25 mg/g dry biomass, as in the baseline): an enzyme in the acidic press would not be active. An earlier design that put enzyme and a NaCl brine in the press was dropped."

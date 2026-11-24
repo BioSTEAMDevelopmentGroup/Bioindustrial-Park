@@ -27,7 +27,7 @@ _MILL = _PREPROCESSING["mill"]
 
 class Press(bst.Unit):
     """
-    Multi-train mechanical dewatering press. Splits wet biomass into:
+    Mechanical dewatering press (one unit, cost scaled by a power law). Splits wet biomass into:
       - pressed_cake: retains most solids + enough water to hit target solids wt%
       - pressate: remaining water + uncaptured solids + (optional) solubles
 
@@ -63,8 +63,8 @@ class Press(bst.Unit):
         basis).
     ref_capacity_tph_wet : float
         Reference wet-throughput capacity (metric ton/h) of a single
-        press train for CAPEX scaling; larger throughputs are split
-        across parallel trains.
+        press train for CAPEX scaling; larger throughputs are
+        costed as one press by the same power law (no parallel trains).
     capex_installed_ref_usd : float
         Installed cost at `ref_capacity_tph_wet`, scaled by
         `scale_exponent` for other train sizes.
@@ -226,8 +226,10 @@ class Press(bst.Unit):
             N = 0
             Q_each = 0.0
         else:
-            N = max(1, math.ceil(wet_tph / Q0))
-            Q_each = wet_tph / N
+            # One press scaled by the power law from the reference unit (no
+            # parallel trains): C = C0 * (Q / Q0) ** n.
+            N = 1
+            Q_each = wet_tph
             capex = N * C0 * (Q_each / Q0) ** n
 
         self.design_results["Wet throughput (tph)"] = wet_tph

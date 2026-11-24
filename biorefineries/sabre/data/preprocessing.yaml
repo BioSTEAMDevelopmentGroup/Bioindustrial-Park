@@ -10,7 +10,7 @@ press:
   capex_model: scaled_anchor
   basis: dry_tph
   ref_capacity_tph_dry: 0.953 # cannot match back to source
-  ref_capacity_tph_wet: 15 # originally 50, cannot match back to source
+  ref_capacity_tph_wet: 15 # originally 50, cannot match back to source; cost scaled as ONE press (no parallel trains) by the power law below
   capex_installed_ref_usd: 3100000.0
   scale_exponent: 0.60
   F_BM: 1.0 # capex already installed
