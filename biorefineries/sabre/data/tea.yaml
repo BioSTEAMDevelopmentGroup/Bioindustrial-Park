@@ -45,7 +45,7 @@ price:
     source: "no literature source cited in legacy scripts"
   sulfuric_acid:
     baseline: 0.0897171175961359
-    note: "$/kg of ~93.3 wt% H2SO4 SOLUTION (1800 kg H2SO4 : 130 kg water), dosed in the dilute-acid pretreatment of the `baseline` and `acid_press` 3-HP scenarios (systems/_3hp_system.py)."
+    note: "$/kg of ~93.3 wt% H2SO4 SOLUTION (1800 kg H2SO4 : 130 kg water), dosed in the mild thermochemical pretreatment (1% H2SO4, 1 M NaCl) of the `baseline` and `pretreatment_press` 3-HP scenarios (systems/_3hp_system.py)."
     source: "biorefineries.cellulosic.streams sulfuric_acid price (corn stover dilute-acid pretreatment)."
   ammonia:
     baseline: 0.50

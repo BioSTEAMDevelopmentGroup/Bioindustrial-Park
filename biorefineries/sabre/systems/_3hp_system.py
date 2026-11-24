@@ -19,8 +19,8 @@ Pathway, following the collaborators' process:
       concentrated juice + concentrated hydrolysate -> FM -> HPFermentation
       -> the shared downstream below (cell mass to the boiler as before).
     Two scenarios: `baseline` (with the mild thermochemical pretreatment) and
-    `acid_press` (no pretreatment reactor; H2SO4 dosed to 1 wt% of the
-    pre-press biomass, assumed to give the same hydrolysis as the baseline
+    `pretreatment_press` (no pretreatment reactor; the same 1 wt% H2SO4 and 1 M NaCl
+    dosed into the pre-press biomass, assumed to give the same hydrolysis as the baseline
     pretreatment, then enzymatic hydrolysis with ammonia neutralization).
     The hydrolysate is concentrated as well as the juice, because at 20 wt%
     insoluble solids it carries only about 4 wt% sugar.
@@ -90,9 +90,9 @@ _TEA_PRICE = load_assumptions("tea.yaml")["price"]
 _3HP_YAML = load_assumptions("3hp.yaml")
 _HYDROLYSATE_SEPARATOR = _3HP_YAML["hydrolysate_separator"]
 _PULP_HYDROLYSIS = _3HP_YAML["pulp_enzymatic_hydrolysis"]
-_ACID_PRETREATMENT = _3HP_YAML["acid_pretreatment"]
-SCENARIOS = ("baseline", "acid_press")
-_ACID_PRESS = _3HP_YAML["acid_press"]
+_MILD_PRETREATMENT = _3HP_YAML["mild_pretreatment"]
+SCENARIOS = ("baseline", "pretreatment_press")
+_PRETREATMENT_PRESS = _3HP_YAML["pretreatment_press"]
 
 _PRESS_CAKE_SOLIDS_WT_FRAC_OVERRIDE = _3HP_YAML["press_cake_solids_wt_frac_override"]
 _PRESSATE_CONCENTRATOR = _3HP_YAML["pressate_concentrator"]
@@ -104,7 +104,7 @@ _CRYSTAL_SEPARATOR = _3HP_YAML["crystal_separator"]
 _ML_RECYCLE = _3HP_YAML["mother_liquor_recycle"]
 _DRYER = _3HP_YAML["dryer"]
 
-_ACID_PRESS_DISSOLVED_IDS = ("Glucose", "Uronics", "H2SO4")
+_PRETREATMENT_PRESS_DISSOLVED_IDS = ("Glucose", "Uronics", "H2SO4", "NaCl")
 # Database solids that behave as dissolved salts (not insoluble solids).
 _DISSOLVED_SALT_IDS = ("AmmoniumSulfate", "NaCl")
 _NOT_HEAT_INTEGRATED = frozenset({"M_PR", "NJ", "H_SA", "M_PT", "R_PT", "F_PT", "H_PT", "AM", "NT"})
@@ -247,7 +247,7 @@ def _make_pulp_pretreatment_train(cake):
     acid dosing -> steam mixer -> pressure reactor -> flash -> condensate,
     flashed slurry -> ammonia neutralization. Mirrors biorefineries.cellulosic's
     corn stover train (systems/pretreatment/dilute_acid.py) with sabre-local
-    units; see data/3hp.yaml (`acid_pretreatment`).
+    units; see data/3hp.yaml (`mild_pretreatment`).
 
     Acid and ammonia are dosed by specifications on their storage tanks,
     so the fresh-feed streams (the ones priced) carry the actual demand.
@@ -257,7 +257,7 @@ def _make_pulp_pretreatment_train(cake):
     Returns (units, neutralized_slurry): the units in path order and the
     neutralized slurry outlet, which feeds the enzymatic hydrolysis.
     """
-    A = _ACID_PRETREATMENT
+    A = _MILD_PRETREATMENT
     price_wastewater = _TEA_PRICE["disposal_wastewater"]["baseline"]
 
     def dry_pulp_kgph():
@@ -349,8 +349,8 @@ def _build_juice_pulp_upstream(MI, press_params=None, scenario="baseline"):
     collaborators' process description: mill (MI) -> plain screw press (PR,
     juice = `pressate` and `pressed_cake` = pulp) -> juice concentration
     (PFS/PC/DIL/EV); in the `baseline` scenario the pulp is first
-    dilute-acid pretreated and neutralized (`_make_pulp_pretreatment_train`),
-    in `acid_press` the acid is dosed ahead of the screw press instead; the pulp goes through an enzymatic hydrolysis tank (SA,
+    given the mild thermochemical pretreatment and neutralized (`_make_pulp_pretreatment_train`),
+    in `pretreatment_press` the same acid and NaCl are dosed ahead of the screw press instead; the pulp goes through an enzymatic hydrolysis tank (SA,
     96 h) and a pressure filter (SLS, residual solids to the boiler); the
     concentrated juice and the pulp hydrolysate are blended (FM) into the
     single fermentation feed.
@@ -368,28 +368,35 @@ def _build_juice_pulp_upstream(MI, press_params=None, scenario="baseline"):
     press_params = press_params or {}
     if scenario not in SCENARIOS:
         raise ValueError(f"scenario must be one of {SCENARIOS}, got {scenario!r}")
-    A = _ACID_PRETREATMENT
+    A = _MILD_PRETREATMENT
     cake_fraction = dict(press_params.get("cake_fraction") or {})
     press_feed = MI - 0
     press_units = []
     # Neutralization of dissolved H2SO4 with ammonia: 2 NH3 + H2SO4 -> (NH4)2SO4.
     neutralization_rxn = tmo.Reaction(
         "2 Ammonia + H2SO4 -> AmmoniumSulfate", reactant="H2SO4", X=1.0)
-    if scenario == "acid_press":
-        # Concentrated H2SO4 (the same ~93.3 wt% solution as the baseline acid)
-        # dosed into the milled biomass ahead of the screw press so that H2SO4
-        # is `H2SO4_wt_frac_pre_press` of the pre-press mixture. The press with
-        # acid is assumed to give the baseline pretreatment's hydrolysis (same
-        # Glucan and Alginate conversions), applied to the mixture. The
-        # monomers and the acid are dissolved, so they follow the water between
-        # cake and pressate (set below); Mannitol keeps the measured split.
-        for cid in _ACID_PRESS_DISSOLVED_IDS:
+    if scenario == "pretreatment_press":
+        # The mild thermochemical pretreatment of the baseline (1 wt% H2SO4 and
+        # 1 M NaCl in the liquid, same basis) applied to the milled biomass
+        # ahead of the screw press: concentrated H2SO4 (the same ~93.3 wt%
+        # solution as the baseline acid) so that H2SO4 is `H2SO4_wt_frac_of_liquid`
+        # of the liquid of the pre-press mixture, and NaCl at
+        # `NaCl_kg_per_kg_liquid_water`. No heating or hold time is modeled in
+        # the press. The press is assumed to give the baseline pretreatment's
+        # hydrolysis (same Glucan and Alginate conversions), applied to the
+        # mixture. The monomers, acid and NaCl are dissolved, so they follow the
+        # water between cake and pressate (set below); Mannitol keeps the
+        # measured split.
+        for cid in _PRETREATMENT_PRESS_DISSOLVED_IDS:
             cake_fraction[cid] = 0.0
         press_acid = bst.Stream("press_sulfuric_acid", units="kg/hr")
         press_acid.price = _TEA_PRICE["sulfuric_acid"]["baseline"]
+        press_salt = bst.Stream("press_sodium_chloride", NaCl=0.0, units="kg/hr", phase="s")
+        press_salt.price = _TEA_PRICE["sodium_chloride"]["baseline"]
         M_PR = bst.Mixer(
-            "M_PR", ins=(MI - 0, press_acid), outs=("biomass_with_acid",))
-        M_PR.H2SO4_wt_frac_pre_press = _ACID_PRESS["H2SO4_wt_frac_pre_press"]
+            "M_PR", ins=(MI - 0, press_acid, press_salt), outs=("biomass_with_acid",))
+        M_PR.H2SO4_wt_frac_of_liquid = _PRETREATMENT_PRESS["H2SO4_wt_frac_of_liquid"]
+        M_PR.NaCl_kg_per_kg_liquid_water = _PRETREATMENT_PRESS["NaCl_kg_per_kg_liquid_water"]
         press_hydrolysis_rxns = tmo.ParallelReaction([
             tmo.Reaction("Glucan + Water -> Glucose", reactant="Glucan",
                          X=A["glucan_to_glucose_conversion"]),
@@ -402,12 +409,18 @@ def _build_juice_pulp_upstream(MI, press_params=None, scenario="baseline"):
             biomass = MI.outs[0]
             solution_H2SO4 = A["acid_solution_H2SO4_kg"] / (
                 A["acid_solution_H2SO4_kg"] + A["acid_solution_water_kg"])
-            # solution mass a: solution_H2SO4 * a = x * (biomass + a)
-            x = M_PR.H2SO4_wt_frac_pre_press
-            a = x * float(biomass.F_mass) / (solution_H2SO4 - x)
+            # solution mass a: H2SO4 = x * liquid, with liquid = biomass water
+            # + the water of the acid solution: solution_H2SO4 * a =
+            # x * (W + (1 - solution_H2SO4) * a)
+            x = M_PR.H2SO4_wt_frac_of_liquid
+            W = float(biomass.imass["Water"])
+            a = x * W / (solution_H2SO4 - x * (1.0 - solution_H2SO4))
             press_acid.empty()
             press_acid.imass["H2SO4"] = a * solution_H2SO4
             press_acid.imass["Water"] = a * (1.0 - solution_H2SO4)
+            press_salt.empty()
+            press_salt.phase = "s"
+            press_salt.imass["NaCl"] = M_PR.NaCl_kg_per_kg_liquid_water * (W + a * (1.0 - solution_H2SO4))
             M_PR._run()
             press_hydrolysis_rxns(M_PR.outs[0])
 
@@ -419,14 +432,14 @@ def _build_juice_pulp_upstream(MI, press_params=None, scenario="baseline"):
             "cake_solids_wt_frac", _PRESS_CAKE_SOLIDS_WT_FRAC_OVERRIDE),
         component_cake_frac=cake_fraction or None,
     )
-    if scenario == "acid_press":
+    if scenario == "pretreatment_press":
         @PR.add_specification
         def dissolved_follow_water():
             PR._run()
             cake_out, pressate_out = PR.outs
             water = float(cake_out.imass["Water"] + pressate_out.imass["Water"])
             to_cake_water = float(cake_out.imass["Water"]) / water if water > 0 else 0.0
-            for cid in _ACID_PRESS_DISSOLVED_IDS:
+            for cid in _PRETREATMENT_PRESS_DISSOLVED_IDS:
                 total = float(cake_out.imass[cid] + pressate_out.imass[cid])
                 cake_out.imass[cid] = total * to_cake_water
                 pressate_out.imass[cid] = total * (1.0 - to_cake_water)
@@ -437,11 +450,11 @@ def _build_juice_pulp_upstream(MI, press_params=None, scenario="baseline"):
     if scenario == "baseline":
         pretreatment_units, cake = _make_pulp_pretreatment_train(PR - 0)
 
-    # acid_press: the juice carries part of the acid and is neutralized before
+    # pretreatment_press: the juice carries part of the acid and is neutralized before
     # its concentration (the cake's acid is neutralized in the hydrolysis, M_SA).
     juice = PR - 1
     juice_units = []
-    if scenario == "acid_press":
+    if scenario == "pretreatment_press":
         juice_ammonia = bst.Stream("juice_ammonia", Ammonia=1.0, units="kg/hr", phase="l")
         juice_ammonia.price = _TEA_PRICE["ammonia"]["baseline"]
         NJ = bst.MixTank("NJ", ins=(PR - 1, juice_ammonia), outs=("neutralized_pressate",))
@@ -462,12 +475,12 @@ def _build_juice_pulp_upstream(MI, press_params=None, scenario="baseline"):
     enzyme.price = _TEA_PRICE["enzyme"]["baseline"]
     hydrolysis_water = bst.Stream("hydrolysis_water", Water=0.0, units="kg/hr")
     hydrolysis_water.price = FRESH_WATER_PRICE_USD_PER_KG
-    # acid_press: ammonia for neutralizing the cake's acid joins the hydrolysis mixer.
+    # pretreatment_press: ammonia for neutralizing the cake's acid joins the hydrolysis mixer.
     hydrolysis_ammonia = bst.Stream("hydrolysis_ammonia", Ammonia=0.0, units="kg/hr", phase="l")
     hydrolysis_ammonia.price = _TEA_PRICE["ammonia"]["baseline"]
     M_SA = bst.Mixer(
         "M_SA",
-        ins=(cake, enzyme, hydrolysis_water, *((hydrolysis_ammonia,) if scenario == "acid_press" else ())),
+        ins=(cake, enzyme, hydrolysis_water, *((hydrolysis_ammonia,) if scenario == "pretreatment_press" else ())),
         outs=("pulp_with_enzyme",),
     )
     M_SA.enzyme_loading_mg_per_g_dwb = _PULP_HYDROLYSIS["enzyme_loading_mg_per_g_dwb"]
@@ -481,7 +494,7 @@ def _build_juice_pulp_upstream(MI, press_params=None, scenario="baseline"):
         hydrolysis_water.empty()
         hydrolysis_ammonia.empty()
         hydrolysis_ammonia.phase = "l"
-        if scenario == "acid_press":
+        if scenario == "pretreatment_press":
             hydrolysis_ammonia.imol["Ammonia"] = (
                 A["ammonia_mol_per_mol_H2SO4"] * float(pulp.imol["H2SO4"]))
         biomass = MI.outs[0]  # milled biomass fed to the press
@@ -491,7 +504,7 @@ def _build_juice_pulp_upstream(MI, press_params=None, scenario="baseline"):
         total_kgph = pulp.F_mass + enzyme.F_mass + hydrolysis_ammonia.F_mass
         hydrolysis_water.imass["Water"] = max(insoluble_kgph / S["solids_loading"] - total_kgph, 0.0)
         M_SA._run()
-        if scenario == "acid_press":
+        if scenario == "pretreatment_press":
             neutralization_rxn.adiabatic_reaction(M_SA.outs[0])
 
     H_SA = bst.HXutility("H_SA", ins=M_SA - 0, outs=("pulp_to_hydrolysis",), T=S["T_K"])
@@ -573,9 +586,9 @@ def create_3hp_system(
         stream, i.e. on the Ca3HP2 content of the dried product only.
         Defaults to data/tea.yaml `price.3hp.baseline` when not given.
     scenario : str
-        'baseline' (milled biomass -> press -> dilute-acid pretreatment and
+        'baseline' (milled biomass -> press -> mild thermochemical pretreatment and
         neutralization of the pulp -> enzymatic hydrolysis) or
-        'acid_press' (H2SO4 dosed to 1 wt% of the pre-press biomass, same
+        'pretreatment_press' (1 wt% H2SO4 and 1 M NaCl dosed into the pre-press biomass, same
         hydrolysis as the baseline pretreatment assumed in the press; ammonia
         neutralization in the hydrolysis step and for the juice).
     Returns

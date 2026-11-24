@@ -17,7 +17,7 @@ gwp100:
   lime: 0.9764  # as Ca(OH)2: 1.29 kg CO2e/kg CaO x 56.0774/74.093
   methane_upstream: 0.40  # natural gas supply chain, per kg CH4; combustion CO2 is added from stoichiometry
   ammonia: 2.64  # as NH3
-  sulfuric_acid: 0.04447  # per kg of H2SO4 (baseline and acid_press scenarios); charged on the H2SO4 content of the solution
+  sulfuric_acid: 0.04447  # per kg of H2SO4 (baseline and pretreatment_press scenarios); charged on the H2SO4 content of the solution
   sodium_chloride: 0.043  # per kg NaCl (baseline scenario pretreatment); rock salt, cradle-to-gate A1-A3 (EPD Norway, GC Rieber, 0.035-0.043 kg CO2e/kg; sea salt 0.057). Transport to the plant is not included; vacuum-pan salt would be higher. Ecoinvent values were behind a paywall and not read.
 
   # Water, facility chemicals and waste handling (added so every inlet and every

@@ -76,7 +76,7 @@ print("RESULT" + json.dumps({k: r[k] for k in ("msp_usd_per_kg", "annual_product
 
 @pytest.mark.parametrize("scenario, msp, annual", [
     ("baseline", 1.4298, 45796290.3),
-    ("acid_press", 1.2057, 45967734.7),
+    ("pretreatment_press", 1.2057, 45967734.7),
 ])
 def test_3hp(scenario, msp, annual):
     proc = subprocess.run(
@@ -106,7 +106,7 @@ print("RESULT" + json.dumps(dict(
 
 @pytest.mark.parametrize("scenario, gwp", [
     ("baseline", 1.3561),
-    ("acid_press", 1.8987),
+    ("pretreatment_press", 1.8987),
 ])
 def test_3hp_inventory_complete(scenario, gwp):
     """Every inlet and outlet of each 3-HP scenario has a cost and an impact basis."""

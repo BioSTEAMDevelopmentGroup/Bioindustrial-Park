@@ -83,19 +83,24 @@ class YarrowiaLipidFermenter(bst.AeratedBioreactor):
         biomass_yield_kg_per_kg_vfa_consumed: float = _VFA_CASE["biomass_yield_kg_per_kg_vfa_consumed"],
         co2_yield_kg_per_kg_vfa_consumed: float = _VFA_CASE["co2_yield_kg_per_kg_vfa_consumed"],
         oxygen_kg_per_kg_vfa_consumed: float = _VFA_CASE["oxygen_kg_per_kg_vfa_consumed"],
-        tau: float = _VFA_CASE["tau"],
-        Q_O2_consumption: float = _VFA_CASE["Q_O2_consumption"],
         target_pH: float = _VFA_CASE["target_pH"],
         seed_water_kgph: float = _VFA_CASE["seed_water_kgph"],
         seed_cellmass_kgph: float = _VFA_CASE["seed_cellmass_kgph"],
         **kwargs,
     ):
+        # `tau` and `Q_O2_consumption` are design inputs of bst.AeratedBioreactor
+        # that already have defaults (None), and thermosteam no longer lets `_init`
+        # override a design input's default. The unit sets design inputs as
+        # attributes before `_init`, so the sabre defaults are filled in here when
+        # they are still unset.
+        if self.tau is None:
+            self.tau = _VFA_CASE["tau"]
+        if self.Q_O2_consumption is None:
+            self.Q_O2_consumption = _VFA_CASE["Q_O2_consumption"]
         kwargs.setdefault('optimize_power', True)
         bst.AeratedBioreactor._init(
         self,
         reactions=None,
-        Q_O2_consumption=Q_O2_consumption,
-        tau=tau,
         **kwargs,
     )
 

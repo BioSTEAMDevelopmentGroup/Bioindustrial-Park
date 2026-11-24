@@ -302,12 +302,12 @@ pulp_enzymatic_hydrolysis:
 
 # ---------------------------------------------------------------------------
 # `baseline` scenario (systems/_3hp_system.py): the press pulp is
-# dilute-acid pretreated and neutralized before the enzymatic hydrolysis,
-# mirroring biorefineries.cellulosic's corn stover train
+# pretreated (mild thermochemical: 1% H2SO4, 1 M NaCl, 121 degC, 20 min) and neutralized before the enzymatic hydrolysis,
+# with the reactor train structured like biorefineries.cellulosic's corn stover train
 # (systems/pretreatment/dilute_acid.py) with sabre-local units. The
-# `acid_press` scenario skips this step.
+# `pretreatment_press` scenario skips this step.
 # ---------------------------------------------------------------------------
-acid_pretreatment:
+mild_pretreatment:
   # Sulfuric acid dosing. The acid stream is a ~93.3 wt% H2SO4 solution
   # (1800 kg H2SO4 : 130 kg water, biorefineries.cellulosic.streams), and the
   # loading is on a SOLUTION-mass basis per kg of dry feed, as in
@@ -345,10 +345,10 @@ acid_pretreatment:
       note: "The baseline pretreatment is the mild thermochemical pretreatment of S. Chundawat (Rutgers), as in the Team Technical Narrative: 1% H2SO4, 1 M NaCl, 121 degC, 20 min (measured on dilute biomass; the narrative gives no loading for the pretreatment itself, so this model keeps its 30 wt% target solids). The acid and NaCl doses are calibrated on the simulated slurry: 4.03 kg liquid water per kg dry pulp after the steam mixer (cake 24.3 wt% solids, 22.3 wt% after steam), so 1 wt% H2SO4 of the liquid = 0.0403 kg H2SO4 = 0.0432 kg of the 93.3 wt% solution per kg dry pulp, and 1 M NaCl (about 0.0597 kg per kg of liquid water) = 0.2405 kg NaCl per kg dry pulp. Recalibrate them if the cake, warm water or steam change. NaCl is bought fresh (data/tea.yaml price.sodium_chloride, $0.08/kg; data/lca.yaml sodium_chloride, 0.043 kg CO2e/kg) with no recycle; 316 stainless steel is kept for the reactor although 1 M chloride at 121 degC may need a more resistant alloy (not costed)."
     reactor_other:
       key: cellulosic_corn_stover_precedent
-      note: "warm_water_kg_per_kg_dry, reactor_V_wf, solids_loading, warm_water_T_K/P_atm and the Glucan and Alginate conversions are still the corn stover values (158 degC dilute-acid) of biorefineries/cellulosic/systems/pretreatment/dilute_acid.py and cellulosic/units.py (PretreatmentReactorSystem). The conversions are kept so the baseline and acid_press scenarios stay comparable; they are not measured for the mild conditions."
+      note: "warm_water_kg_per_kg_dry, reactor_V_wf, solids_loading, warm_water_T_K/P_atm and the Glucan and Alginate conversions are still the corn stover values (158 degC dilute-acid) of biorefineries/cellulosic/systems/pretreatment/dilute_acid.py and cellulosic/units.py (PretreatmentReactorSystem). The conversions are kept so the baseline and pretreatment_press scenarios stay comparable; they are not measured for the mild conditions."
     ash_buffering_caveat:
       key: known_model_limitation
-      note: "Sargassum is ~35 wt% dry ash (modeled as inert CaO), which in reality buffers the acid, and alginate gels at low pH. The corn stover acid loading is used unchanged and does NOT account for either, so acid and neutralizer costs are likely understated. Placeholder pending Sargassum-specific dilute-acid data."
+      note: "Sargassum is ~35 wt% dry ash (modeled as inert CaO), which in reality buffers the acid, and alginate gels at low pH. The 1 wt% H2SO4 dose (of the liquid) does NOT account for either, so acid and neutralizer costs are likely understated. Placeholder pending Sargassum-specific data on the mild thermochemical pretreatment."
     alginate_conversion:
       key: placeholder
       note: "No source for alginate conversion under dilute acid; set equal to the Glucan value. No degradation products (HMF, furfural) are modeled since they are not in sabre's chemical set."
@@ -358,26 +358,27 @@ acid_pretreatment:
 
 
 # ---------------------------------------------------------------------------
-# `acid_press` scenario: no pretreatment reactor; concentrated H2SO4 is dosed
+# `pretreatment_press` scenario: no pretreatment reactor; the same 1 wt% H2SO4 and 1 M NaCl as the baseline are dosed
 # into the milled biomass ahead of the screw press, which is assumed to give
-# the same hydrolysis as the baseline's dilute-acid pretreatment. The acid is
+# the same hydrolysis as the baseline's mild thermochemical pretreatment. The acid is
 # neutralized with ammonia in the enzymatic hydrolysis step (and for the juice).
 # ---------------------------------------------------------------------------
-acid_press:
-  H2SO4_wt_frac_pre_press: 0.01  # H2SO4 as a wt fraction of the pre-press mixture (biomass + acid solution)
+pretreatment_press:
+  H2SO4_wt_frac_of_liquid: 0.01  # H2SO4 as a wt fraction of the liquid of the pre-press mixture (biomass water + acid solution water), as in the baseline pretreatment
+  NaCl_kg_per_kg_liquid_water: 0.0597  # 1 M NaCl (58.4 g/L) per kg of that liquid, as in the baseline pretreatment (0.0596 simulated)
   # Acid solution composition, Glucan/Alginate conversions and the ammonia
-  # ratio are the baseline's (`acid_pretreatment` above).
+  # ratio are the baseline's (`mild_pretreatment` above).
 
   sources:
-    acid_dose:
+    pretreatment_dose:
       key: user_specified
-      note: "1 wt% H2SO4 in the pre-press biomass, dosed as the ~93.3 wt% solution (user-specified, collaborator feedback)."
+      note: "Same chemistry as the baseline's mild thermochemical pretreatment (1 wt% H2SO4 and 1 M NaCl in the liquid), applied to the pre-press mixture: H2SO4 dosed as the ~93.3 wt% solution to 1 wt% of the liquid, NaCl at 0.0597 kg per kg of liquid water, bought fresh with no recycle. No heating or hold time is modeled in the press (user-specified, collaborator feedback)."
     hydrolysis_in_press:
       key: user_specified
-      note: "The screw press with acid is assumed to give the same hydrolysis as the baseline dilute-acid pretreatment (Glucan and Alginate conversions of acid_pretreatment), applied to the mixture ahead of the press, with no heating."
+      note: "The screw press with the acid and NaCl dosed ahead of it is assumed to give the same hydrolysis as the baseline mild thermochemical pretreatment (Glucan and Alginate conversions of mild_pretreatment), applied to the mixture ahead of the press, with no heating."
     press_split:
       key: simplification
       note: "The measured 15 psi split was made without acid. Glucose, Uronics and H2SO4 are treated as dissolved and follow the water between cake and pressate; the other components keep the measured split. The juice therefore carries part of the acid and is neutralized before concentration (an addition: the cake's acid is neutralized in the hydrolysis step). Acid-resistant press materials are not costed."
     enzyme:
       key: simplification
-      note: "Enzyme is dosed only in the hydrolysis step (25 mg/g dry biomass, as in the baseline): an enzyme in the acidic press would not be active. The press-enzyme and NaCl-brine design of the earlier pretreatment_press scenario was dropped."
+      note: "Enzyme is dosed only in the hydrolysis step (25 mg/g dry biomass, as in the baseline): an enzyme in the acidic press would not be active. An earlier design that put enzyme and a NaCl brine in the press was dropped."

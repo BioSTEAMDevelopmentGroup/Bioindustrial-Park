@@ -44,8 +44,8 @@ def create_chemicals(set_thermo: bool = True, include_hp3: bool = False,
         Uronics, Enzyme, ...).
     include_dilute_acid : bool
         If True (requires `include_hp3`), also include the chemicals used
-        only by the 3-HP scenarios with dilute acid (`baseline`, `acid_press`) (H2SO4,
-        AmmoniumSulfate), and lock Glucose to the liquid phase (needed by the
+        only by the 3-HP scenarios with the mild thermochemical pretreatment (`baseline`, `pretreatment_press`)
+        (H2SO4, AmmoniumSulfate, NaCl), and lock Glucose to the liquid phase (needed by the
         pretreatment flash). Kept behind its own flag, separate from
         `include_hp3`, so a chemical set without them stays exactly as it was.
     """
@@ -190,7 +190,7 @@ def create_chemicals(set_thermo: bool = True, include_hp3: bool = False,
             SO2, P4O10, CaSO4,
         ]
 
-    # Dilute-acid pretreatment chemicals (`baseline` and `acid_press` scenarios).
+    # Mild thermochemical pretreatment chemicals (`baseline` and `pretreatment_press` scenarios).
     # Same choices biorefineries.cellulosic makes for its own corn stover
     # dilute-acid pretreatment: H2SO4 as a liquid, and ammonium sulfate as a
     # single-phase chemical locked to its database phase (solid) that

@@ -17,13 +17,14 @@ _M_TO_FT = 3.28084
 _PA_TO_PSI = 0.000145038
 
 # Loaded assumptions
-_PRETREATMENT = load_assumptions("3hp.yaml")["acid_pretreatment"]
+_PRETREATMENT = load_assumptions("3hp.yaml")["mild_pretreatment"]
 
 
 class DiluteAcidReactor(PressureVessel, bst.Unit):
     """
-    Dilute-acid pretreatment pressure reactor for the 3-HP press pulp
-    in the `baseline` scenario (the `acid_press` scenario reuses its conversions): a sabre-local adaptation of
+    Pressure reactor for the mild thermochemical pretreatment (1% H2SO4, 1 M NaCl,
+    121 degC, 20 min) of the 3-HP press pulp in the `baseline` scenario (the
+    `pretreatment_press` scenario reuses its conversions): a sabre-local adaptation of
     biorefineries.cellulosic's `PretreatmentReactorSystem` (corn stover),
     re-implemented here rather than imported for the same reason as
     `HPFermentation` (sabre's dependency boundary, and cellulosic's reaction
@@ -66,7 +67,7 @@ class DiluteAcidReactor(PressureVessel, bst.Unit):
 
     See Also
     --------
-    Refer to data/3hp.yaml (`acid_pretreatment`) for the default
+    Refer to data/3hp.yaml (`mild_pretreatment`) for the default
     values and references.
     """
 
