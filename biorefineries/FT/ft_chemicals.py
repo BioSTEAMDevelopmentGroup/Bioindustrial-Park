@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """FT chemicals (Ostadi/Hillestad). Named ft_chemicals.py to avoid shadowing `chemicals`."""
+import math
 import thermosteam as tmo
 
 # Hillestad et al., Fuel 2018, Table 1 (wt% dry)
@@ -50,16 +51,31 @@ def _dry_biomass_formula():
     return f"CH{r['H']:.3f}O{r['O']:.3f}N{r['N']:.4f}S{r['S']:.4f}", r
 
 
-def _dry_biomass_Hf(formula_ratios, HHV_J_per_kg=20.0e6):
-    """Hf [J/mol] from HHV for empirical CH_aO_b formula."""
+# Hillestad et al., Fuel 2018, Sec. 3.1: Burnham estimate, -5.184e5 kJ/kmol at an
+# arbitrary 100.11 kg/kmol (dry HHV ~20.4 MJ/kg, LHV ~19.0 MJ/kg).
+_HF_DRY_J_PER_G = -5.184e5 / 100.11
+
+
+def _molar_mass(formula_ratios):
     r = formula_ratios
-    MW = (_AW['C'] + r['H'] * _AW['H'] + r['O'] * _AW['O']
-          + r['N'] * _AW['N'] + r['S'] * _AW['S'])
-    HHV_molar = HHV_J_per_kg * MW / 1000.0
-    Hf_CO2 = tmo.Chemical('CO2').Hf
-    Hf_H2O = tmo.Chemical('Water').Hf
-    a, b = r['H'], r['O']
-    return Hf_CO2 + 0.5 * a * Hf_H2O + HHV_molar
+    return (_AW['C'] + r['H'] * _AW['H'] + r['O'] * _AW['O']
+            + r['N'] * _AW['N'] + r['S'] * _AW['S'])
+
+
+def _dry_biomass_Hf(formula_ratios):
+    """Hf [J/mol] per mole of the C1 empirical formula."""
+    return _HF_DRY_J_PER_G * _molar_mass(formula_ratios)
+
+
+def _set_wood_heat_capacity(chemical):
+    """Dry wood Cp = 0.1031 + 0.003867 T [kJ/kg/K] (USDA Wood Handbook, FPL-GTR-190)."""
+    MW = chemical.MW
+    a, b = 0.1031 * MW, 0.003867 * MW  # J/mol/K
+    chemical.Cn.add_method(
+        f=lambda T: a + b * T, Tmin=200.0, Tmax=2000.0,
+        f_int=lambda Ta, Tb: a * (Tb - Ta) + 0.5 * b * (Tb * Tb - Ta * Ta),
+        f_int_over_T=lambda Ta, Tb: a * math.log(Tb / Ta) + b * (Tb - Ta),
+    )
 
 
 def create_ft_chemicals():
@@ -72,8 +88,19 @@ def create_ft_chemicals():
         default=True,
         Hf=_dry_biomass_Hf(ratios),
     )
+    _set_wood_heat_capacity(DryBiomass)
     Ash = tmo.Chemical('Ash', search_ID='CaO', phase='s')
-    gas_IDs = ['H2', 'CO', 'CO2', 'Water', 'O2', 'N2', 'H2S', 'CH4']
+    # Boiler FGD product; required when CaO lime is used for SO2 scrubbing
+    CaSO4 = tmo.Chemical('CaSO4', phase='s')
+    # WWT chemicals (Humbird et al. 2011 / BioSTEAM conventional wastewater system)
+    NaOH = tmo.Chemical('NaOH', phase='l')
+    WWTsludge = tmo.Chemical(
+        'WWTsludge', search_db=False, phase='s',
+        formula='CH1.64O0.39N0.23S0.0035', Hf=-23200.01 * 4.184,
+        default=True,
+    )
+    # SO2 is needed by the boiler's combustion reactions (H2S, biomass S)
+    gas_IDs = ['H2', 'CO', 'CO2', 'Water', 'O2', 'N2', 'H2S', 'CH4', 'SO2']
     paraffin_IDs = [p for p in FT_PARAFFINS if p != 'CH4']
     olefins = []
     for ID, search_ID in _OLEFIN_SPECS:
@@ -81,7 +108,8 @@ def create_ft_chemicals():
             olefins.append(tmo.Chemical(ID))
         else:
             olefins.append(tmo.Chemical(ID, search_ID=search_ID))
-    chems = tmo.Chemicals([DryBiomass, Ash, *gas_IDs, *paraffin_IDs, *olefins])
+    chems = tmo.Chemicals([DryBiomass, Ash, CaSO4, NaOH, WWTsludge,
+                           *gas_IDs, *paraffin_IDs, *olefins])
     tmo.settings.set_thermo(chems)
     return chems
 
