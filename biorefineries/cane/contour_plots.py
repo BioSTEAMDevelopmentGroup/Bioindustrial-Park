@@ -1149,8 +1149,5 @@ def plot_recovery_and_oil_content_contours(
                                linewidth=1.0)
             if hasattr(ax, '_cached_ytwin'):                
                 plt.sca(ax._cached_ytwin)
-            # plot_scatter_points([60], [10], marker='*', s=100, color=startcolor,
-            #                     edgecolor=edgecolor, clip_on=False, zorder=3)
-            # plot_scatter_points([ub], [15], marker='*', s=100, color=targetcolor,
-            #                     edgecolor=edgecolor, clip_on=False, zorder=3)
+            
     return fig, axes
